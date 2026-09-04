@@ -1,0 +1,5 @@
+# No third-party dependencies. The client, CLI, and MCP server are all pure
+# Python standard library and run on Python 3.9+.
+#
+# The MCP protocol is implemented directly in stdlib
+# (resourcecontracts/mcp_server.py), so the `mcp` SDK is NOT required.

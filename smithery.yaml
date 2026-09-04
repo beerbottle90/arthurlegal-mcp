@@ -1,0 +1,47 @@
+runtime: "container"
+
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+
+startCommand:
+  type: "http"
+  # Only ONE field normally needs filling: EMBEDDINGS_API_KEY. The endpoint and
+  # model are pre-set to Voyage's cheapest multilingual model, which is the
+  # combination this package needs -- multilingual is not optional when the
+  # question is in one language and the corpus is in another.
+  #
+  # The server handles no secrets of its own and stores no client data.
+  configSchema:
+    type: "object"
+    properties:
+      EMBEDDINGS_API_KEY:
+        type: "string"
+        description: >-
+          Voyage AI API key (console.voyageai.com). THIS IS THE ONLY FIELD YOU
+          NORMALLY NEED. Leaving it empty is safe: search still works on BM25 +
+          fuzzy matching, and every response reports semantic as off rather than
+          pretending a keyword match was a conceptual one.
+      EMBEDDINGS_URL:
+        type: "string"
+        description: >-
+          Embeddings endpoint. Any OpenAI-compatible /v1/embeddings works
+          (Voyage, OpenAI, or your own). Change only if you are not using Voyage.
+        default: "https://api.voyageai.com/v1/embeddings"
+      EMBEDDINGS_MODEL:
+        type: "string"
+        description: >-
+          voyage-4-lite is multilingual, 1024-dimensional and the cheapest of the
+          voyage-4 family ($0.02/1M tokens, first 200M free). A MONOLINGUAL model
+          here will score poorly on cross-language questions and the server
+          cannot detect that -- it will still report semantic as on.
+        default: "voyage-4-lite"
+      DE_ELI_URL:
+        type: "string"
+        description: >-
+          Where the German de-eli backend listens. Defaults to the in-container
+          process; set to "off" to drop German law entirely.
+        default: "http://127.0.0.1:8790/mcp"
+    required: []
+  exampleConfig:
+    EMBEDDINGS_MODEL: "voyage-4-lite"

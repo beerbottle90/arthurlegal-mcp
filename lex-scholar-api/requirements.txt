@@ -1,0 +1,10 @@
+# No third-party dependencies. The client, router, CLI, and MCP server are all
+# pure Python standard library and run on Python 3.9+.
+#
+# The MCP protocol is implemented directly in stdlib (lexscholar/mcp_server.py),
+# so the `mcp` SDK is NOT required.
+#
+# Optional environment variable:
+#   OPENALEX_API_KEY   raises the metered OpenAlex budget ~100x (free to obtain).
+#                      Everything works without it; the router simply holds
+#                      OpenAlex back when its anonymous budget runs low.

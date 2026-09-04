@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.DS_Store
+*.log
+
+# Scratch full-text dumps. Scoped to out/ deliberately: a blanket *.txt would
+# silently swallow LICENSE.txt / NOTICE.txt / CITATION.txt and ship a repo
+# missing them, with `git add` reporting nothing.
+out/
+*-fulltext.txt
+
+# local tool downloads (cloudflared)
+.tools/

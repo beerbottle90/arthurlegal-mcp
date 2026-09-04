@@ -1,0 +1,13 @@
+# Local tooling bootstrapped by run-public.sh
+.tools/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Scratch outputs
+*.txt.out
+*.log

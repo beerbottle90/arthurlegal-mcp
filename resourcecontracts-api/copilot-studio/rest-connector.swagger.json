@@ -1,0 +1,115 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "ResourceContracts REST (petroleum & mining contracts)",
+    "description": "Direct read-only connector over the public api.resourcecontracts.org (no auth, no hosting — Power Platform calls it straight from the cloud). Covers search + metadata + annotations + taxonomy. NOTE: full contract text (/contract/{id}/text) comes back with <br /> markup and one PDF page per request; for cleaned, paginated full text use the MCP connector (mcp-connector.swagger.json). Content is CC BY-SA 4.0 (NRGI/CCSI) — attribute and preserve share-alike.",
+    "version": "1.0.0"
+  },
+  "host": "api.resourcecontracts.org",
+  "basePath": "/",
+  "schemes": [
+    "https"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/contracts/group": {
+      "get": {
+        "summary": "Search contracts",
+        "description": "Grouped full-text search. Returns { total, country, year, resource, results: [ { id, name, year_signed, contract_type, document_type, resource, countries, language } ] }.",
+        "operationId": "SearchContracts",
+        "parameters": [
+          {"name": "q", "in": "query", "required": false, "type": "string", "description": "Free-text query; empty browses all."},
+          {"name": "country_code", "in": "query", "required": false, "type": "string", "description": "ISO alpha-2, lowercase (e.g. 'az')."},
+          {"name": "resource", "in": "query", "required": false, "type": "string", "description": "Resource name, e.g. 'Hydrocarbons', 'Gold'."},
+          {"name": "year", "in": "query", "required": false, "type": "integer", "description": "Signature year."},
+          {"name": "contract_type", "in": "query", "required": false, "type": "string", "description": "e.g. 'Production or Profit Sharing Agreement'."},
+          {"name": "document_type", "in": "query", "required": false, "type": "string", "description": "e.g. 'Company-State Contract'."},
+          {"name": "language", "in": "query", "required": false, "type": "string", "description": "Contract language code, e.g. 'en'."},
+          {"name": "company_name", "in": "query", "required": false, "type": "string"},
+          {"name": "corporate_group", "in": "query", "required": false, "type": "string"},
+          {"name": "annotation_category", "in": "query", "required": false, "type": "string", "description": "Restrict to an annotated category."},
+          {"name": "annotated", "in": "query", "required": false, "type": "integer", "description": "1 = only contracts with annotations."},
+          {"name": "from", "in": "query", "required": false, "type": "integer", "default": 0, "description": "Pagination offset."},
+          {"name": "per_page", "in": "query", "required": false, "type": "integer", "default": 20, "description": "Page size."},
+          {"name": "group", "in": "query", "required": false, "type": "string", "default": "metadata", "description": "Sub-docs to embed: metadata|text|annotations."}
+        ],
+        "responses": {"200": {"description": "Search results with facets"}}
+      }
+    },
+    "/contracts/count": {
+      "get": {
+        "summary": "Count all contracts",
+        "description": "Grand total of all published contracts as a bare integer (e.g. 5125). For a filtered count, use /contracts/group with per_page=1 and read 'total'.",
+        "operationId": "CountContracts",
+        "parameters": [],
+        "responses": {"200": {"description": "Integer count"}}
+      }
+    },
+    "/contract/{id}/metadata": {
+      "get": {
+        "summary": "Get contract metadata",
+        "description": "Structured metadata: name, countries, resource, contract_type, document_type, year_signed, number_of_pages, government_entity, participation (companies + shares), concession, source_url.",
+        "operationId": "GetContractMetadata",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "type": "integer", "description": "Contract id (from a search result)."}
+        ],
+        "responses": {"200": {"description": "Contract metadata"}}
+      }
+    },
+    "/contract/{id}/text": {
+      "get": {
+        "summary": "Get contract text (one PDF page)",
+        "description": "OCR/full text, one PDF page per request. 'page' is the 1-based PDF page (page count = metadata number_of_pages). Text carries <br /> markup and HTML entities.",
+        "operationId": "GetContractText",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "type": "integer"},
+          {"name": "page", "in": "query", "required": false, "type": "integer", "default": 1, "description": "1-based PDF page number."}
+        ],
+        "responses": {"200": {"description": "One page of contract text"}}
+      }
+    },
+    "/contract/{id}/annotations": {
+      "get": {
+        "summary": "Get contract annotations",
+        "description": "Expert-curated key-clause annotations: { total, result: [ { category, category_key, article_reference, page_no, text, quote } ] }. Not every contract is annotated (total may be 0).",
+        "operationId": "GetContractAnnotations",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "type": "integer"},
+          {"name": "page", "in": "query", "required": false, "type": "integer", "default": 1}
+        ],
+        "responses": {"200": {"description": "Annotations"}}
+      }
+    },
+    "/contract/countries": {
+      "get": {
+        "summary": "List countries",
+        "description": "Countries with contract counts: { results: [ { code, contract } ] }.",
+        "operationId": "ListCountries",
+        "parameters": [],
+        "responses": {"200": {"description": "Countries with counts"}}
+      }
+    },
+    "/contract/resources": {
+      "get": {
+        "summary": "List resources",
+        "description": "Resources/commodities with contract counts: { results: [ { resource, contract } ] }.",
+        "operationId": "ListResources",
+        "parameters": [],
+        "responses": {"200": {"description": "Resources with counts"}}
+      }
+    },
+    "/contracts/annotations/category": {
+      "get": {
+        "summary": "List annotation categories",
+        "description": "Annotation category taxonomy (key clause types): { results: [ ... ] }.",
+        "operationId": "ListAnnotationCategories",
+        "parameters": [],
+        "responses": {"200": {"description": "Annotation categories"}}
+      }
+    }
+  },
+  "securityDefinitions": {},
+  "security": []
+}

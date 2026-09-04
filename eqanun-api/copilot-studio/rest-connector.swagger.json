@@ -1,0 +1,236 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "e-qanun REST (Azerbaijan legislation)",
+    "description": "Direct read-only connector over the public api.e-qanun.az (no auth, no hosting — Power Platform calls it straight from the cloud). Covers search + metadata + taxonomy. NOTE: full act text is NOT available here — it lives on the Referer-guarded e-qanun.az static host and needs HTML->text conversion; use the MCP connector (mcp-connector.swagger.json) for full text.",
+    "version": "1.0.0"
+  },
+  "host": "api.e-qanun.az",
+  "basePath": "/",
+  "schemes": [
+    "https"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/getDetailSearch": {
+      "get": {
+        "summary": "Search acts",
+        "description": "Search legal acts by word. Returns { data: [ { id, title, citation, typeName, statusName, acceptDate, registerCode } ], totalCount }.",
+        "operationId": "SearchActs",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "Search term(s), e.g. 'mülki məcəllə'."
+          },
+          {
+            "name": "title",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "true",
+            "description": "Search in titles: 'true' or 'false'."
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "false",
+            "description": "Search in full text: 'true' or 'false'."
+          },
+          {
+            "name": "exact",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "false",
+            "description": "Exact match: 'true' or 'false'."
+          },
+          {
+            "name": "statusId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 1,
+            "description": "0 = all, 1 = in force (Qüvvədədir), 2 = cancelled (Ləğv)."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 0,
+            "description": "Pagination offset."
+          },
+          {
+            "name": "length",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "default": 20,
+            "description": "Page size. MANDATORY upstream — omitting it returns HTTP 500."
+          },
+          {
+            "name": "orderColumn",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "default": 8,
+            "x-ms-visibility": "internal",
+            "description": "MANDATORY upstream — omitting it returns HTTP 500. Leave at 8."
+          },
+          {
+            "name": "orderDirection",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "desc"
+          },
+          {
+            "name": "codeType",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "dateType",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "secondType",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 2
+          },
+          {
+            "name": "specialDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "false"
+          },
+          {
+            "name": "array",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "default": "",
+            "description": "Act-type filter: comma-separated type ids from /all-type (e.g. 73 = Constitutional Court decisions, 87 = Supreme Court Plenum). Empty string = no type filter. MANDATORY upstream — omitting it returns HTTP 500."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results"
+          }
+        }
+      }
+    },
+    "/detailNameCount": {
+      "get": {
+        "summary": "Count acts",
+        "description": "Return only the number of acts matching a query. The count is in the 'id' field of the response.",
+        "operationId": "CountActs",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "title",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "true"
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "false"
+          },
+          {
+            "name": "statusId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "exact",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Count in the 'id' field"
+          }
+        }
+      }
+    },
+    "/framework/{id}": {
+      "get": {
+        "summary": "Get act metadata",
+        "description": "Return metadata for one act by id: requisite (title, acceptDate, effectDate, typeName, statusName, classCodes) and htmlUrl (canonical full-text location on e-qanun.az).",
+        "operationId": "GetAct",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Act id (from a search result)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Act metadata"
+          }
+        }
+      }
+    },
+    "/all-type": {
+      "get": {
+        "summary": "List act types",
+        "description": "Return the act-type taxonomy tree (id, name with counts, sectionId, parentId).",
+        "operationId": "ListTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Act-type tree"
+          }
+        }
+      }
+    },
+    "/sections": {
+      "get": {
+        "summary": "List sections",
+        "description": "Return the four top-level act sections.",
+        "operationId": "ListSections",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sections"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {},
+  "security": []
+}
