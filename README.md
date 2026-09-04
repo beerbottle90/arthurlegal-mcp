@@ -1,60 +1,61 @@
----
-title: ArthurLegal MCP
-emoji: ⚖️
-colorFrom: indigo
-colorTo: gray
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # ArthurLegal MCP
 
 **Ten jurisdictions of legal research behind one MCP endpoint.**
 
-🇳🇱 Netherlands · 🇵🇱 Poland · 🇦🇹 Austria · 🇮🇪 Ireland · 🇫🇮 Finland · 🇪🇸 Spain ·
-🇦🇿 Azerbaijan · 🇩🇪 Germany · 🌍 legal scholarship · 🌍 signed resource contracts
+Netherlands - Poland - Austria - Ireland - Finland - Spain - Azerbaijan -
+Germany - legal scholarship - signed resource contracts.
 
-62 tools. Connect an MCP client to `https://<this-space>.hf.space/mcp` — no
-authentication.
-
-## Configuration
-
-Set these in **Settings → Variables and secrets**. Only the first is normally
-needed; the rest have working defaults.
-
-| Name | Kind | Purpose |
-|---|---|---|
-| `EMBEDDINGS_API_KEY` | secret | Voyage AI key. Turns on semantic search. |
-| `EMBEDDINGS_URL` | variable | `https://api.voyageai.com/v1/embeddings` |
-| `EMBEDDINGS_MODEL` | variable | `voyage-4-lite` — multilingual, 1024-dim |
-| `DE_ELI_URL` | variable | German backend; `off` to disable |
-
-Leaving the key unset is safe: search still runs on BM25 + fuzzy matching, and
-every response reports `semantic: "off"` rather than passing a keyword match off
-as a conceptual one.
+62 tools. Point an MCP client at `https://<app>.fly.dev/mcp`. No authentication:
+anyone with the URL can call every tool.
 
 ## Tool naming
 
-Every tool is prefixed with its jurisdiction — `nl_` `pl_` `at_` `ie_` `fi_`
+Every tool carries its jurisdiction as a prefix -- `nl_` `pl_` `at_` `ie_` `fi_`
 `es_` `az_` `de_` `scholar_` `contracts_`. Across the underlying servers
 `get_act` means five different things and `search_legislation` three, so the
 prefix is what keeps a Spanish question from being answered with Finnish law.
 
-Call `status` for the health of every jurisdiction at once: which backends
-loaded, how many documents each has indexed, and whether semantic search is
-live.
+`status` reports every jurisdiction at once: which backends loaded, how many
+documents each has indexed, how many are vectorised, and whether semantic
+search is live. A backend that fails to load is announced there rather than
+quietly returning nothing -- "no results" and "not searched" are different
+answers.
 
-## First boot
+## Indexes
 
-Indexes are crawled and vectorised in the background on first start (roughly
-10–20 minutes). The server answers from the first second — direct document
-fetches never need an index — and every search reports `indexed_documents` and
-`vectorised_documents` so a thin result is never mistaken for a settled
-question.
+Five jurisdictions are searched from a local SQLite index (FTS5 + vectors); the
+rest are queried upstream and reranked in memory. The indexes are built on a
+workstation and baked into the image at `baked/<jurisdiction>.db`:
 
-⚠️ A Space's disk is ephemeral: on the free tier the crawl repeats after a
-restart. Attach a Storage Bucket to keep the indexes.
+    python crawl.py --embed          # in each jurisdiction directory
+    python build_bundle.py --target fly --out fly-app
+    flyctl deploy
+
+Crawling is a maintenance task, not something a booting container does. Baking
+the databases in means a machine is never healthy-but-empty, and the corpus can
+never drift away from the code that was tested against it. `start.sh` still
+falls back to crawling when no baked index is present, and says which it used:
+`indexes present: N/5`.
+
+## Configuration
+
+| Name | Kind | Purpose |
+|---|---|---|
+| `EMBEDDINGS_API_KEY` | secret | Voyage AI key. Required for semantic search. |
+| `EMBEDDINGS_URL` | env | `https://api.voyageai.com/v1/embeddings` |
+| `EMBEDDINGS_MODEL` | env | `voyage-4-lite` -- multilingual, 1024-dim |
+| `DE_ELI_URL` | env | German backend; `off` to disable |
+
+A document holds exactly one vector (`vecs.doc_id` is the primary key), so
+changing `EMBEDDINGS_MODEL` does not add a second vector -- the next embedding
+run overwrites the old one. Until it does, queries find no vectors for the new
+model and semantic search reports itself off. That is deliberate: bge-m3 and
+voyage-4-lite are both 1024-dimensional, so mixing them would raise nothing and
+rank by distances computed across two unrelated vector spaces.
+
+Without a key the server still answers, on BM25 and fuzzy matching, and every
+response says `semantic: "off"` rather than passing a keyword match off as a
+conceptual one.
 
 ---
 
