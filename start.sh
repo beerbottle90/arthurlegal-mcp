@@ -17,13 +17,45 @@ else
     export DE_ELI_URL=off
 fi
 
-# Crawl the indexes in the background when they are missing, and vectorise them
+APP="$(cd "$(dirname "$0")" && pwd)"
+INDEX_SRC="${INDEX_SOURCE:-/data/index}"
+JURISDICTIONS="nl-rechtspraak-mcp pl-sejm-mcp es-boe-mcp ie-statutebook-mcp fi-finlex-mcp"
+
+# Seed the indexes from an attached storage bucket when one is mounted.
+#
+# The databases are COPIED to local disk rather than opened where they lie. A
+# bucket is object storage behind a FUSE mount: SQLite would issue a byte-range
+# read for every btree page it touches, and would rely on file locking that
+# object storage does not honestly provide. The copy costs seconds at boot; the
+# alternative costs a corrupted index that still answers queries.
+seeded=0
+expected=0
+for j in $JURISDICTIONS; do
+    expected=$((expected + 1))
+    src="$INDEX_SRC/$j.db"
+    dst="$APP/$j/data/index.db"
+    if [ -f "$dst" ]; then
+        seeded=$((seeded + 1))
+    elif [ -f "$src" ]; then
+        mkdir -p "$APP/$j/data"
+        if cp "$src" "$dst"; then
+            seeded=$((seeded + 1))
+        else
+            echo "could not seed $j from $src" >&2
+        fi
+    fi
+done
+echo "indexes present: $seeded/$expected (source: $INDEX_SRC)" >&2
+if [ "$seeded" -eq "$expected" ]; then
+    touch "$APP/.crawled"
+fi
+
+# Crawl whatever the bucket did not supply, in the background, and vectorise it
 # in the same pass (--embed). Without --embed the index would build but hold no
 # vectors: semantic search would report itself "on", contribute nothing, and the
 # results would quietly be keyword-only. Blocking on this would fail the
 # platform health check; every search tool reports an empty index plainly in the
 # meantime.
-APP="$(cd "$(dirname "$0")" && pwd)"
 if [ ! -f "$APP/.crawled" ]; then
     (
       cd "$APP/es-boe-mcp"         && python crawl.py --max 0 --embed                         || true
