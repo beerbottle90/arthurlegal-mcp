@@ -23,16 +23,19 @@ fi
 # results would quietly be keyword-only. Blocking on this would fail the
 # platform health check; every search tool reports an empty index plainly in the
 # meantime.
-if [ ! -f /app/.crawled ]; then
+APP="$(cd "$(dirname "$0")" && pwd)"
+if [ ! -f "$APP/.crawled" ]; then
     (
-      cd /app/es-boe-mcp        && python crawl.py --max 0 --embed                        || true
-      cd /app/ie-statutebook-mcp && python crawl.py --from 2015 --to 2026 --embed          || true
-      cd /app/fi-finlex-mcp     && python crawl.py --from 2020 --to 2026 --embed           || true
-      cd /app/pl-sejm-mcp       && python crawl.py --from 2015 --to 2026 --embed           || true
-      cd /app/nl-rechtspraak-mcp && python crawl.py --from 2024-01-01 --to 2026-12-31 --embed || true
-      touch /app/.crawled
+      cd "$APP/es-boe-mcp"         && python crawl.py --max 0 --embed                         || true
+      cd "$APP/ie-statutebook-mcp" && python crawl.py --from 2015 --to 2026 --embed           || true
+      cd "$APP/fi-finlex-mcp"      && python crawl.py --from 2020 --to 2026 --embed           || true
+      cd "$APP/pl-sejm-mcp"        && python crawl.py --from 2015 --to 2026 --embed           || true
+      cd "$APP/nl-rechtspraak-mcp" && python crawl.py --from 2024-01-01 --to 2026-12-31 --embed || true
+      touch "$APP/.crawled"
       echo "index crawl finished" >&2
     ) &
 fi
+
+cd "$APP"
 
 exec python server.py

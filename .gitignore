@@ -1,7 +1,5 @@
 __pycache__/
 *.pyc
 *.db
-*.db-wal
-*.db-shm
-data/
+*.sqlite3
 .crawled

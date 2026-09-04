@@ -1,74 +1,61 @@
-# arthurlegal-mcp
+---
+title: ArthurLegal MCP
+emoji: ⚖️
+colorFrom: indigo
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# ArthurLegal MCP
 
 **Ten jurisdictions of legal research behind one MCP endpoint.**
 
 🇳🇱 Netherlands · 🇵🇱 Poland · 🇦🇹 Austria · 🇮🇪 Ireland · 🇫🇮 Finland · 🇪🇸 Spain ·
 🇦🇿 Azerbaijan · 🇩🇪 Germany · 🌍 legal scholarship · 🌍 signed resource contracts
 
-62 tools, no authentication.
+62 tools. Connect an MCP client to `https://<this-space>.hf.space/mcp` — no
+authentication.
 
-## Why one endpoint
+## Configuration
 
-Ten separate connectors meant ten addresses to register, and — because the
-servers were reachable only through ephemeral tunnels — ten addresses to
-re-enter by hand every time the host restarted. One endpoint means one.
+Set these in **Settings → Variables and secrets**. Only the first is normally
+needed; the rest have working defaults.
 
-Consolidation was measured before it was adopted: routing a search through the
-aggregator instead of straight at its backend costs **+3 ms on an 88 ms query**.
-Nine of the ten backends are loaded *in-process*, so their handlers are called
-directly with no network in between. de-eli runs on FastMCP and is proxied over
-loopback inside the container.
+| Name | Kind | Purpose |
+|---|---|---|
+| `EMBEDDINGS_API_KEY` | secret | Voyage AI key. Turns on semantic search. |
+| `EMBEDDINGS_URL` | variable | `https://api.voyageai.com/v1/embeddings` |
+| `EMBEDDINGS_MODEL` | variable | `voyage-4-lite` — multilingual, 1024-dim |
+| `DE_ELI_URL` | variable | German backend; `off` to disable |
 
-## Every tool carries its jurisdiction
+Leaving the key unset is safe: search still runs on BM25 + fuzzy matching, and
+every response reports `semantic: "off"` rather than passing a keyword match off
+as a conceptual one.
 
-`nl_` `pl_` `at_` `ie_` `fi_` `es_` `az_` `de_` `scholar_` `contracts_`
+## Tool naming
 
-This is not cosmetic. Across the underlying servers `get_act` means five
-different things, `search_legislation` three and `search_acts` three. Merging
-them unprefixed would route a Spanish question to a Finnish server and answer
-confidently with the wrong country's law.
+Every tool is prefixed with its jurisdiction — `nl_` `pl_` `at_` `ie_` `fi_`
+`es_` `az_` `de_` `scholar_` `contracts_`. Across the underlying servers
+`get_act` means five different things and `search_legislation` three, so the
+prefix is what keeps a Spanish question from being answered with Finnish law.
 
-## One health answer
+Call `status` for the health of every jurisdiction at once: which backends
+loaded, how many documents each has indexed, and whether semantic search is
+live.
 
-`status` reports every jurisdiction at once: which backends loaded, how many
-documents each has indexed, what date range was crawled, and whether semantic
-search is live. A backend that fails to load is **announced** — its jurisdiction
-is reported unavailable rather than quietly returning nothing, because "no
-results" and "not searched" are different answers and only one of them is safe
-to act on.
+## First boot
 
-## Semantic search
+Indexes are crawled and vectorised in the background on first start (roughly
+10–20 minutes). The server answers from the first second — direct document
+fetches never need an index — and every search reports `indexed_documents` and
+`vectorised_documents` so a thin result is never mistaken for a settled
+question.
 
-Set `EMBEDDINGS_URL` to any OpenAI-compatible `/v1/embeddings` endpoint and the
-dense channel turns on across all jurisdictions. Verified locally with Ollama and
-`bge-m3`: a Turkish query separated conceptually related documents at 0.70 cosine
-from unrelated ones at 0.41. Without it, search degrades to BM25 plus fuzzy
-matching and every response says which ran, so a keyword ordering is never
-mistaken for a conceptual one.
-
-The model must be multilingual for cross-language questions. The server cannot
-verify that and does not pretend to.
-
-## Indexes
-
-Four of the jurisdictions cannot be searched at their source at all — the Dutch
-case-law API has no free-text parameter, the Irish Statute Book publishes no
-search endpoint — so those servers keep local SQLite indexes. On a cold start the
-crawl runs in the background; searches work as soon as it lands, and report an
-empty index plainly until then.
-
-## Run it locally
-
-```sh
-python server.py                                  # stdio
-python server.py --transport http --port 8900     # http://127.0.0.1:8900/mcp
-```
-
-## Licence
-
-MIT for the server code. The underlying legal data belongs to its publishers and
-carries their terms.
+⚠️ A Space's disk is ephemeral: on the free tier the crawl repeats after a
+restart. Attach a Storage Bucket to keep the indexes.
 
 ---
 
-Part of [ArthurLegal](https://github.com/beerbottle90/ArthurLegal).
+Source: [github.com/beerbottle90/arthurlegal-mcp](https://github.com/beerbottle90/arthurlegal-mcp)
