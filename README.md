@@ -1,17 +1,18 @@
 # ArthurLegal MCP
 
-**Ten jurisdictions of legal research behind one MCP endpoint.**
+**Fourteen jurisdictions of legal research behind one MCP endpoint.**
 
-Netherlands - Poland - Austria - Ireland - Finland - Spain - Azerbaijan -
-Germany - legal scholarship - signed resource contracts.
+Netherlands - Poland - Austria - Ireland - Finland - Spain - United Kingdom -
+European Union - Japan - Azerbaijan - Germany - legal scholarship - signed
+resource contracts - GLEIF entity identity.
 
-62 tools. Point an MCP client at `https://<app>.fly.dev/mcp`. No authentication:
+81 tools. Point an MCP client at `https://<app>.fly.dev/mcp`. No authentication:
 anyone with the URL can call every tool.
 
 ## Tool naming
 
 Every tool carries its jurisdiction as a prefix -- `nl_` `pl_` `at_` `ie_` `fi_`
-`es_` `az_` `de_` `scholar_` `contracts_`. Across the underlying servers
+`es_` `uk_` `eu_` `jp_` `gleif_` `az_` `de_` `scholar_` `contracts_`. Across the underlying servers
 `get_act` means five different things and `search_legislation` three, so the
 prefix is what keeps a Spanish question from being answered with Finnish law.
 

@@ -62,6 +62,13 @@ STDLIB_BACKENDS = [
     ("ie", os.path.join(ROOT, "ie-statutebook-mcp"), "srv_ie", "🇮🇪 İrlanda — Act'ler"),
     ("fi", os.path.join(ROOT, "fi-finlex-mcp"), "srv_fi", "🇫🇮 Finlandiya — mevzuat"),
     ("es", os.path.join(ROOT, "es-boe-mcp"), "srv_es", "🇪🇸 İspanya — mevzuat"),
+    ("uk", os.path.join(ROOT, "uk-legislation-mcp"), "srv_uk",
+     "🇬🇧 Birleşik Krallık — mevzuat + işlenmemiş tadiller"),
+    ("eu", os.path.join(ROOT, "eu-cellar-mcp"), "srv_eu",
+     "🇪🇺 AB — mevzuat + CJEU içtihadı (CELLAR)"),
+    ("jp", os.path.join(ROOT, "jp-egov-mcp"), "srv_jp", "🇯🇵 Japonya — mevzuat"),
+    ("gleif", os.path.join(ROOT, "gleif-mcp"), "srv_gleif",
+     "🌍 Tüzel kişi kimliği + grup yapısı (LEI)"),
 ]
 
 # The three older servers expose TOOLS as dicts with a "handler" key rather than
@@ -267,7 +274,7 @@ def _t_status(args: Dict[str, Any]) -> Any:
         "backends_loaded": _loaded,
         "tools_exposed": len(_tools),
         "note": "Every tool is prefixed with its jurisdiction (nl_, pl_, at_, ie_, "
-                "fi_, es_, az_, scholar_, contracts_, de_). Across the underlying "
+                "fi_, es_, uk_, eu_, jp_, gleif_, az_, scholar_, contracts_, de_). Across the underlying "
                 "servers `get_act` means five different things, so the prefix is "
                 "what keeps a Spanish question from being answered with Finnish law.",
     }
@@ -314,12 +321,13 @@ def build() -> None:
     ))
 
 
-INSTRUCTIONS_HEADER = """ArthurLegal — 10 yargı çevresi tek uçta.
+INSTRUCTIONS_HEADER = """ArthurLegal — 14 yargı çevresi tek uçta.
 
 ARAÇ ÖNEKLERİ. Her araç ait olduğu yargı çevresinin önekini taşır:
 `nl_` Hollanda · `pl_` Polonya · `at_` Avusturya · `ie_` İrlanda · `fi_` Finlandiya
-· `es_` İspanya · `az_` Azerbaycan · `de_` Almanya · `scholar_` doktrin ·
-`contracts_` sözleşme emsali.
+· `es_` İspanya · `uk_` Birleşik Krallık · `eu_` AB (CELLAR) · `jp_` Japonya ·
+`az_` Azerbaycan · `de_` Almanya · `gleif_` tüzel kişi kimliği (LEI) ·
+`scholar_` doktrin · `contracts_` sözleşme emsali.
 
 Bu kozmetik değil: alttaki sunucularda `get_act` beş ayrı şey, `search_legislation`
 üç ayrı şey demek. Önek, İspanyol hukuku sorusunun Fin mevzuatıyla
