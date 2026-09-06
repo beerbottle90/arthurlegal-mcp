@@ -29,7 +29,14 @@ BASE = "https://spk.gov.tr"
 _http = Http(BASE, {"Accept": "text/html,application/pdf,*/*"})
 _list_cache: Dict[int, List[Dict[str, Any]]] = {}
 _pdf_cache: Dict[str, str] = {}
-_PDF = re.compile(r'href="(https://spk\.gov\.tr/data/[0-9a-f]+/(\d{4})-(\d+)\.pdf)"', re.I)
+# Current years name files "<yyyy>-<no>.pdf"; the archive ("geçmiş yıllara ait
+# bültenler", 2005–2024) names them "<no>-<yyyy>.pdf".
+_PDF = re.compile(r'href="(https://spk\.gov\.tr/data/[0-9a-f]+/(?:(\d{4})-(\d+)|(\d+)-(\d{4}))(?:-[A-Za-z]+)?\.pdf)"', re.I)
+
+
+def _year_pages(year: int) -> List[str]:
+    return ["/spk-bultenleri/%d-yili-spk-bultenleri" % year,
+            "/spk-bultenleri/gecmis-yillara-ait-bultenler/%d-yili-spk-bultenleri" % year]
 _SECTION = re.compile(r"(?m)^\s*([A-ZÇĞİÖŞÜ]\.\s+[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ \-/,()]{6,})\s*$")
 
 
@@ -37,20 +44,26 @@ def _year_list(year: int) -> List[Dict[str, Any]]:
     if year in _list_cache:
         return _list_cache[year]
     items: Dict[str, Dict[str, Any]] = {}
-    for s in range(1, 8):
-        try:
-            html = _http.get_text("/spk-bultenleri/%d-yili-spk-bultenleri" % year, params={"s": s} if s > 1 else None)
-        except HttpError:
-            break
-        found = 0
-        for m in _PDF.finditer(html):
-            url, y, no = m.groups()
-            key = "%s/%s" % (y, no)
-            if key not in items:
-                items[key] = {"bulten": key, "year": int(y), "number": int(no), "pdf_url": url,
-                              "citation": "SPK Bülteni %s" % key}
-                found += 1
-        if not found:
+    for path in _year_pages(year):
+        for s in range(1, 12):
+            try:
+                html = _http.get_text(path, params={"s": s} if s > 1 else None)
+            except HttpError:
+                break
+            found = 0
+            for m in _PDF.finditer(html):
+                url, y1, n1, n2, y2 = m.groups()
+                y, no = (y1, n1) if y1 else (y2, n2)
+                if int(y) != year:
+                    continue
+                key = "%s/%s" % (y, no)
+                if key not in items:
+                    items[key] = {"bulten": key, "year": int(y), "number": int(no), "pdf_url": url,
+                                  "citation": "SPK Bülteni %s" % key}
+                    found += 1
+            if not found:
+                break
+        if items:
             break
     out = sorted(items.values(), key=lambda x: -x["number"])
     _list_cache[year] = out

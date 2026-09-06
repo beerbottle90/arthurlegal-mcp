@@ -74,9 +74,12 @@ def test_rekabet_list_parser():
 def test_sigorta_split():
     txt = ("İÇİNDEKİLER\n15.06.2026 Tarih ve K-2026/1 Sayılı Hakem Kararı ....... 3\n" +
            "15.06.2026 Tarih ve K-2026/1 Sayılı Hakem Kararı\n" + "gövde " * 300 +
-           "\n16.06.2026 Tarih ve K-2026/2 Sayılı İtiraz Hakem Heyeti Kararı\n" + "metin " * 300)
+           "\n16.06.2026 Tarih ve K-2026/2 Sayılı İtiraz Hakem Heyeti Kararı\n" + "metin " * 300 +
+           "\n07/09/2015 tarih ve K.2015/8207 Sayılı Hakem Kararı\n" + "eski " * 300 +
+           "\n09.04.2025 Tarih – K-2025/180058 Sayılı Hakem Kararı\n" + "tire " * 300 +
+           "\n21/09/2021 Tarihli - 2021/İHK-30910 Sayılı İtiraz Hakem Heyeti Kararı\n" + "ihk " * 300)
     d = sigorta_tahkim.split_decisions(txt, min_len=500)
-    assert [x["heading"][:10] for x in d] == ["15.06.2026", "16.06.2026"]
+    assert [x["heading"][:10] for x in d] == ["15.06.2026", "16.06.2026", "07/09/2015", "09.04.2025", "21/09/2021"]
 
 
 def test_spk_sections():

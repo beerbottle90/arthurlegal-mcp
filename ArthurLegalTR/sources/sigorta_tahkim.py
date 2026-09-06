@@ -27,7 +27,15 @@ from sources import Source
 BASE = "https://www.sigortatahkim.org"
 _http = Http(BASE, {"Accept": "application/pdf,*/*"})
 LATEST_KNOWN = 66
-_HEAD = re.compile(r"(\d{2}\.\d{2}\.\d{4}\s+Tarih\s+ve\s+K-\d{4}/\d+\s+Sayılı\s+(?:İtiraz\s+)?Hakem\s+(?:Heyeti\s+)?Kararı)", re.I)
+# Heading spellings seen across 66 issues (2010–2026):
+#   "12.03.2024 Tarih ve K-2024/12345 Sayılı Hakem Kararı"          (recent)
+#   "07/09/2015 tarih ve K.2015/8207 Sayılı Hakem Kararı"           (2015, slashes, dot)
+#   "09.04.2025 Tarih – K-2025/180058 Sayılı Hakem Kararı"          (dash instead of "ve")
+#   "21/09/2021 Tarihli - 2021/İHK-30910 Sayılı İtiraz Hakem Heyeti Kararı"
+_HEAD = re.compile(
+    r"(\d{2}[./]\d{2}[./]\d{4}\s+Tarih(?:li)?\s*(?:ve|[-–—])\s*"
+    r"(?:K[-.]\s?\d{4}\s?/\s?\d+|\d{4}/[A-ZİÇŞĞÜÖ]{2,5}-\d+)\s+Sayılı\s+"
+    r"(?:İtiraz\s+)?Hakem\s+(?:Heyeti\s+)?Kararı)", re.I)
 _cache: Dict[int, str] = {}
 
 
