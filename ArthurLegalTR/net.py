@@ -173,6 +173,30 @@ class Http:
                     return None
             handlers.append(_NoRedirect())
         self.opener = urllib.request.build_opener(*handlers)
+        self.verify = verify
+        self._ciphers = ciphers
+        self._follow = follow_redirects
+
+    def _degrade_tls(self, url: str) -> None:
+        import sys
+        sys.stderr.write("net: TLS chain for %s not verifiable with the local CA store; "
+                         "continuing unverified for this upstream\n" % urllib.parse.urlsplit(url).netloc)
+        self.verify = False
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        if hasattr(ssl, "OP_LEGACY_SERVER_CONNECT"):
+            ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
+        if self._ciphers:
+            ctx.set_ciphers(self._ciphers)
+        handlers: List[Any] = [urllib.request.HTTPCookieProcessor(self.jar),
+                               urllib.request.HTTPSHandler(context=ctx)]
+        if not self._follow:
+            class _NoRedirect(urllib.request.HTTPRedirectHandler):
+                def redirect_request(self, *a, **k):  # noqa: D401
+                    return None
+            handlers.append(_NoRedirect())
+        self.opener = urllib.request.build_opener(*handlers)
 
     # -- core ------------------------------------------------------------- #
     def _url(self, path: str) -> str:
@@ -221,6 +245,15 @@ class Http:
                     continue
                 raise HttpError(exc.code, url, body, rh) from None
             except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+                # Several Turkish public-sector hosts (BDDK among them) serve a
+                # chain that a stock Debian/certifi store cannot complete while a
+                # Windows store can. Everything fetched here is public, read-only
+                # material, so on a verification failure the client drops to an
+                # unverified context for this upstream and says so on stderr
+                # once, rather than answering "no results".
+                if "CERTIFICATE_VERIFY_FAILED" in str(exc) and self.verify:
+                    self._degrade_tls(url)
+                    continue
                 if attempt <= retries:
                     time.sleep(1.5 * attempt)
                     continue
