@@ -1,13 +1,19 @@
 # ArthurLegal MCP
 
-**Fourteen jurisdictions of legal research behind one MCP endpoint.**
+**Fifteen jurisdictions of legal research behind one MCP endpoint.**
 
-Netherlands - Poland - Austria - Ireland - Finland - Spain - United Kingdom -
-European Union - Japan - Azerbaijan - Germany - legal scholarship - signed
-resource contracts - GLEIF entity identity.
+Türkiye - Netherlands - Poland - Austria - Ireland - Finland - Spain - United
+Kingdom - European Union - Japan - Azerbaijan - Germany - legal scholarship -
+signed resource contracts - GLEIF entity identity.
 
-81 tools. Point an MCP client at `https://<app>.fly.dev/mcp`. No authentication:
+105 tools. Point an MCP client at `https://<app>.fly.dev/mcp`. No authentication:
 anyone with the URL can call every tool.
+
+Türkiye (`tr_`) is the largest backend: Yargıtay/Danıştay/BAM case law, AYM,
+Uyuşmazlık, all legislation types, Resmî Gazete, and twelve regulators (EPDK,
+Rekabet, SPK, BDDK, KVKK, BTK, KİK, Sayıştay, GİB, Sigorta Tahkim, İSTAÇ,
+TÜRKPATENT) behind one `tr_kurum_karari_ara` interface, plus a locally indexed
+archive for `tr_semantik_ara`. Source: the `ArthurLegalTR/` folder.
 
 ## Tool naming
 

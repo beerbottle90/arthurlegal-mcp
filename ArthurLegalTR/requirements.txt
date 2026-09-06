@@ -1,0 +1,3 @@
+# The server runs on the standard library. pypdf is the one optional
+# dependency: PDF text for Rekabet, EPDK, SPK, BTK, Sigorta Tahkim, İSTAÇ.
+pypdf>=4.0

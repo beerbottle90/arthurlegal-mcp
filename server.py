@@ -56,6 +56,12 @@ AL = HERE
 # prefix, directory, module name, human label. The prefix is the jurisdiction the
 # tool answers for, so a reader of a tool name always knows which law they are in.
 STDLIB_BACKENDS = [
+    # Türkiye loads FIRST on purpose: every backend does `import retrieval` by bare
+    # name and Python caches the first copy. ArthurLegalTR's retrieval.py is the
+    # same module plus dotless-ı query expansion, so letting it win costs the
+    # others nothing and keeps Turkish queries working.
+    ("tr", os.path.join(AL, "ArthurLegalTR"), "srv_tr",
+     "🇹🇷 Türkiye — içtihat + mevzuat + 12 düzenleyici kurum + Resmî Gazete"),
     ("nl", os.path.join(ROOT, "nl-rechtspraak-mcp"), "srv_nl", "🇳🇱 Hollanda — içtihat + mevzuat"),
     ("pl", os.path.join(ROOT, "pl-sejm-mcp"), "srv_pl", "🇵🇱 Polonya — mevzuat"),
     ("at", os.path.join(ROOT, "at-ris-mcp"), "srv_at", "🇦🇹 Avusturya — mevzuat + içtihat"),
@@ -117,7 +123,7 @@ def _load_stdlib(prefix: str, directory: str, modname: str, label: str) -> None:
 
         count = 0
         for tool in module.TOOLS:
-            if tool.name == "server_status":
+            if tool.name in ("server_status", "status"):
                 continue          # replaced by the aggregate `status` tool
             _tools.append(Tool(
                 _prefixed(prefix, tool.name),
@@ -150,7 +156,7 @@ def _load_legacy(prefix: str, directory: str, dotted: str, label: str) -> None:
         module = importlib.import_module(dotted)
         count = 0
         for entry in module.TOOLS:
-            if entry["name"] == "server_status":
+            if entry["name"] in ("server_status", "status"):
                 continue
             _tools.append(Tool(
                 _prefixed(prefix, entry["name"]),
@@ -321,13 +327,17 @@ def build() -> None:
     ))
 
 
-INSTRUCTIONS_HEADER = """ArthurLegal — 14 yargı çevresi tek uçta.
+INSTRUCTIONS_HEADER = """ArthurLegal — 15 yargı çevresi tek uçta.
 
 ARAÇ ÖNEKLERİ. Her araç ait olduğu yargı çevresinin önekini taşır:
-`nl_` Hollanda · `pl_` Polonya · `at_` Avusturya · `ie_` İrlanda · `fi_` Finlandiya
-· `es_` İspanya · `uk_` Birleşik Krallık · `eu_` AB (CELLAR) · `jp_` Japonya ·
-`az_` Azerbaycan · `de_` Almanya · `gleif_` tüzel kişi kimliği (LEI) ·
-`scholar_` doktrin · `contracts_` sözleşme emsali.
+`tr_` Türkiye (içtihat, mevzuat, EPDK/Rekabet/SPK/BDDK/KVKK/BTK/KİK/Sayıştay/GİB/
+Sigorta Tahkim/İSTAÇ, Resmî Gazete, semantik arşiv) · `nl_` Hollanda · `pl_` Polonya ·
+`at_` Avusturya · `ie_` İrlanda · `fi_` Finlandiya · `es_` İspanya · `uk_` Birleşik Krallık ·
+`eu_` AB (CELLAR) · `jp_` Japonya · `az_` Azerbaycan · `de_` Almanya ·
+`gleif_` tüzel kişi kimliği (LEI) · `scholar_` doktrin · `contracts_` sözleşme emsali.
+
+TÜRKİYE İÇİN GİRİŞ NOKTASI: karmaşık Türk hukuku sorusunda önce `tr_hukuk_arastirma_rehberi`
+(hangi soru için hangi araç), sonra `tr_kurum_listesi` (12 kurumun filtreleri).
 
 Bu kozmetik değil: alttaki sunucularda `get_act` beş ayrı şey, `search_legislation`
 üç ayrı şey demek. Önek, İspanyol hukuku sorusunun Fin mevzuatıyla

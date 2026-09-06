@@ -27,6 +27,7 @@ primary_region = "ams"
 
 [[vm]]
   size = "shared-cpu-1x"
-  # Measured: 18 MB resident after five searches across five
-  # jurisdictions. 256mb is ~14x that.
-  memory = "256mb"
+  # Measured: 18 MB resident after five searches across five jurisdictions.
+  # The Turkish index adds ~10k documents whose vectors are scanned per
+  # semantic query; 512mb leaves that comfortable.
+  memory = "512mb"

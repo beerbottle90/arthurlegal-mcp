@@ -19,7 +19,7 @@ fi
 
 APP="$(cd "$(dirname "$0")" && pwd)"
 INDEX_SRC="${INDEX_SOURCE:-/data/index}"
-JURISDICTIONS="nl-rechtspraak-mcp pl-sejm-mcp es-boe-mcp ie-statutebook-mcp fi-finlex-mcp"
+JURISDICTIONS="ArthurLegalTR nl-rechtspraak-mcp pl-sejm-mcp es-boe-mcp ie-statutebook-mcp fi-finlex-mcp"
 
 # Seed the indexes from an attached storage bucket when one is mounted.
 #
@@ -66,6 +66,15 @@ if [ ! -f "$APP/.crawled" ]; then
       touch "$APP/.crawled"
       echo "index crawl finished" >&2
     ) &
+fi
+
+# The Turkish index is baked with its documents but vectorised on the machine:
+# the workstation that crawls it has no Voyage key, so vectors for the
+# configured model are filled here, in the background, with the platform
+# secret. `embed_missing` is idempotent -- a machine that already has them
+# does nothing -- and tr_semantik_ara reports semantic: off until it is done.
+if [ -n "$EMBEDDINGS_API_KEY" ] && [ -f "$APP/ArthurLegalTR/data/index.db" ]; then
+    (cd "$APP/ArthurLegalTR" && python crawl.py --embed-only >/tmp/tr-embed.log 2>&1         && echo "ArthurLegalTR vectors ready" >&2 || echo "ArthurLegalTR embedding failed (see /tmp/tr-embed.log)" >&2) &
 fi
 
 cd "$APP"

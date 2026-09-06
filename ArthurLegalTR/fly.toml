@@ -1,0 +1,30 @@
+app = "arthurlegal-tr"
+primary_region = "fra"
+
+[build]
+
+[env]
+  # Not secrets; visible on purpose. When semantic search misbehaves the first
+  # question is which endpoint and which model were actually in use.
+  EMBEDDINGS_URL = "https://api.voyageai.com/v1/embeddings"
+  EMBEDDINGS_MODEL = "voyage-4-lite"
+  BEDESTEN_RATE_REFILL_S = "3.5"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # An MCP connector is not a web page: a stopped machine is a failed tool call.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "30s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
