@@ -189,9 +189,12 @@ def t_ictihat_semantik(args: Dict[str, Any]) -> Any:
     for r in results or []:
         body = r.pop("body", "")
         r["snippet"] = body[:500]
+    method = ranked.get("method") if isinstance(ranked, dict) else "none"
     return {"query": q, "initial_keyword": kw, "candidates_total": res.get("total"),
             "fetched": len(docs), "results": results,
-            "retrieval": ranked.get("retrieval") if isinstance(ranked, dict) else {"mode": "lexical-only"},
+            "retrieval": {"method": method,
+                          "semantic": "on" if method == "semantic" else "off",
+                          **{k: v for k, v in (ranked.items() if isinstance(ranked, dict) else []) if k not in ("results", "method")}},
             "note": "Adaylar Bedesten anahtar kelime aramasının ilk sayfasından; anlamsal sıralama yalnız çekilen metinler üzerinde."}
 
 

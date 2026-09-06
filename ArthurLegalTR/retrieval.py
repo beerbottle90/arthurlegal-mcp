@@ -166,9 +166,16 @@ def embeddings_model() -> str:
     return os.environ.get("EMBEDDINGS_MODEL") or _DEFAULT_MODEL
 
 
+_PROBE_FAIL_TTL = 10.0
+
+
 def _probe(force: bool = False) -> bool:
     now = time.time()
-    if not force and now - _probe_cache["at"] < _PROBE_TTL:
+    # A success is trusted for a minute; a failure only for ten seconds. A single
+    # 429 or hiccup used to switch every search on the machine to keyword-only
+    # for a full minute, which read as "semantic unavailable" to the model.
+    ttl = _PROBE_TTL if _probe_cache["ok"] else _PROBE_FAIL_TTL
+    if not force and now - _probe_cache["at"] < ttl:
         return bool(_probe_cache["ok"])
     try:
         _embed(["ping"], timeout=20)
@@ -232,8 +239,17 @@ def _embed(texts: Sequence[str], timeout: int = 60,
     key = os.environ.get("EMBEDDINGS_API_KEY")
     if key:
         req.add_header("Authorization", "Bearer %s" % key)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        # Rate limits are momentary; one short wait and retry keeps a burst of
+        # queries from reporting the semantic channel as unavailable.
+        if exc.code != 429:
+            raise
+        time.sleep(1.5)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
     items = data.get("data") or []
     out = [it["embedding"] for it in items]
     if len(out) != len(texts):
