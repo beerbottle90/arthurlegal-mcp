@@ -20,7 +20,6 @@ python crawl.py --source kvkk,bddk --embed        # build data/index.db
 - `textx.py` — HTML/PDF → text, Turkish lower/fold, pagination, excerpts.
 - `retrieval.py` — vendored FTS5 + trigram + vector index (RRF). `_dotless_variants` is the only local change.
 - `mcpcore.py` — vendored JSON-RPC MCP core. Do not edit; upstream is arthurlegal-mcp.
-- `aes_min.py` — pure-Python AES-CBC (FIPS-197 vectors in `__main__`) for EKAP v2 request signing only.
 - `crawl.py` — builds the local index; stamps `subject = <kurum key>` so `semantik_ara` can filter.
 
 ## Rules that are not style
@@ -31,19 +30,21 @@ python crawl.py --source kvkk,bddk --embed        # build data/index.db
   convert that into an empty `results` list.
 - **Bedesten rate limit is real** (10 req / 30 s per IP). `bedesten_ictihat.BUCKET` is shared with mevzuat.
   Don't add parallel fan-out over Bedesten.
-- **No paid keys.** KVKK/BDDK/Sigorta Tahkim are parsed directly; if a source truly needs CAPTCHA solving
-  (TÜRKPATENT) the adapter says so and points to the working route instead.
+- **No paid keys, no half-working sources.** KVKK/BDDK/Sigorta Tahkim are parsed directly. A source whose
+  official endpoint does not answer reliably is REMOVED, not shipped with a stub (see below).
 - **Windows console is cp1254.** Run tests with `PYTHONIOENCODING=utf-8`.
 
-## Known gaps (2026-09-05)
+## Removed sources (2026-09-06) — do not re-add without a working live test
 
-- KİK: EKAP v2 changed signing headers to `X-Ekap-Sec-1..6`; implemented, but the API now answers HTTP 500.
-  Key lives in `KIK_R8FACT`. `generateSecurityHeaders` sits in chunk `1959.*.js`; the `environment`
-  object (with `r8fact`) is not a string literal in any of the 54 shell chunks nor in the
-  module-federation remotes (`/f_ihale-araclari/remoteEntry.js`) — it is probably injected at runtime.
-  Next step would be a browser capture of one signed request to compare header values.
-- Aggregator integration: `server.py` exposes module-level `TOOLS` and `_t_status`; arthurlegal-mcp
-  loads this directory first so its `retrieval.py` (dotless-ı) is the cached copy for every backend.
-- Sayıştay: upstream WAF answers 418 to DataTables POSTs for every client. Reported as `upstream_blocked`.
-- TÜRKPATENT: no public decision database; research portal is reCAPTCHA-gated. Adapter is a router only.
-- EPDK: only the "Kurul Kararları" trees per market (structural decisions); individual licence acts are not listed there.
+- **KİK** — EKAP v2 signs requests (`X-Ekap-Sec-1..6`, AES-CBC with `environment.r8fact`); with the key from
+  the reference implementation the API answers HTTP 500. `r8fact` is not a string literal in any shell
+  chunk or module-federation remote. Needs a browser capture of one signed request.
+- **Sayıştay** — WAF answers 418 to every DataTables POST, browsers included (also from Fly's IP).
+- **TÜRKPATENT** — no public decision database; research portal is reCAPTCHA-gated.
+- **İSTAÇ** — istac.org.tr did not resolve from Fly nor from the workstation (nor by forced IP) on 2026-09-06.
+  Rules PDFs are static; re-add when the host is back (old adapter in git history: `git show 784eb95:sources/istac.py`).
+
+## Aggregator integration
+
+`server.py` exposes module-level `TOOLS` and `_t_status`; arthurlegal-mcp loads this directory first so its
+`retrieval.py` (dotless-ı) is the cached copy for every backend.

@@ -1,10 +1,10 @@
 # ArthurLegalTR
 
-**Türk hukuku tek MCP ucunda: içtihat, mevzuat, 12 düzenleyici kurum, Resmî Gazete ve semantik arama.**
+**Türk hukuku tek MCP ucunda: içtihat, mevzuat, 8 düzenleyici kurum, Resmî Gazete ve semantik arama.**
 
 Yargıtay · Danıştay · BAM · yerel mahkeme · KYB · Anayasa Mahkemesi · Uyuşmazlık Mahkemesi ·
 mevzuat (12 tür, madde ağacı, gerekçe) · Resmî Gazete · **Rekabet Kurumu · EPDK · SPK · BDDK ·
-KVKK · BTK · KİK · Sayıştay · GİB · Sigorta Tahkim Komisyonu · İSTAÇ** · (TÜRKPATENT: yönlendirme)
+KVKK · BTK · GİB · Sigorta Tahkim Komisyonu**
 
 25 araç. Standart kütüphane; tek opsiyonel bağımlılık `pypdf`. Ücretli arama anahtarı yok
 (Brave / Tavily / OpenRouter gerekmez). Yerel SQLite indeks: FTS5 + trigram + vektör
@@ -16,7 +16,7 @@ Said Sürücü'nün `yargi-mcp` / `mevzuat-mcp` çalışması Türk yargı kayna
 konuştuğunu ortaya koydu ([ATTRIBUTION.md](ATTRIBUTION.md)). Bu sunucu o bilgiyi alır, çerçeveyi
 ve ücretli anahtarları bırakır, enerji/finans pratiğinin gerçekten atıf yaptığı sektör
 düzenleyicilerini — EPDK Kurul kararları ağacı, SPK haftalık bültenleri, BDDK'nın iki karar
-listesi, Sigorta Tahkim dergileri, İSTAÇ kuralları — ekler ve hepsinin arkasına, Türkçe sorunun
+listesi, Sigorta Tahkim dergileri — ekler ve hepsinin arkasına, Türkçe sorunun
 kelime paylaşmadığı kararı da bulabilen bir yerel indeks koyar.
 
 ## Kurulum
@@ -46,7 +46,7 @@ HTTP (claude.ai connector, Copilot Studio): `python server.py --transport http -
 | Uyuşmazlık | `uyusmazlik_ara` `uyusmazlik_getir` | kararlar.uyusmazlik.gov.tr |
 | Mevzuat | `mevzuat_ara` `mevzuat_getir` `mevzuat_icindekiler` `mevzuat_madde_getir` `mevzuat_gerekce` `mevzuat_icinde_ara` | Bedesten mevzuat |
 | Resmî Gazete | `resmi_gazete_fihrist` `resmi_gazete_getir` `resmi_gazete_tara` | resmigazete.gov.tr |
-| Kurum | `kurum_karari_ara` `kurum_karari_getir` `kurum_listesi` `spk_bulten_icinde_ara` | 12 kurum, tek arayüz |
+| Kurum | `kurum_karari_ara` `kurum_karari_getir` `kurum_listesi` `spk_bulten_icinde_ara` | 8 kurum, tek arayüz |
 | Yerel indeks | `semantik_ara` `belge_getir` | `data/index.db` |
 | Yardımcı | `hukuk_arastirma_rehberi` `status` | — |
 
@@ -71,7 +71,7 @@ Kuruma özel filtreler `kurum_listesi` ile görülür; `params={…}` ile geçil
 Canlı kaynaklar indeks olmadan da çalışır. `semantik_ara` için:
 
 ```bash
-python crawl.py --source kvkk,bddk,btk,rekabet,epdk,spk,sigorta_tahkim,istac --embed
+python crawl.py --source kvkk,bddk,btk,rekabet,epdk,spk,sigorta_tahkim --embed
 python crawl.py --source sigorta_tahkim --issues 1-66 --embed      # 16 yıl hakem kararı
 python crawl.py --source spk --years 2023,2024,2025,2026 --embed
 python crawl.py --source bddk,rekabet --fetch-text --embed         # karar PDF metinleri (yavaş)
@@ -88,14 +88,12 @@ Gömme ucu ortam değişkenleriyle seçilir; hiçbiri yoksa `127.0.0.1:11434` (O
 Vektör yoksa `semantik_ara` yine cevap verir ve `retrieval.semantic: "off"` der; anahtar kelime
 eşleşmesini kavramsal eşleşme gibi sunmaz.
 
-## Durum (2026-09-05)
+## Durum (2026-09-06)
 
 | Kaynak | Durum |
 |---|---|
-| Bedesten içtihat + mevzuat, AYM, Uyuşmazlık, RG, Rekabet, EPDK, SPK, BDDK, KVKK, BTK, GİB, Sigorta Tahkim, İSTAÇ | ✅ canlı doğrulandı |
-| KİK (EKAP v2) | ⚠️ imza şeması `X-Ekap-Sec-1..6`'ya güncellendi; API şu an 500 döndürüyor |
-| Sayıştay | ⚠️ upstream WAF POST'lara 418 veriyor (tüm istemciler) |
-| TÜRKPATENT | ❌ karar veritabanı yok, portal reCAPTCHA'lı; araç yalnız rota verir |
+| Bedesten içtihat + mevzuat (madde ağacı, gerekçe), AYM, Uyuşmazlık, RG, Rekabet, EPDK, SPK, BDDK, KVKK, BTK, GİB, Sigorta Tahkim | ✅ canlı uçta arama + getirme doğrulandı (2026-09-06) |
+| KİK, Sayıştay, TÜRKPATENT, İSTAÇ | ❌ **kaldırıldı** — resmi uçları güvenilir cevap vermiyor (EKAP 500, Sayıştay WAF 418, reCAPTCHA, istac.org.tr DNS). Çalışıyormuş gibi gösterilmez; ayrıntı `docs/SOURCES.md` |
 
 Ayrıntı ve endpoint'ler: [docs/SOURCES.md](docs/SOURCES.md).
 
@@ -104,8 +102,8 @@ Ayrıntı ve endpoint'ler: [docs/SOURCES.md](docs/SOURCES.md).
 **Üretim yolu: arthurlegal-mcp aggregator'ı.** Bu repo, `beerbottle90/arthurlegal-mcp`
 içinde `tr_` önekiyle bir backend olarak yüklenir (`server.py` modül düzeyinde `TOOLS`
 verir; aggregator `status`'u kendi durumuna katlar). Tek uç: `https://arthurlegal-mcp.fly.dev/mcp`
-→ `tr_ictihat_ara`, `tr_kurum_karari_ara`, `tr_semantik_ara` … Aggregator'ın `start.sh`'ı
-baked TR indeksini Fly'daki Voyage anahtarıyla açılışta vektörler.
+→ `tr_ictihat_ara`, `tr_kurum_karari_ara`, `tr_semantik_ara` … TR indeksi vektörleriyle birlikte (voyage-4-lite) imaja gömülür;
+aggregator'ın `start.sh`'ı eksik vektör kalırsa Fly'daki anahtarla tamamlar.
 
 Tek başına: `Dockerfile` + `fly.toml` (Fly.io, `fra`). İndeks imaja gömülür; açılan konteyner
 asla crawl yapmaz. `flyctl secrets set EMBEDDINGS_API_KEY=…` semantik kanalı açar.
@@ -113,7 +111,7 @@ asla crawl yapmaz. `flyctl secrets set EMBEDDINGS_API_KEY=…` semantik kanalı 
 ## Test
 
 ```bash
-PYTHONIOENCODING=utf-8 python tests/test_offline.py     # ağ yok, 12 test
+PYTHONIOENCODING=utf-8 python tests/test_offline.py     # ağ yok, 11 test
 ```
 
 ## Lisans

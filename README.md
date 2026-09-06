@@ -10,9 +10,9 @@ signed resource contracts - GLEIF entity identity.
 anyone with the URL can call every tool.
 
 Türkiye (`tr_`) is the largest backend: Yargıtay/Danıştay/BAM case law, AYM,
-Uyuşmazlık, all legislation types, Resmî Gazete, and twelve regulators (EPDK,
-Rekabet, SPK, BDDK, KVKK, BTK, KİK, Sayıştay, GİB, Sigorta Tahkim, İSTAÇ,
-TÜRKPATENT) behind one `tr_kurum_karari_ara` interface, plus a locally indexed
+Uyuşmazlık, all legislation types, Resmî Gazete, and eight regulators (EPDK,
+Rekabet, SPK, BDDK, KVKK, BTK, GİB, Sigorta Tahkim) behind one
+`tr_kurum_karari_ara` interface, plus a locally indexed
 archive for `tr_semantik_ara`. Source: the `ArthurLegalTR/` folder.
 
 ## Tool naming

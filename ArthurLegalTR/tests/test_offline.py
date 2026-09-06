@@ -12,21 +12,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-import aes_min  # noqa: E402
 import retrieval  # noqa: E402
 import textx  # noqa: E402
 from net import decode  # noqa: E402
 from sources import bedesten_ictihat, bddk, kvkk, rekabet, resmi_gazete, sigorta_tahkim, spk  # noqa: E402
-
-
-def test_aes_fips_vectors():
-    pt = bytes.fromhex("00112233445566778899aabbccddeeff")
-    for klen, expect in ((16, "69c4e0d86a7b0430d8cdb78070b4c55a"), (24, "dda97ca4864cdfe06eaf70a0ec0d7191"),
-                         (32, "8ea2b7ca516745bfeafc49904b496089")):
-        rk, r = aes_min._expand_key(bytes(range(klen)))
-        assert aes_min._encrypt_block(pt, rk, r).hex() == expect
-    out = aes_min.aes_cbc_encrypt(bytes(range(24)), b"\x00" * 16, b"hello")
-    assert len(out) == 16
 
 
 def test_turkish_folding():

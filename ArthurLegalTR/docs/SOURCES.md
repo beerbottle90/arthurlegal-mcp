@@ -16,12 +16,8 @@ time; "Local" = crawled into `data/index.db` for `semantik_ara`.
 | `bddk` | BDDK Kurul kararları | `/Mevzuat/Liste/55` (RG'de yayımlanan), `/56` (yayımlanmayan) → `/Mevzuat/DokumanGetir/<id>` | HTML list + PDF | ✅ (title) | ✅ | `BDDK, 06.08.2026 tarih ve 11548 sayılı Kurul Kararı` |
 | `kvkk` | KVK Kurulu karar özetleri | `/Icerik/5406/kurul-karar-ozetleri?page=N` (36 pages) → `/Icerik/<id>/<yyyy>-<no>` | HTML | ✅ (recent pages) | ✅ | `KVK Kurulu, 08/08/2024 tarih ve 2024/1361 sayılı karar özeti` |
 | `btk` | BTK Kurul kararları | `btk.tr/api/content/board-decisions` | JSON GET + PDF | ✅ | ✅ | `BTK, 03.08.2026 tarih ve 2026/İK-THD/186 sayılı Kurul Kararı` |
-| `kik` | Kamu İhale Kurulu | `ekapv2.kik.gov.tr/b_ihalearaclari/api/KurulKararlari/*` | signed JSON POST | ⚠️ 500 | — | `KİK, 12.04.2025 tarih ve 2025/UH.II-1801 sayılı karar` |
-| `sayistay` | Sayıştay | `sayistay.gov.tr/Kararlar*/DataTablesList` | CSRF + DataTables POST | ⚠️ WAF 418 | — | `Sayıştay Temyiz Kurulu, <tarih> tarih ve <no> tutanak no.lu karar` |
 | `gib` | GİB özelgeleri | `gib.gov.tr/api/gibportal/mevzuat/ozelge/list` | JSON POST (HTML inline) | ✅ | — | `GİB, 31.12.2025 tarih ve 62030549-125[6-2024]-1742807 sayılı özelge` |
 | `sigorta_tahkim` | Sigorta Tahkim Komisyonu | `sigortatahkim.org/content/CmsFiles/karardrgs<N>.pdf` (1–66) | PDF, regex split | ✅ (per issue) | ✅ | `Sigorta Tahkim Komisyonu, 15.06.2026 Tarih ve K-2026/343230 Sayılı Hakem Kararı (Hakem Karar Dergisi S. 66)` |
-| `istac` | İSTAÇ kuralları | `istac.org.tr/tr/kurallar` → rule PDFs | PDF | ✅ | ✅ | `İSTAÇ Tahkim Kuralları (v3, 2020), <başlık>` |
-| `turkpatent` | TÜRKPATENT | — | — | ❌ | — | router only (reCAPTCHA; YİDK decisions not published) |
 
 ## Details worth knowing
 
@@ -55,20 +51,17 @@ titles; `--fetch-text` crawls the PDFs.
 `revizekd<N>.pdf`, the rest `karardrgs<N>.pdf`. Decisions start with
 `dd.mm.yyyy Tarih ve K-yyyy/n Sayılı (İtiraz) Hakem (Heyeti) Kararı`.
 
-**KİK**. EKAP v2 signs every request. The reference implementation (2026-05)
-used `X-Custom-Request-*` headers; the bundle shipped in 2026-09 uses
-`X-Ekap-Sec-1..6` (guid, IV, timestamp, HTTP method, path, all AES-CBC with
-`environment.r8fact`). Implemented; the API currently returns HTTP 500 with
-either scheme, which is reported as an error, not as "no decisions".
+## Removed on 2026-09-06 (official endpoint does not answer reliably)
 
-**Sayıştay**. The WAF in front of `DataTablesList` answers 418 to POSTs from
-every client including browsers (confirmed upstream, 2026-05). Reported as
-`upstream_blocked: true`.
+| Kurum | What happened | Evidence |
+|---|---|---|
+| KİK (EKAP v2) | signed JSON API answers HTTP 500 with both the 2026-05 and 2026-09 header schemes | `POST /b_ihalearaclari/api/KurulKararlari/GetKurulKararlari` → 500 "Sunucu hatası oluştu" |
+| Sayıştay | WAF answers 418 to every DataTables POST, from Fly and from a workstation | `POST /KararlarTemyiz/DataTablesList` → 418 |
+| TÜRKPATENT | no decision database; research portal needs a reCAPTCHA v3 token per call | `/yidk-kararlari` 404 shell, `/api/research` 500 |
+| İSTAÇ | `istac.org.tr` does not resolve (Fly, workstation) and does not answer by IP | `getaddrinfo failed` / connect timeout |
 
-**TÜRKPATENT**. `/yidk-kararlari` is a 404 shell; the research portal requires
-a reCAPTCHA token per request. The adapter returns the manual portal URL and
-the working judicial route (Yargıtay 11. HD decisions on YİDK acts, via
-`ictihat_ara`).
+The adapters live in git history (`git show 784eb95:sources/<name>.py`). Re-adding one requires a
+live search **and** fetch to pass from the deployed machine, not from a browser.
 
 ## Not included (and why)
 

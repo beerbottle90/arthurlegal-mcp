@@ -230,12 +230,19 @@ def gerekce(args: Dict[str, Any]) -> Dict[str, Any]:
     gid = str(args.get("gerekce_id") or "").strip()
     if not gid:
         return {"error": "gerekce_id gerekli (mevzuat_ara sonucunda gerekce_id alanı; yoksa gerekçe yayımlanmamış)."}
-    try:
-        c = _content("GEREKCE", gid)
-    except HttpError as exc:
-        return {"error": str(exc)}
+    key = "GEREKCE:%s" % gid
+    if key not in _cache:
+        try:
+            d = _call("/getGerekceContent", {"gerekceId": gid}) or {}
+        except HttpError as exc:
+            return {"error": str(exc)}
+        raw = base64.b64decode(d.get("content") or b"")
+        mime = d.get("mimetype") or d.get("mimeType") or "text/html"
+        text = pdf_to_text(raw)[0] if "pdf" in mime else html_to_text(raw.decode("utf-8", "replace"))
+        _cache[key] = {"text": text, "mime": mime, "mevzuat_id": d.get("mevzuatId")}
+    c = _cache[key]
     out = paginate(c["text"], args.get("page") or 1, int(args.get("page_chars") or 8000))
-    out.update({"gerekce_id": gid})
+    out.update({"gerekce_id": gid, "mevzuat_id": c.get("mevzuat_id"), "mime_type": c["mime"]})
     return out
 
 

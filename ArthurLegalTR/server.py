@@ -12,7 +12,7 @@ different ideas of what an API is. Said Sürücü's yargi-mcp / mevzuat-mcp
 (MIT) proved the upstream endpoints; this server takes that knowledge, drops
 the framework and the paid search keys (Brave, Tavily, OpenRouter), adds the
 sector regulators the energy / finance practice actually cites — EPDK, SPK,
-BDDK, Sigorta Tahkim, İSTAÇ — and puts a local FTS5 + vector index behind them
+BDDK, Sigorta Tahkim — and puts a local FTS5 + vector index behind them
 so a question asked in plain Turkish finds a decision that shares none of its
 words.
 
@@ -25,7 +25,7 @@ Tool families
 ``uyusmazlik_*``   Uyuşmazlık Mahkemesi                           (live)
 ``mevzuat_*``      kanun … tebliğ, madde ağacı, gerekçe            (Bedesten, live)
 ``resmi_gazete_*`` günlük fihrist + belge                          (live)
-``kurum_karari_*`` 12 düzenleyici kurum, tek arayüz                (live + local)
+``kurum_karari_*`` 8 düzenleyici kurum, tek arayüz                 (live + local)
 ``semantik_ara``   yerel indeks: hibrit (BM25 + trigram + vektör)  (local)
 ``status``         hangi kaynak ayakta, indeks ne kadar dolu
 """
@@ -235,13 +235,14 @@ GUIDE = """ArthurLegalTR — hangi soru için hangi araç
    Kavramsal soru + kısa liste: ictihat_semantik_ara(query, initial_keyword)
 
 3. DÜZENLEYİCİ KURUM KARARLARI — kurum_karari_ara(kurum=…)
-   rekabet · epdk · spk · bddk · kvkk · btk · kik · sayistay · gib · sigorta_tahkim · istac · turkpatent
+   rekabet · epdk · spk · bddk · kvkk · btk · gib · sigorta_tahkim
+   (KİK, Sayıştay, TÜRKPATENT, İSTAÇ bu sunucuda YOK: resmi uçları güvenilir cevap vermiyor; bkz. status)
    Kuruma özel filtreler: kurum_listesi. Metin: kurum_karari_getir(kurum, id)
    SPK bülteni içinde: spk_bulten_icinde_ara(bulten="2026/27", query)
    Yayım teyidi ve RG künyesi: resmi_gazete_fihrist(date) / resmi_gazete_tara(query, date_from, date_to)
 
 4. SEMANTİK / ARŞİV
-   semantik_ara(query, kurum=?) — yerel indeks (crawl edilmiş kurum kararları, SPK bültenleri, Sigorta Tahkim dergileri, İSTAÇ kuralları)
+   semantik_ara(query, kurum=?) — yerel indeks (crawl edilmiş kurum kararları, SPK bültenleri, Sigorta Tahkim dergileri)
    status → hangi kurum kaç belge, vektör var mı. Boş indeks ≠ karar yok.
 
 ALINTI DİSİPLİNİ
@@ -270,7 +271,7 @@ def build_tools() -> List[Tool]:
         "date_from": {"type": "string", "description": "YYYY-MM-DD (kurum destekliyorsa)"},
         "date_to": {"type": "string"},
         "year": {"type": "integer", "description": "spk: bülten yılı; epdk/bddk: karar yılı"},
-        "decision_type": {"type": "string", "description": "rekabet: birlesme_devralma|rekabet_ihlali|muafiyet_menfi_tespit|ozellestirme|diger · kik: uyusmazlik|duzenleyici|mahkeme · sayistay: genel_kurul|temyiz_kurulu|daire"},
+        "decision_type": {"type": "string", "description": "rekabet: birlesme_devralma|rekabet_ihlali|muafiyet_menfi_tespit|ozellestirme|diger"},
         "decision_no": {"type": "string"},
         "market": {"type": "string", "description": "epdk: elektrik|dogalgaz|petrol|lpg"},
         "issue": {"type": "integer", "description": "sigorta_tahkim: dergi sayısı"},
@@ -330,7 +331,7 @@ def build_tools() -> List[Tool]:
         Tool("spk_bulten_icinde_ara", "Bir SPK haftalık bülteni içinde arar (bölüm bazında). bulten='2026/27'.",
              spk.WITHIN_SCHEMA, _wrap(spk.search_within)),
         Tool("semantik_ara", "Yerel indekste hibrit arama (BM25 + trigram + vektör). Kurum kararları, SPK bültenleri, "
-             "Sigorta Tahkim dergileri, İSTAÇ kuralları — crawl edilmiş kadarıyla (status).",
+             "Sigorta Tahkim dergileri — crawl edilmiş kadarıyla (status).",
              {"type": "object", "properties": {
                  "query": {"type": "string"},
                  "kurum": {"type": "string", "enum": KURUM_KEYS, "description": "Tek kuruma daralt"},
@@ -351,11 +352,13 @@ def build_tools() -> List[Tool]:
     return tools
 
 
-INSTRUCTIONS = """ArthurLegalTR — Türk hukuku araştırma sunucusu (içtihat + mevzuat + 12 düzenleyici kurum + semantik arama).
+INSTRUCTIONS = """ArthurLegalTR — Türk hukuku araştırma sunucusu (içtihat + mevzuat + 8 düzenleyici kurum + semantik arama).
 
 ARAÇ AİLELERİ. `ictihat_*` Yargıtay/Danıştay/BAM/yerel/KYB · `aym_*` Anayasa Mahkemesi · `uyusmazlik_*` ·
 `mevzuat_*` kanun–tebliğ, madde ağacı, gerekçe · `resmi_gazete_*` · `kurum_karari_*` (rekabet, epdk, spk, bddk,
-kvkk, btk, kik, sayistay, gib, sigorta_tahkim, istac, turkpatent) · `semantik_ara` yerel indeks · `status`.
+kvkk, btk, gib, sigorta_tahkim) · `semantik_ara` yerel indeks · `status`.
+KİK, Sayıştay, TÜRKPATENT ve İSTAÇ bilinçli olarak YOK: resmi uçları çalışmıyor (EKAP 500, Sayıştay WAF 418,
+reCAPTCHA, DNS). Bu kurumlar sorulursa bunu söyleyin; sonuç uydurmayın.
 
 İLK ÇAĞRI. Karmaşık soruda önce `hukuk_arastirma_rehberi`; sonuçlar ince göründüğünde `status`. Yüklenememiş
 kaynak ERİŞİLEMEZ demektir, "karar yok" demek değildir. `unavailable: true` veya `upstream_blocked: true`
@@ -369,7 +372,7 @@ HIZ. Bedesten (içtihat + mevzuat) 10 istek / 30 sn: art arda 5'ten fazla arama 
 gelirse birkaç saniye bekleyip yineleyin. ictihat_semantik_ara karar başına ~4 sn sürer.
 
 SEMANTİK. `semantik_ara` yalnız yerel indekse (crawl edilmiş kurum kararları, SPK bültenleri, Sigorta Tahkim
-dergileri, İSTAÇ kuralları) bakar ve `retrieval.semantic` alanıyla vektör kanalının açık olup olmadığını söyler;
+dergileri) bakar ve `retrieval.semantic` alanıyla vektör kanalının açık olup olmadığını söyler;
 "off" ise sonuçlar anahtar kelime eşleşmesidir.
 """
 

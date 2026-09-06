@@ -61,7 +61,7 @@ STDLIB_BACKENDS = [
     # same module plus dotless-ı query expansion, so letting it win costs the
     # others nothing and keeps Turkish queries working.
     ("tr", os.path.join(AL, "ArthurLegalTR"), "srv_tr",
-     "🇹🇷 Türkiye — içtihat + mevzuat + 12 düzenleyici kurum + Resmî Gazete"),
+     "🇹🇷 Türkiye — içtihat + mevzuat + 8 düzenleyici kurum + Resmî Gazete"),
     ("nl", os.path.join(ROOT, "nl-rechtspraak-mcp"), "srv_nl", "🇳🇱 Hollanda — içtihat + mevzuat"),
     ("pl", os.path.join(ROOT, "pl-sejm-mcp"), "srv_pl", "🇵🇱 Polonya — mevzuat"),
     ("at", os.path.join(ROOT, "at-ris-mcp"), "srv_at", "🇦🇹 Avusturya — mevzuat + içtihat"),
@@ -330,8 +330,8 @@ def build() -> None:
 INSTRUCTIONS_HEADER = """ArthurLegal — 15 yargı çevresi tek uçta.
 
 ARAÇ ÖNEKLERİ. Her araç ait olduğu yargı çevresinin önekini taşır:
-`tr_` Türkiye (içtihat, mevzuat, EPDK/Rekabet/SPK/BDDK/KVKK/BTK/KİK/Sayıştay/GİB/
-Sigorta Tahkim/İSTAÇ, Resmî Gazete, semantik arşiv) · `nl_` Hollanda · `pl_` Polonya ·
+`tr_` Türkiye (içtihat, mevzuat, EPDK/Rekabet/SPK/BDDK/KVKK/BTK/GİB/Sigorta Tahkim,
+Resmî Gazete, semantik arşiv; KİK/Sayıştay/TÜRKPATENT/İSTAÇ YOK — resmi uçları cevap vermiyor) · `nl_` Hollanda · `pl_` Polonya ·
 `at_` Avusturya · `ie_` İrlanda · `fi_` Finlandiya · `es_` İspanya · `uk_` Birleşik Krallık ·
 `eu_` AB (CELLAR) · `jp_` Japonya · `az_` Azerbaycan · `de_` Almanya ·
 `gleif_` tüzel kişi kimliği (LEI) · `scholar_` doktrin · `contracts_` sözleşme emsali.

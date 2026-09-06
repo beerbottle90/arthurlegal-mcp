@@ -63,12 +63,8 @@ MODULES = [
     "bddk",
     "kvkk",
     "btk",
-    "kik",
-    "sayistay",
     "gib",
     "sigorta_tahkim",
-    "istac",
-    "turkpatent",
 ]
 
 _loaded: Dict[str, Source] = {}

@@ -7,7 +7,7 @@ was done with it:
 
 The upstream *knowledge* in this server — which endpoint each Turkish court
 and regulator actually answers on, what headers Bedesten expects, the 79
-chamber codes, the KİK request-signing scheme, the GİB özelge body shape, the
+chamber codes, the GİB özelge body shape, the
 Sigorta Tahkim journal file-name rules, the AYM Kararlar Bilgi Bankası
 envelope — was established in those two repositories and is reused here.
 
@@ -61,5 +61,5 @@ Turkish-specific change here: dotless-ı query expansion (`_dotless_variants`).
 All content is retrieved live from, or indexed from, official Turkish public
 sources: Adalet Bakanlığı (Bedesten / mevzuat.adalet.gov.tr), Anayasa
 Mahkemesi, Uyuşmazlık Mahkemesi, Resmî Gazete, Rekabet Kurumu, EPDK, SPK,
-BDDK, KVKK, BTK, KİK (EKAP), Sayıştay, GİB, Sigorta Tahkim Komisyonu, İSTAÇ.
+BDDK, KVKK, BTK, GİB, Sigorta Tahkim Komisyonu.
 Their terms of use apply. Nothing here is legal advice.
