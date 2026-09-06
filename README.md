@@ -6,7 +6,7 @@ Türkiye - Netherlands - Poland - Austria - Ireland - Finland - Spain - United
 Kingdom - European Union - Japan - Azerbaijan - Germany - legal scholarship -
 signed resource contracts - GLEIF entity identity.
 
-105 tools. Point an MCP client at `https://<app>.fly.dev/mcp`. No authentication:
+104 tools. Point an MCP client at `https://<app>.fly.dev/mcp`. No authentication:
 anyone with the URL can call every tool.
 
 Türkiye (`tr_`) is the largest backend: Yargıtay/Danıştay/BAM case law, AYM,
