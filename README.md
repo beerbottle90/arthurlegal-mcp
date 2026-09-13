@@ -6,8 +6,46 @@ Türkiye - Netherlands - Poland - Austria - Ireland - Finland - Spain - United
 Kingdom - European Union - Japan - Azerbaijan - Germany - legal scholarship -
 signed resource contracts - GLEIF entity identity.
 
-104 tools. Point an MCP client at `https://<app>.fly.dev/mcp`. No authentication:
-anyone with the URL can call every tool.
+104 tools, one hosted endpoint, no authentication:
+
+    https://arthurlegal-mcp.fly.dev/mcp
+
+Anyone with the URL can call every tool. Self-hosting? Deploy your own copy (see
+[Indexes](#indexes)) and use `https://<your-app>.fly.dev/mcp` instead.
+
+## Use it directly
+
+This is the endpoint the ArthurLegal assistant packages use. You can also connect
+it to any MCP client on its own (Streamable HTTP transport).
+
+**Claude (claude.ai or Claude Desktop):** Settings -> Connectors -> Add custom
+connector. Name: `ArthurLegal MCP`, URL: `https://arthurlegal-mcp.fly.dev/mcp`.
+Leave the OAuth fields empty.
+
+**Claude Code:**
+
+    claude mcp add --transport http arthurlegal https://arthurlegal-mcp.fly.dev/mcp
+
+**Clients that take a JSON config with remote servers** (Cursor, VS Code and others):
+
+```json
+{ "mcpServers": { "arthurlegal": { "url": "https://arthurlegal-mcp.fly.dev/mcp" } } }
+```
+
+**Clients that only launch local (stdio) servers:** bridge with
+`npx -y mcp-remote https://arthurlegal-mcp.fly.dev/mcp` as the command.
+
+**Check it is up:**
+
+    curl -s -X POST https://arthurlegal-mcp.fly.dev/mcp       -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream'       -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"check","version":"1"}}}'
+
+Then call the `status` tool from your client to see which jurisdictions are loaded.
+
+The hosted endpoint is provided as is, without an uptime guarantee. Your search
+queries reach this server and the official upstream sources it queries, and are
+sent to the embeddings provider when semantic search runs. Do not put client names
+or other confidential facts into queries; mask documents locally first (for
+example with [Arthur Mask](https://github.com/beerbottle90/arthur-mask)).
 
 Türkiye (`tr_`) is the largest backend: Yargıtay/Danıştay/BAM case law, AYM,
 Uyuşmazlık, all legislation types, Resmî Gazete, and eight regulators (EPDK,
