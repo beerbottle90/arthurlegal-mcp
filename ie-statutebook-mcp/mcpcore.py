@@ -171,6 +171,16 @@ class Dispatcher:
 # stdio transport                                                              #
 # --------------------------------------------------------------------------- #
 def run_stdio(dispatcher: Dispatcher) -> None:
+    # JSON-RPC over stdio is UTF-8 by spec. On Windows sys.stdin/sys.stdout default
+    # to the locale codepage (cp1254 on a Turkish install), so every non-ASCII
+    # character in a tool description or result leaves the stream as bytes the
+    # client cannot decode. The HTTP transport below encodes explicitly; stdio has
+    # to be told.
+    for stream in (sys.stdin, sys.stdout):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):  # not a TextIOWrapper (tests, embedding)
+            pass
     stdin = sys.stdin
     stdout = sys.stdout
     for line in stdin:
