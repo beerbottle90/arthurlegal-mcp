@@ -30,7 +30,36 @@ from textx import html_to_text, paginate, pdf_to_text, tr_fold, excerpt, count_h
 from sources import Source
 from sources.bedesten_ictihat import BUCKET, HEADERS
 
+try:                                    # Konu süzgeci isteğe bağlıdır.
+    import triyaj as _triyaj
+except Exception:                       # pragma: no cover - modül yoksa sessiz
+    _triyaj = None
+
 BASE = "https://bedesten.adalet.gov.tr/mevzuat"
+
+# Bedesten'in gerçek üst sınırı. 20'den büyük bir pageSize HTTP 400 döndürür:
+# "Kayıt sayısı 20'den fazla olamaz" (canlı, 2026-09-20). Şema 50 diyordu.
+PAGE_MAX = 20
+
+# Bedesten TEK TARAFLI bir RG tarih aralığını SESSİZCE yok sayar (canlı, 2026-09-20): yalnız
+# resmiGazeteTarihiStart verilince 917 kanunun hepsi döner, ikisi birlikte verilince 6. Eksik ucu
+# biz doldururuz; yoksa rg_date_from="2024-09-01" diyen çağıran 1926 tarihli kanunları da alır.
+_RG_EN_ESKI = "1850-01-01T21:00:00.000Z"
+_RG_EN_YENI = "2100-01-01T21:00:00.000Z"
+
+# Bir çağrıda metni açılacak torba kanun sayısı (her biri bir Bedesten isteği).
+TORBA_AZAMI = 5
+# "(9/6/1932 tarihli ve 2004 sayılı İcra ve İflas Kanunu ile ilgili olup, …)".
+# Metinde "ile" ile "ilgili" arasına satır sonu girebiliyor; boşluklar \s+ ile geçilir.
+_TORBA_RE = re.compile(r"\(([^()]{5,400}?)\s+ile\s+ilgili\s+olup", re.S)
+_JENERIK = {"kanun", "kanun hukmunde kararname"}      # "2872 sayılı Kanun" gibi adsız atıflar
+
+_KONU_NOT = ("Konu süzgeci bir ÖN ELEMEDİR ve Resmî Gazete fihristinde eğitildi. Mevzuat "
+             "başlıklarında ayrıca ölçüldü: eğitimde görülmemiş 60 başlıkta vergi 4/4, icra 2/2, "
+             "enerji 0/3 yakalandı (pozitif az; sayı okuyun). Enerji taramasında konu'ya "
+             "güvenmeyin, query ile birlikte kullanın. Torba kanunlarda değiştirilen kanun "
+             "adlarına bakılır; adları okunamayan torba kanun ELENMEZ, konu_kaynak='belirsiz' "
+             "ile döner. esik=0 süzgeci kapatır.")
 _http = Http(BASE, HEADERS, bucket=BUCKET)
 
 TYPES = {
@@ -69,21 +98,109 @@ def _call(path: str, data: Dict[str, Any], paging: bool = False) -> Any:
     return body.get("data")
 
 
+def _satir(m: Dict[str, Any]) -> Dict[str, Any]:
+    tur = m.get("mevzuatTur") or {}
+    rg_date = (m.get("resmiGazeteTarihi") or "")[:10]
+    return {
+        "mevzuat_id": m.get("mevzuatId"),
+        "number": m.get("mevzuatNo"),
+        "title": (m.get("mevzuatAdi") or "").strip(),
+        "type": tur.get("name"),
+        "tertip": m.get("mevzuatTertip"),
+        "rg_date": rg_date,
+        "rg_number": m.get("resmiGazeteSayisi"),
+        "mukerrer": m.get("mukerrer"),
+        "gerekce_id": m.get("gerekceId"),
+        "citation": _citation(m, tur, rg_date),
+        "source_url": m.get("url") or "",
+    }
+
+
+def _degistirilen(mevzuat_id: str) -> List[str]:
+    """Bir torba kanunun değiştirdiği kanun ADLARI (metnin ilk sayfasından)."""
+    g = get({"mevzuat_id": mevzuat_id, "page": 1, "page_chars": 12000})
+    adlar: List[str] = []
+    for mt in _TORBA_RE.finditer(g.get("text") or ""):
+        seg = " ".join(mt.group(1).split())
+        ad = re.sub(r"^.*?say[ıi]l[ıi]\s+", "", seg)
+        if len(ad) < 8 or " ".join(tr_fold(ad).split()) in _JENERIK:
+            continue
+        if ad not in adlar:
+            adlar.append(ad)
+    return adlar
+
+
+def _konu_ele(items: List[Dict[str, Any]], konu: str, motor: Any, e: float):
+    """Başlıkları konu olasılığına göre eler; ``(tutulan, belirsiz_sayısı)``.
+
+    Torba kanun ("… Değişiklik Yapılmasına Dair Kanun") başlığı konuyu taşımaz:
+    7531 sayılı Kanun İİK ve HMK'yı değiştirir, adı "Bazı Kanunlarda Değişiklik"tir.
+    Başlık eşiği geçemezse değiştirilen kanun ADLARI skorlanır. Adlar okunamazsa
+    (istek sınırı, hata, metinde ad yok) kalem ELENMEZ: bilinmeyeni atmak, bir
+    hukukçuya "bu dönemde İİK değişmedi" demektir.
+    """
+    tutulan: List[Dict[str, Any]] = []
+    belirsiz = acilan = 0
+    for it in items:
+        baslik = " ".join((it.get("title") or "").split())
+        metin = (_triyaj.TUR_BOLUM.get(it.get("type") or "", "") + " " + baslik).strip()
+        p = motor.p(konu, metin)
+        kaynak, degisen = "baslik", None
+        torba = (it.get("type") == "KANUN"
+                 and "degisiklik yapilmasina dair kanun" in " ".join(tr_fold(baslik).split()))
+        if torba and p < e:
+            adlar: List[str] = []
+            if acilan < TORBA_AZAMI:
+                acilan += 1
+                try:
+                    adlar = _degistirilen(str(it.get("mevzuat_id") or ""))
+                except Exception:  # noqa: BLE001 - okunamayan torba kanun belirsizdir, hata değil
+                    adlar = []
+            if not adlar:
+                kaynak = "belirsiz"
+                belirsiz += 1
+            else:
+                en_p, en_ad = max(((motor.p(konu, "KANUNLAR " + ad), ad) for ad in adlar),
+                                  key=lambda t: t[0])
+                if en_p > p:
+                    p, kaynak, degisen = en_p, "degistirilen_kanunlar", en_ad
+        if kaynak == "belirsiz" or p >= e:
+            ek: Dict[str, Any] = {"konu_skoru": round(p, 4), "konu_kaynak": kaynak}
+            if degisen:
+                ek["konu_degistirilen"] = degisen
+            tutulan.append(dict(it, **ek))
+    return tutulan, belirsiz
+
+
 def search(args: Dict[str, Any]) -> Dict[str, Any]:
     q = (args.get("query") or "").strip()
     number = str(args.get("number") or "").strip()
-    if not q and not number:
-        return {"error": "query veya number gerekli."}
     types = args.get("types") or []
     if isinstance(types, str):
         types = [t.strip() for t in types.split(",") if t.strip()]
     bad = [t for t in types if t not in TYPES]
     if bad:
         return {"error": "Bilinmeyen mevzuat türü %s. Geçerli: %s" % (bad, list(TYPES))}
+    # Bedesten sorgu kelimesi olmadan da listeler: tür ve/veya RG tarih aralığı yeter
+    # (canlı doğrulandı 2026-09-20). Konu taramasını mümkün kılan şey budur.
+    listeleme = bool(types or args.get("rg_date_from") or args.get("rg_date_to") or args.get("rg_number"))
+    if not q and not number and not listeleme:
+        return {"error": "query, number ya da bir liste süzgeci (types / rg_date_from / "
+                         "rg_date_to / rg_number) gerekli."}
+    konu = (args.get("konu") or "").strip()
+    hazir: Any = None
+    if konu:                       # doğrulama AĞA ÇIKMADAN
+        if _triyaj is None:
+            return {"error": "Konu süzgeci bu kurulumda yok (triyaj modülü yüklü değil)."}
+        hazir = _triyaj.hazirla(konu, args.get("esik"))
+        if isinstance(hazir, dict):
+            return hazir
     where = args.get("search_in") or "title"
+    page_size = max(1, min(int(args.get("page_size") or 10), PAGE_MAX))
+    page = max(1, int(args.get("page") or 1))
     data: Dict[str, Any] = {
-        "pageSize": max(1, min(int(args.get("page_size") or 10), 50)),
-        "pageNumber": max(1, int(args.get("page") or 1)),
+        "pageSize": page_size,
+        "pageNumber": page,
         "sortFields": ["RESMI_GAZETE_TARIHI"],
         "sortDirection": "desc",
     }
@@ -100,39 +217,50 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
     if args.get("exact_phrase"):
         data["tamCumle"] = True
     try:
-        if args.get("rg_date_from"):
-            data["resmiGazeteTarihiStart"] = _rg_iso(args["rg_date_from"])
-        if args.get("rg_date_to"):
-            data["resmiGazeteTarihiEnd"] = _rg_iso(args["rg_date_to"], end=True)
+        bas = _rg_iso(args["rg_date_from"]) if args.get("rg_date_from") else ""
+        son = _rg_iso(args["rg_date_to"], end=True) if args.get("rg_date_to") else ""
     except ValueError:
         return {"error": "Tarih biçimi YYYY-MM-DD veya DD/MM/YYYY olmalı."}
+    if bas or son:                 # tek taraflı aralık upstream'de sessizce yok sayılır
+        data["resmiGazeteTarihiStart"] = bas or _RG_EN_ESKI
+        data["resmiGazeteTarihiEnd"] = son or _RG_EN_YENI
     if args.get("rg_number"):
         data["resmiGazeteSayisi"] = str(args["rg_number"])
-    try:
-        d = _call("/searchDocuments", data, paging=True) or {}
-    except HttpError as exc:
-        return {"error": str(exc)}
-    items = []
-    for m in d.get("mevzuatList") or []:
-        tur = m.get("mevzuatTur") or {}
-        rg_date = (m.get("resmiGazeteTarihi") or "")[:10]
-        items.append({
-            "mevzuat_id": m.get("mevzuatId"),
-            "number": m.get("mevzuatNo"),
-            "title": (m.get("mevzuatAdi") or "").strip(),
-            "type": tur.get("name"),
-            "tertip": m.get("mevzuatTertip"),
-            "rg_date": rg_date,
-            "rg_number": m.get("resmiGazeteSayisi"),
-            "mukerrer": m.get("mukerrer"),
-            "gerekce_id": m.get("gerekceId"),
-            "citation": _citation(m, tur, rg_date),
-            "source_url": m.get("url") or "",
-        })
-    return {"query": q or number, "total": d.get("total", 0), "page": data["pageNumber"],
-            "results": items,
-            "note": "Tam metin: mevzuat_getir(mevzuat_id). Madde ağacı: mevzuat_icindekiler. "
-                    "Belirli hükmü aramak için mevzuat_icinde_ara."}
+
+    # konu verilince art arda birkaç sayfa taranabilir; aksi hâlde tek sayfa (eski davranış).
+    max_pages = max(1, min(int(args.get("max_pages") or 1), 5)) if konu else 1
+    items: List[Dict[str, Any]] = []
+    total = 0
+    taranan = 0
+    sayfa_hatasi = ""
+    for n in range(max_pages):
+        data["pageNumber"] = page + n
+        try:
+            d = _call("/searchDocuments", data, paging=True) or {}
+        except HttpError as exc:
+            if n == 0:
+                return {"error": str(exc)}
+            sayfa_hatasi = "sayfa %d alınamadı: %s" % (page + n, exc)   # eksik ≠ boş
+            break
+        lst = d.get("mevzuatList") or []
+        total = d.get("total", total)
+        items.extend(_satir(m) for m in lst)
+        taranan += 1
+        if len(lst) < page_size:
+            break
+    out: Dict[str, Any] = {
+        "query": q or number or "(liste)", "total": total, "page": page, "results": items,
+        "note": "Tam metin: mevzuat_getir(mevzuat_id). Madde ağacı: mevzuat_icindekiler. "
+                "Belirli hükmü aramak için mevzuat_icinde_ara."}
+    if konu:
+        motor, e = hazir
+        tutulan, belirsiz = _konu_ele(items, konu, motor, e)
+        out.update(results=tutulan, konu=konu, esik=e, konu_taranan=len(items),
+                   konu_elenen=len(items) - len(tutulan), konu_belirsiz=belirsiz,
+                   pages_scanned=taranan, konu_notu=_KONU_NOT)
+        if sayfa_hatasi:
+            out["pages_error"] = sayfa_hatasi
+    return out
 
 
 def _citation(m: Dict[str, Any], tur: Dict[str, Any], rg_date: str) -> str:
@@ -300,7 +428,20 @@ SEARCH_SCHEMA = {
         "rg_date_to": {"type": "string", "description": "Resmî Gazete tarihi ≤, YYYY-MM-DD"},
         "rg_number": {"type": "string", "description": "Resmî Gazete sayısı"},
         "page": {"type": "integer", "minimum": 1, "default": 1},
-        "page_size": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
+        "page_size": {"type": "integer", "minimum": 1, "maximum": PAGE_MAX, "default": 10,
+                      "description": "Bedesten'in üst sınırı 20'dir; fazlası 400 döndürür."},
+        "konu": {"type": "string", "enum": ["enerji", "rekabet", "vergi", "icra"],
+                 "description": "Yerel, ağsız konu ÖN ELEMESİ: başlıkta konu adı geçmese de yakalar; torba "
+                                "kanunlarda değiştirilen kanun adlarına da bakar. Sorgu kelimesi gerekmez: "
+                                "types ve/veya rg_date_from/rg_date_to ile listeleyin. SINIR: eğitimde "
+                                "görülmemiş 60 mevzuat başlığında vergi 4/4, icra 2/2, enerji 0/3 yakalandı — "
+                                "enerji taramasında query ile birlikte kullanın. Elenen ve belirsiz sayısı "
+                                "yanıtta yazar; esik=0 süzgeci kapatır."},
+        "esik": {"type": "number", "description": "Konu eşiği (varsayılan 0.20, ölçülmüştür). 0 = eleme yok, "
+                                                   "skorlar yine döner."},
+        "max_pages": {"type": "integer", "minimum": 1, "maximum": 5, "default": 1,
+                      "description": "Yalnız konu ile: art arda taranacak sayfa sayısı (sayfa başı en çok "
+                                     "20 kayıt, istek başına ~3,5 sn)."},
     },
 }
 
@@ -323,7 +464,9 @@ SOURCE = Source(
         "search_in='fulltext' veya önce mevzuat_ara ile belgeyi bulup mevzuat_icinde_ara. "
         "Madde numarası ve RG künyesi kayıttan gelir; ezberden madde numarası yazmayın. "
         "Sektörel ikincil düzenleme (EPDK/SPK/BDDK tebliğ ve yönetmelikleri) de buradadır: "
-        "types=['KKY','TEBLIGLER'] ve query='Enerji Piyasası' gibi."
+        "types=['KKY','TEBLIGLER'] ve query='Enerji Piyasası' gibi. Sorgu kelimesi olmadan da "
+        "listeler (types ve/veya RG tarih aralığı); konu=… bu listeyi yerel olarak eler ve torba "
+        "kanunlarda değiştirilen kanun adlarına bakar. Sayfa başı en çok 20 kayıt."
     ),
     search=search, get=get, search_schema=SEARCH_SCHEMA, get_schema=GET_SCHEMA,
     homepage="https://mevzuat.adalet.gov.tr",

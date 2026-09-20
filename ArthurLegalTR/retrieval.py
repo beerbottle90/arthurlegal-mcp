@@ -327,6 +327,16 @@ class Index:
         )
         return int(cur.lastrowid)
 
+    def has_ref(self, ref: str) -> bool:
+        """True when a document with this ``ref`` is already indexed."""
+        return self.db.execute("SELECT 1 FROM docs WHERE ref = ? LIMIT 1", (ref,)).fetchone() is not None
+
+    def has_prefix(self, prefix: str) -> bool:
+        """True when any indexed ``ref`` starts with ``prefix`` (one bülten, one dergi sayısı)."""
+        like = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        return self.db.execute("SELECT 1 FROM docs WHERE ref LIKE ? ESCAPE '\\' LIMIT 1",
+                               (like,)).fetchone() is not None
+
     def reindex_fts(self) -> None:
         """Rebuild both FTS tables from ``docs``.
 

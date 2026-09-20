@@ -98,6 +98,35 @@ kurum_karari_getir(kurum="epdk", id="https://www.epdk.gov.tr/Detay/DownloadDocum
 
 Kuruma özel filtreler `kurum_listesi` ile görülür; `params={…}` ile geçilir.
 
+
+### Mevzuatta konu taraması — `mevzuat_ara(konu=…)`
+
+```
+mevzuat_ara(types=["KANUN"], rg_date_from="2024-09-01", konu="icra", max_pages=3)
+mevzuat_ara(types=["TEBLIGLER"], rg_date_from="2026-06-01", konu="vergi")
+```
+
+Sorgu kelimesi gerekmez: Bedesten tür ve/veya RG tarih aralığıyla listeler, `konu` bu listeyi yerel
+olarak eler. Asıl kazanç **torba kanunlar**dır. 7531 sayılı Kanun İcra ve İflas Kanununu ve HMK'yı
+değiştirir; adı "Bazı Kanunlarda Değişiklik Yapılmasına Dair Kanun"dur. Başlık eşiği geçemezse
+değiştirilen kanun adları metnin ilk sayfasından okunur ve onlar skorlanır. Adları okunamayan torba
+kanun (çağrı başına en çok 5 metin açılır) **elenmez**; `konu_kaynak: "belirsiz"` ile döner.
+
+Resmî Gazete'deki duyarlılık buraya kopyalanmadı, ayrıca ölçüldü (187 başlık, 6 tür):
+
+| dilim | ne ölçer | sonuç |
+|---|---|---|
+| eğitimde görülmüş 127 başlık | yalnız Bedesten biçimine aktarım | 26/26 pozitif, 3 yanlış pozitif |
+| görülmemiş 60 başlık | genelleme | vergi 4/4 · icra 2/2 · **enerji 0/3** · 2 yanlış pozitif |
+| aynı, torba geçişi kapalı | başlığın tek başına yettiği yer | vergi 3/4 · icra 1/2 |
+
+Enerjideki üç kaçağın ikisi RG altın kümesinin bilinen tuzağıdır (katı yakıt, aydınlatma gideri),
+biri yenidir (Rüzgâr Gücü İzleme ve Tahmin Merkezine Bağlantı Yönetmeliği). Kural eklenerek
+kapatılmadı: sınav kümesine bakarak kural yazmak sınavı anlamsızlaştırır. **Enerji taramasında
+`konu`'ya güvenmeyin; `query` ile birlikte kullanın.** Pozitif sayısı azdır; yüzde değil sayı okuyun.
+
+Sayfa başı en çok 20 kayıt gelir (Bedesten sınırı; 20'den büyüğü HTTP 400 döndürür).
+
 ## Yerel indeks ve semantik arama
 
 Canlı kaynaklar indeks olmadan da çalışır. `semantik_ara` için:

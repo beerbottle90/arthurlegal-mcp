@@ -51,19 +51,10 @@ def _konu_suz(items: List[Dict[str, Any]], konu: str, esik: Any
     """
     if _triyaj is None:
         return {"error": "Konu süzgeci bu kurulumda yok (triyaj modülü yüklü değil)."}
-    try:
-        motor = _triyaj.motor()
-    except _triyaj.TriyajYok as exc:
-        return {"error": "Konu süzgeci kullanılamıyor: %s" % exc}
-    if konu not in motor.konular:
-        return {"error": "konu '%s' desteklenmiyor; geçerli: %s"
-                         % (konu, ", ".join(motor.konular))}
-    try:
-        e = motor.esik if esik is None or esik == "" else float(esik)
-    except (TypeError, ValueError):
-        return {"error": "esik sayı olmalı (0-1)."}
-    if not 0.0 <= e <= 1.0:
-        return {"error": "esik 0 ile 1 arasında olmalı."}
+    hazir = _triyaj.hazirla(konu, esik)
+    if isinstance(hazir, dict):
+        return hazir
+    motor, e = hazir
 
     tutulan = []
     for it in items:

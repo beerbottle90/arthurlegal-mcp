@@ -153,6 +153,8 @@ def crawl(index, years: Optional[List[int]] = None, limit: int = 0, log=print) -
         for b in _year_list(y):
             if limit and n >= limit:
                 break
+            if getattr(index, "exists_prefix", lambda p: False)("spk:%s:" % b["bulten"]):
+                continue
             try:
                 text = _text(b["bulten"])
             except HttpError as exc:

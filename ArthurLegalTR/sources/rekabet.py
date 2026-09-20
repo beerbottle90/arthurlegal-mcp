@@ -134,6 +134,8 @@ def crawl(index, max_pages: int = 20, query: str = "", decision_type: str = "",
         if not items:
             break
         for it in items:
+            if getattr(index, "exists", lambda r: False)("rekabet:%s" % it["karar_id"]):
+                continue
             body = it["title"]
             if fetch_text:
                 g = get({"id": it["karar_id"], "page_chars": 200000})
@@ -174,7 +176,9 @@ GET_SCHEMA = {"type": "object", "properties": {"id": {"type": "string", "descrip
 SOURCE = Source(
     key="rekabet", label="Rekabet Kurumu — Kurul kararları", kind="kurum",
     notes=("Liste sayfası 10 karar/sayfa; PdfText araması karar metninde yapılır. Karar PDF'leri "
-           "büyük olabilir (birleşme kararları 100+ sayfa). Kılavuz ve tebliğler için mevzuat_ara."),
+           "büyük olabilir (birleşme kararları 100+ sayfa). Kılavuz ve tebliğler için mevzuat_ara. "
+           "Yerel indeks Rekabet kararlarının YALNIZ BAŞLIĞINI taşır: semantik_ara(kurum='rekabet') gerekçede değil başlıkta "
+           "arar; gerekçe için bu canlı aramayı kullanın."),
     search=search, get=get, crawl=crawl, search_schema=SEARCH_SCHEMA, get_schema=GET_SCHEMA,
     homepage=BASE + "/tr/Kararlar",
 )

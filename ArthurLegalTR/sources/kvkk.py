@@ -103,6 +103,8 @@ def crawl(index, max_pages: int = 40, fetch_text: bool = True, log=print) -> Dic
         if not items:
             break
         for it in items:
+            if getattr(index, "exists", lambda r: False)("kvkk:%s" % it["id"]):
+                continue
             body = it["summary"]
             if fetch_text:
                 g = get({"id": it["id"], "page_chars": 200000})

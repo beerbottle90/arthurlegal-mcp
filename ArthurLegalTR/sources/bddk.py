@@ -98,6 +98,8 @@ def crawl(index, fetch_text: bool = False, limit: int = 0, log=print) -> Dict[st
         for it in _list(k):
             if limit and n >= limit:
                 break
+            if getattr(index, "exists", lambda r: False)("bddk:%s" % it["id"]):
+                continue
             body = it["title"]
             if fetch_text:
                 g = get({"id": it["id"], "page_chars": 200000})
@@ -126,7 +128,8 @@ GET_SCHEMA = {"type": "object", "properties": {"id": {"type": "string"}, "page":
 
 SOURCE = Source(
     key="bddk", label="BDDK — Bankacılık Düzenleme ve Denetleme Kurulu kararları", kind="kurum",
-    notes="~1.900 Kurul kararı iki listede. Canlı arama BAŞLIKTA; metin içi için yerel indeks (crawl --fetch-text).",
+    notes="~1.900 Kurul kararı iki listede. Canlı arama BAŞLIKTA; karar metnine dair soru için yerel indeks: "
+          "semantik_ara(kurum='bddk') (metinler 2026-09-20'de eklendi).",
     search=search, get=get, crawl=crawl, search_schema=SEARCH_SCHEMA, get_schema=GET_SCHEMA,
     homepage=BASE + "/Mevzuat/Liste/55",
 )

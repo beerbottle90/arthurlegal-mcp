@@ -235,6 +235,214 @@ def test_rg_tara_semasi_konuyu_ve_sinirini_duyurur():
     assert "konu" in araclar["resmi_gazete_fihrist"].input_schema["properties"]
 
 
+def test_only_new_mevcut_kaydi_atlar_ve_vektorunu_korur():
+    """Tazeleme modu: indeksteki ref yeniden yazılmaz, vektörü silinmez, adaptöre 'var' der."""
+    import crawl
+    d = tempfile.mkdtemp()
+    idx = retrieval.Index(os.path.join(d, "t.db"))
+    idx.upsert({"ref": "bddk:1", "title": "Eski başlık", "body": "tam metin", "subject": "bddk"})
+    doc_id = idx.db.execute("SELECT id FROM docs WHERE ref='bddk:1'").fetchone()["id"]
+    idx.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?, ?, ?, ?)", (doc_id, 2, b"\x00" * 8, "m"))
+    idx.db.commit()
+
+    yeni = crawl._Tagged(idx, "bddk", only_new=True)
+    assert yeni.exists("bddk:1") and not yeni.exists("bddk:2")
+    assert yeni.exists_prefix("bddk:") and not yeni.exists_prefix("spk:")
+    yeni.upsert({"ref": "bddk:1", "title": "Kısa stub", "body": "stub", "subject": "bddk"})
+    row = idx.db.execute("SELECT body FROM docs WHERE ref='bddk:1'").fetchone()
+    assert row["body"] == "tam metin", "only_new mevcut gövdeyi ezdi"
+    assert idx.db.execute("SELECT COUNT(*) FROM vecs WHERE doc_id=?", (doc_id,)).fetchone()[0] == 1
+    assert yeni.skipped >= 1
+
+    eski = crawl._Tagged(idx, "bddk")          # varsayılan: değişmeyen davranış
+    assert not eski.exists("bddk:1") and not eski.exists_prefix("bddk:")
+    eski.upsert({"ref": "bddk:1", "title": "Kısa stub", "body": "stub", "subject": "bddk"})
+    assert idx.db.execute("SELECT body FROM docs WHERE ref='bddk:1'").fetchone()["body"] == "stub"
+    assert idx.db.execute("SELECT COUNT(*) FROM vecs WHERE doc_id=?", (doc_id,)).fetchone()[0] == 0
+
+
+def test_ictihat_tek_tarafli_tarih_araligi_tamamlanir():
+    """Bedesten yalnız kararTarihiStart verilince süzgeci SESSİZCE yok sayıyor: 612 yerine
+    52.993 karar (canlı, 2026-09-20). ictihat_semantik_ara yalnız date_from alır — hep süzgeçsizdi."""
+    gonderilen = []
+    eski = bedesten_ictihat._http.post_json
+
+    def sahte(path, payload, **kw):
+        gonderilen.append(payload["data"])
+        return {"metadata": {"FMTY": "SUCCESS"}, "data": {"emsalKararList": [], "total": 0}}
+
+    bedesten_ictihat._http.post_json = sahte
+    try:
+        bedesten_ictihat.search({"query": "işe iade", "date_from": "2025-01-01"})
+        bedesten_ictihat.search({"query": "işe iade", "date_to": "2015-12-31"})
+        bedesten_ictihat.search({"query": "işe iade"})
+    finally:
+        bedesten_ictihat._http.post_json = eski
+    a, b, c = gonderilen
+    assert a["kararTarihiStart"].startswith("2025-01-01") and a["kararTarihiEnd"].startswith("2100")
+    assert b["kararTarihiStart"].startswith("1900") and b["kararTarihiEnd"].startswith("2015-12-31")
+    assert "kararTarihiStart" not in c and "kararTarihiEnd" not in c
+
+
+def test_backfill_yalniz_basliktan_ibaret_govdeyi_doldurur():
+    """BDDK/BTK/Rekabet listeden indekslendi: gövde = başlık, semantik arama başlığı arıyordu."""
+    import crawl
+    import sources as _sources
+    d = tempfile.mkdtemp()
+    idx = retrieval.Index(os.path.join(d, "t.db"))
+    idx.upsert({"ref": "bddk:11", "title": "X A.Ş.'nin faaliyet izninin iptaline ilişkin Kurul Kararı",
+                "body": "X A.Ş.'nin faaliyet izninin iptaline ilişkin Kurul Kararı", "subject": "bddk"})
+    idx.upsert({"ref": "bddk:12", "title": "Y Bankası kuruluş izni", "body": "tam metin " * 80, "subject": "bddk"})
+    idx.upsert({"ref": "bddk:13", "title": "Taranmış karar", "body": "Taranmış karar", "subject": "bddk"})
+    ids = {r["ref"]: r["id"] for r in idx.db.execute("SELECT id, ref FROM docs")}
+    for i in ids.values():
+        idx.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?, ?, ?, ?)", (i, 2, b"\x00" * 8, "m"))
+    idx.db.commit()
+
+    istenen = []
+
+    class _Sahte:
+        @staticmethod
+        def get(args):
+            istenen.append(args["id"])
+            return {"text": "Kurul, 5411 sayılı Kanunun 71 inci maddesi uyarınca " * 12} if args["id"] == "11" else {"text": ""}
+
+    eski = _sources.load_all
+    _sources.load_all = lambda: {"bddk": _Sahte}
+    try:
+        ozet = crawl._backfill(idx, ["bddk", "kvkk"], 0, lambda m: None)
+    finally:
+        _sources.load_all = eski
+    assert sorted(istenen) == ["11", "13"], "zaten metni olan belge yeniden indirilmemeli"
+    assert ozet["bddk"] == {"aday": 2, "metin_eklendi": 1, "metin_yok": 1}
+    govde = {r["ref"]: r["body"] for r in idx.db.execute("SELECT ref, body FROM docs")}
+    assert "5411 sayılı Kanunun" in govde["bddk:11"] and govde["bddk:13"] == "Taranmış karar"
+    vek = {r[0] for r in idx.db.execute("SELECT doc_id FROM vecs")}
+    assert ids["bddk:11"] not in vek, "metni değişen belgenin eski vektörü kalmamalı"
+    assert ids["bddk:12"] in vek and ids["bddk:13"] in vek
+
+
+# ---------------------------------------------------------------- mevzuat_ara(konu=…)
+
+from sources import bedesten_mevzuat as _mv  # noqa: E402
+
+
+class _SahteBedesten:
+    """_mv._call ve _mv.get'i geçici olarak değiştirir; ağ yok."""
+
+    def __init__(self, sayfalar, metinler=None, cagri_yasak=False):
+        self.sayfalar, self.metinler, self.cagri_yasak = sayfalar, metinler or {}, cagri_yasak
+        self.istekler = []
+
+    def __enter__(self):
+        self._call, self._get = _mv._call, _mv.get
+
+        def call(path, data, paging=False):
+            assert not self.cagri_yasak, "doğrulama ağa çıkmadan yapılmalıydı"
+            self.istekler.append(dict(data))
+            i = data["pageNumber"] - 1
+            lst = self.sayfalar[i] if i < len(self.sayfalar) else []
+            return {"total": sum(len(x) for x in self.sayfalar), "mevzuatList": lst}
+
+        _mv._call = call
+        _mv.get = lambda args: {"text": self.metinler.get(str(args.get("mevzuat_id")), "")}
+        return self
+
+    def __exit__(self, *a):
+        _mv._call, _mv.get = self._call, self._get
+
+
+def _kayit(i, tur, ad):
+    return {"mevzuatId": str(i), "mevzuatNo": str(7000 + i), "mevzuatAdi": ad,
+            "mevzuatTur": {"name": tur}, "resmiGazeteTarihi": "2026-08-26T21:00:00.000Z",
+            "resmiGazeteSayisi": "33350"}
+
+
+def test_mevzuat_sayfa_boyu_20yi_asamaz():
+    """Bedesten 20'den büyük pageSize'a 400 döndürür; şema 50 diyordu (canlı, 2026-09-20)."""
+    with _SahteBedesten([[]]) as b:
+        _mv.search({"query": "enerji", "page_size": 50})
+    assert b.istekler[0]["pageSize"] == 20
+    assert _mv.SEARCH_SCHEMA["properties"]["page_size"]["maximum"] == 20
+
+
+def test_mevzuat_sorgusuz_liste_tur_veya_tarihle_olur():
+    with _SahteBedesten([[_kayit(1, "KKY", "ARI ZEHRİNİN TOPLANMASINA İLİŞKİN YÖNETMELİK")]]) as b:
+        r = _mv.search({"types": ["KKY"], "rg_date_from": "2026-07-01"})
+    assert not r.get("error") and len(r["results"]) == 1
+    assert "mevzuatAdi" not in b.istekler[0] and "phrase" not in b.istekler[0]
+    assert "error" in _mv.search({})                      # hiçbir süzgeç yokken hâlâ reddeder
+
+
+def test_mevzuat_tek_tarafli_rg_araligi_tamamlanir():
+    """Bedesten yalnız Start ya da yalnız End verilince süzgeci SESSİZCE yok sayar:
+    rg_date_from="2024-09-01" ile 6 yerine 917 kanun dönüyordu (canlı, 2026-09-20)."""
+    with _SahteBedesten([[], []]) as b:
+        _mv.search({"types": ["KANUN"], "rg_date_from": "2024-09-01"})
+        _mv.search({"types": ["KANUN"], "rg_date_to": "2024-09-01"})
+    ilk, ikinci = b.istekler
+    assert ilk["resmiGazeteTarihiStart"].startswith("2024-08-31") and ilk["resmiGazeteTarihiEnd"].startswith("2100")
+    assert ikinci["resmiGazeteTarihiStart"].startswith("1850") and ikinci["resmiGazeteTarihiEnd"].startswith("2024-09-01")
+
+
+def test_mevzuat_konu_gecersizse_AGA_CIKMADAN_hata_verir():
+    with _SahteBedesten([[]], cagri_yasak=True):
+        r = _mv.search({"types": ["KANUN"], "konu": "ceza"})
+        r2 = _mv.search({"types": ["KANUN"], "konu": "icra", "esik": "elma"})
+    assert "desteklenmiyor" in r["error"] and "sayı" in r2["error"]
+
+
+def test_mevzuat_konu_eler_sayar_ve_birden_cok_sayfa_tarar():
+    s1 = [_kayit(1, "TEBLIGLER", "KONKORDATO GİDER AVANSI TARİFESİ")] + \
+         [_kayit(10 + i, "KKY", "TÜRK OPTİSYEN-GÖZLÜKÇÜLER BİRLİĞİ YÖNETMELİĞİ") for i in range(19)]
+    s2 = [_kayit(2, "KKY", "KUR’AN KURSLARI YÖNETMELİĞİ")]
+    with _SahteBedesten([s1, s2]) as b:
+        r = _mv.search({"types": ["KKY", "TEBLIGLER"], "konu": "icra", "page_size": 20, "max_pages": 3})
+    assert [x["title"] for x in r["results"]] == ["KONKORDATO GİDER AVANSI TARİFESİ"]
+    assert r["results"][0]["konu_kaynak"] == "baslik" and r["results"][0]["konu_skoru"] >= 0.20
+    assert r["konu_taranan"] == 21 and r["konu_elenen"] == 20 and r["konu_belirsiz"] == 0
+    assert r["pages_scanned"] == 2 and len(b.istekler) == 2      # kısa sayfada durur
+    assert "0/3" in r["konu_notu"]                               # sınır her yanıtta
+
+
+def test_mevzuat_torba_kanun_degistirilen_adlardan_yakalanir():
+    """'Bazı Kanunlarda Değişiklik' başlığı İİK'yı değiştirdiğini söylemez; metin söyler.
+    'ile' ile 'ilgili' arasındaki satır sonu bir kez her ikinci kanunu kaçırtmıştı."""
+    metin = ("MADDE 1- 2- ( 9/6/1932 tarihli ve 2004 sayılı İcra ve İflas Kanunu ile \n"
+             "ilgili olup, yerine işlenmiştir.) MADDE 3- ( 19/3/1969 tarihli ve 1136 sayılı "
+             "Avukatlık Kanunu ile ilgili olup, yerine işlenmiştir.) MADDE 4- (2872 sayılı Kanun "
+             "ile ilgili olup, yerine işlenmiştir.)")
+    torba = _kayit(5, "KANUN", "BAZI KANUNLARDA DEĞİŞİKLİK YAPILMASINA DAİR KANUN")
+    with _SahteBedesten([[torba]], {"5": metin}):
+        assert _mv._degistirilen("5") == ["İcra ve İflas Kanunu", "Avukatlık Kanunu"]
+        r = _mv.search({"types": ["KANUN"], "konu": "icra"})
+    assert len(r["results"]) == 1 and r["konu_elenen"] == 0
+    assert r["results"][0]["konu_kaynak"] == "degistirilen_kanunlar"
+    assert r["results"][0]["konu_degistirilen"] == "İcra ve İflas Kanunu"
+
+
+def test_mevzuat_torba_kanun_adlari_okunamazsa_ELENMEZ():
+    """7557: 'MADDE 1 ila 27- İlgili Kanunlara işlenmiştir.' Ad yok. Bilinmeyeni atmak,
+    hukukçuya 'bu dönemde o kanun değişmedi' demektir."""
+    torba = _kayit(3, "KANUN", "SAĞLIKLA İLGİLİ BAZI KANUNLARDA DEĞİŞİKLİK YAPILMASINA DAİR KANUN")
+    with _SahteBedesten([[torba]], {"3": "MADDE 1 ila MADDE 27- İlgili Kanunlara işlenmiştir."}):
+        r = _mv.search({"types": ["KANUN"], "konu": "vergi"})
+    assert len(r["results"]) == 1 and r["konu_belirsiz"] == 1 and r["konu_elenen"] == 0
+    assert r["results"][0]["konu_kaynak"] == "belirsiz"
+
+
+def test_mevzuat_semasi_konuyu_ve_olculmus_sinirini_duyurur():
+    import server
+    sema = {t.name: t for t in server.TOOLS}["mevzuat_ara"].input_schema
+    p = sema["properties"]
+    assert set(p["konu"]["enum"]) == {"enerji", "rekabet", "vergi", "icra"}
+    assert "enerji 0/3" in p["konu"]["description"], "zayıf konu şemada gizlenmemeli"
+    assert "max_pages" in p and "esik" in p and not sema.get("required")
+    import triyaj
+    k = triyaj.kunye()
+    assert k["mevzuat"]["gorulmemis"]["enerji"] == {"pozitif": 3, "yakalanan": 0}
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

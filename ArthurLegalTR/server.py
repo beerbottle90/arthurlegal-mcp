@@ -48,7 +48,7 @@ import sources  # noqa: E402
 from sources import bedesten_ictihat, bedesten_mevzuat, anayasa, uyusmazlik, resmi_gazete, spk  # noqa: E402
 from textx import HAS_PYPDF  # noqa: E402
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 INDEX_PATH = os.environ.get("INDEX_PATH") or os.path.join(HERE, "data", "index.db")
 
 _index: Optional[retrieval.Index] = None
@@ -246,6 +246,12 @@ GUIDE = """ArthurLegalTR — hangi soru için hangi araç
    Belirli hüküm: mevzuat_icinde_ara(mevzuat_id, query)
    Gerekçe: mevzuat_gerekce(gerekce_id)   (yalnız gerekce_id dolu kanunlarda)
    Sektörel düzenleme: types=["KKY","TEBLIGLER"] + query="Enerji Piyasası" / "Sermaye Piyasası" / "Bankacılık"
+   Konu taraması: mevzuat_ara(types=["KANUN"], rg_date_from="2024-09-01", konu="icra", max_pages=3)
+     Sorgu kelimesi gerekmez. Torba kanunlarda ("Bazı Kanunlarda Değişiklik…") değiştirilen kanun
+     ADLARINA bakar: 7531 sayılı Kanun İİK'yı değiştirir ama başlığı bunu söylemez. Adları okunamayan
+     torba kanun ELENMEZ, konu_kaynak="belirsiz" ile döner.
+     SINIR: eğitimde görülmemiş 60 başlıkta vergi 4/4, icra 2/2, enerji 0/3. Enerji taramasında
+     konu'ya güvenmeyin; query ile birlikte kullanın. Sayfa başı en çok 20 kayıt (Bedesten sınırı).
 
 2. İÇTİHAT
    Yargıtay/Danıştay/BAM/yerel/KYB: ictihat_ara(query, courts, chamber, date_from) → ictihat_getir(document_id)
@@ -323,7 +329,10 @@ def build_tools() -> List[Tool]:
         Tool("uyusmazlik_ara", "Uyuşmazlık Mahkemesi kararlarını arar (adli–idari görev uyuşmazlıkları).", uy.SEARCH_SCHEMA, _wrap(uy.search)),
         Tool("uyusmazlik_getir", "Uyuşmazlık Mahkemesi karar PDF metni.", uy.GET_SCHEMA, _wrap(uy.get)),
         Tool("mevzuat_ara", "Mevzuat arar: kanun, KHK, CB kararnamesi/kararı/yönetmeliği/genelgesi, tüzük, kurum yönetmeliği, tebliğ, mülga. "
-             "Varsayılan başlıkta; search_in='fulltext' ile metinde.", mv.SEARCH_SCHEMA, _wrap(mv.search)),
+             "Varsayılan başlıkta; search_in='fulltext' ile metinde. Sorgu kelimesi olmadan da listeler "
+             "(types ve/veya rg_date_from/rg_date_to). konu=… yerel bir ön elemedir: başlıkta konu adı "
+             "geçmeyen mevzuatı ve torba kanunları (değiştirilen kanun adlarından) yakalar; sınırı şemada yazar.",
+             mv.SEARCH_SCHEMA, _wrap(mv.search)),
         Tool("mevzuat_getir", "Mevzuat tam metni (sayfalı).", mv.GET_SCHEMA, _wrap(mv.get)),
         Tool("mevzuat_icindekiler", "Mevzuatın madde ağacı (bölüm/madde başlıkları, madde_id'ler).",
              {"type": "object", "properties": {"mevzuat_id": {"type": "string"}}, "required": ["mevzuat_id"]}, _wrap(mv.toc)),

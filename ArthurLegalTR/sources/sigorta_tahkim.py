@@ -121,6 +121,8 @@ def get(args: Dict[str, Any]) -> Dict[str, Any]:
 def crawl(index, issues: Optional[List[int]] = None, log=print) -> Dict[str, Any]:
     n = 0
     for issue in issues or range(1, LATEST_KNOWN + 1):
+        if getattr(index, "exists_prefix", lambda p: False)("stk:%d:" % issue):
+            continue
         try:
             text = _text(issue)
         except HttpError as exc:

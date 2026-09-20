@@ -204,6 +204,8 @@ def crawl(index, markets: Optional[List[str]] = None, fetch_text: bool = False, 
             for r in rows:
                 if limit and n >= limit:
                     break
+                if getattr(index, "exists", lambda ref: False)("epdk:%s" % r["id"]):
+                    continue
                 body = "%s\n%s › %s" % (r["subject"], r["path"], r["category"])
                 if fetch_text and r["documents"]:
                     g = get({"id": r["documents"][0]["url"], "page_chars": 200000})

@@ -109,10 +109,14 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
     chamber = (args.get("chamber") or "").strip()
     if chamber and chamber.upper() != "ALL":
         data["birimAdi"] = CHAMBERS.get(chamber.upper(), chamber)
-    if args.get("date_from"):
-        data["kararTarihiStart"] = _iso(args["date_from"])
-    if args.get("date_to"):
-        data["kararTarihiEnd"] = _iso(args["date_to"], end=True)
+    # Bedesten TEK TARAFLI tarih aralığını SESSİZCE yok sayar (canlı, 2026-09-20): "işe iade" için
+    # yalnız date_from=2025-01-01 -> 52.993 karar (süzgeçsiz), iki uç birlikte -> 612. Eksik ucu biz
+    # doldururuz; yoksa "2025'ten sonraki kararlar" diyen hukukçu 1990'ların kararını okur.
+    bas = _iso(args["date_from"]) if args.get("date_from") else ""
+    son = _iso(args["date_to"], end=True) if args.get("date_to") else ""
+    if bas or son:
+        data["kararTarihiStart"] = bas or "1900-01-01T00:00:00.000Z"
+        data["kararTarihiEnd"] = son or "2100-01-01T23:59:59.999Z"
     payload = {"data": data, "applicationName": "UyapMevzuat", "paging": True}
     try:
         body = _http.post_json("/emsal-karar/searchDocuments", payload)

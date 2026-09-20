@@ -92,6 +92,8 @@ def crawl(index, max_pages: int = 10, fetch_text: bool = False, log=print) -> Di
         if not items:
             break
         for it in items:
+            if getattr(index, "exists", lambda r: False)("btk:%s" % it["id"]):
+                continue
             body = it["title"] or ""
             if fetch_text and it.get("pdf_url"):
                 g = get({"id": it["pdf_url"], "page_chars": 200000})
@@ -126,7 +128,8 @@ GET_SCHEMA = {"type": "object", "properties": {"id": {"type": "string", "descrip
 
 SOURCE = Source(
     key="btk", label="BTK — Bilgi Teknolojileri ve İletişim Kurumu Kurul kararları", kind="kurum",
-    notes="Karar başlığı listede, gerekçe PDF'te. id = pdf_url.",
+    notes="Karar başlığı listede, gerekçe PDF'te; canlı arama BAŞLIKTA. Karar metnine dair soru için yerel indeks: "
+          "semantik_ara(kurum='btk') (metinler 2026-09-20'de eklendi). id = pdf_url.",
     search=search, get=get, crawl=crawl, search_schema=SEARCH_SCHEMA, get_schema=GET_SCHEMA,
     homepage=BASE + "/kurul-kararlari",
 )

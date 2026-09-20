@@ -53,14 +53,16 @@ Rekabet, SPK, BDDK, KVKK, BTK, GİB, Sigorta Tahkim) behind one
 `tr_kurum_karari_ara` interface, plus a locally indexed
 archive for `tr_semantik_ara`. Source: the `ArthurLegalTR/` folder.
 
-`tr_resmi_gazete_tara` and `tr_resmi_gazete_fihrist` also take a `konu` filter
-(`enerji`, `rekabet`, `vergi`, `icra`): a local, network-free topic triage over
-gazette titles that finds items whose titles never mention the topic (in the
-labelled corpus the topic word appears in only 10% of `icra` items). It is a
-pre-filter, not a guarantee: measured out-of-fold sensitivity at the default
-threshold is 92-100% per topic, every response says how many items it dropped,
-`esik=0` disables it, and `status` reports whether the model is present. Do not
-use it for publication verification.
+`tr_resmi_gazete_tara`, `tr_resmi_gazete_fihrist` and `tr_mevzuat_ara` also take a `konu` filter
+(`enerji`, `rekabet`, `vergi`, `icra`): a local, network-free topic triage over titles that finds
+items whose titles never mention the topic (in the labelled gazette corpus the topic word appears
+in only 10% of `icra` items). In legislation it also reads the names of the laws an omnibus act
+amends -- "Bazi Kanunlarda Degisiklik Yapilmasina Dair Kanun" says nothing, Law 7531 amends the
+Enforcement and Bankruptcy Code -- and an omnibus act whose names cannot be read is never dropped.
+It is a pre-filter, not a guarantee, and it was measured separately per source: gazette
+out-of-fold sensitivity 92-100% per topic; on 60 unseen legislation titles vergi 4/4, icra 2/2,
+enerji 0/3. Every response says how many items it dropped, `esik=0` disables it, and `status`
+reports the model and both measurements. Do not use it for publication verification.
 
 ## Tool naming
 

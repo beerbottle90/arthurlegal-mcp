@@ -228,6 +228,69 @@ def motor() -> Triyaj:
     return m
 
 
+# Bedesten mevzuat türü -> Resmî Gazete fihristindeki bölüm adı. Model girdiyi
+# "BÖLÜM başlık" olarak gördü; tür adını aynı sözcüklerle vermek biçim farkını
+# küçültür. Eğitim deposundaki olc_mevzuat.py aynı eşlemeyi kullanır.
+TUR_BOLUM = {
+    "KANUN": "KANUNLAR",
+    "KHK": "KANUN HÜKMÜNDE KARARNAMELER",
+    "CB_KARARNAME": "CUMHURBAŞKANLIĞI KARARNAMELERİ",
+    "CB_KARAR": "CUMHURBAŞKANI KARARLARI",
+    "CB_YONETMELIK": "YÖNETMELİKLER",
+    "CB_GENELGE": "GENELGELER",
+    "YONETMELIK": "YÖNETMELİKLER",
+    "KKY": "YÖNETMELİKLER",
+    "UY": "YÖNETMELİKLER",
+    "TEBLIGLER": "TEBLİĞLER",
+    "TUZUK": "TÜZÜKLER",
+    "MULGA": "",
+}
+
+# Model RG fihristinde eğitildi; mevzuat başlıklarındaki başarımı AYRICA ölçüldü
+# (arthurlegal-1.9.1-jev-edition/olc_mevzuat.py, 2026-09-20, eşik 0.20). RG'deki
+# duyarlılık buraya kopyalanamaz. Pozitif sayısı azdır: yüzde değil SAYI okuyun.
+MEVZUAT_OLCUM = {
+    "kume": "187 Bedesten başlığı · 6 tür · RG 2024-09-01..2026-09-19",
+    "bicim_aktarimi": {
+        "kalem": 127, "pozitif": 26, "yakalanan": 26, "yanlis_pozitif": 3,
+        "not": "bu başlıklar modelin eğitim örneğidir; genelleme değil, yalnız "
+               "Bedesten biçimine (BÜYÜK HARF, bölüm adı yok) aktarımı ölçer"},
+    "gorulmemis": {
+        "kalem": 60,
+        "enerji": {"pozitif": 3, "yakalanan": 0},
+        "rekabet": {"pozitif": 0, "yakalanan": 0},
+        "vergi": {"pozitif": 4, "yakalanan": 4},
+        "icra": {"pozitif": 2, "yakalanan": 2},
+        "yanlis_pozitif": 2,
+        "torba_gecisi_olmadan": {"vergi": 3, "icra": 1}},
+    "uyari": "enerji 0/3: ikisi RG altın kümesinin bilinen tuzağı (katı yakıt, "
+             "aydınlatma gideri), biri yeni (rüzgâr gücü izleme). Enerji "
+             "taramasında konu'ya güvenmeyin; query ile birlikte kullanın.",
+}
+
+
+def hazirla(konu: str, esik: Any) -> Any:
+    """``(motor, eşik)`` ya da ``{"error": …}``.
+
+    Konu ve eşik doğrulaması tek yerde ve AĞA ÇIKMADAN yapılır: geçersiz bir konu
+    onlarca isteği tetikleyip sonunda "sonuç yok" gibi görünmemelidir.
+    """
+    try:
+        m = motor()
+    except TriyajYok as exc:
+        return {"error": "Konu süzgeci kullanılamıyor: %s" % exc}
+    if konu not in m.konular:
+        return {"error": "konu '%s' desteklenmiyor; geçerli: %s"
+                         % (konu, ", ".join(m.konular))}
+    try:
+        e = m.esik if esik is None or esik == "" else float(esik)
+    except (TypeError, ValueError):
+        return {"error": "esik sayı olmalı (0-1)."}
+    if not 0.0 <= e <= 1.0:
+        return {"error": "esik 0 ile 1 arasında olmalı."}
+    return m, e
+
+
 def kunye() -> Dict[str, Any]:
     """Durum raporu için: model var mı, neyi kapsıyor, ne kadar kaçırıyor."""
     try:
@@ -236,5 +299,6 @@ def kunye() -> Dict[str, Any]:
         return {"var": False, "neden": str(exc)}
     return {"var": True, "konular": list(m.konular), "esik": m.esik,
             "sozluk": m._ust["boyut"], "kural": len(m._ust["kurallar"]),
-            "kapsam": "Resmî Gazete fihristi (bölüm + başlık)",
-            "olcum": m._ust["olcum"]}
+            "kapsam": "Resmî Gazete fihristi (bölüm + başlık); mevzuat_ara başlıkları ayrıca ölçüldü",
+            "olcum": m._ust["olcum"],
+            "mevzuat": MEVZUAT_OLCUM}

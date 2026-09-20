@@ -21,11 +21,26 @@ time; "Local" = crawled into `data/index.db` for `semantik_ara`.
 
 ## Details worth knowing
 
+**The local index is not equally deep.** Measured 2026-09-20: 13,313 of 19,498 documents (BDDK, BTK, Rekabet) were
+indexed from their listings, so their body was the title and `semantik_ara` searched titles, not decisions.
+`crawl.py --backfill-text` added full text for BDDK (964/964) and BTK (1,897/1,904; seven are scanned PDFs).
+"idari para cezası" occurs in the text of 412 BTK decisions and in the title of none — a question that could not be
+asked before, because BTK's live search is title-only too. Rekabet stays title-only on purpose: its live search
+already matches inside the PDFs, and ten thousand long PDFs would bloat the baked image. EPDK has text for about half
+of its decisions (the rest have no extractable document); KVKK, SPK and Sigorta Tahkim always had full text.
+
 **Bedesten** (ictihat + mevzuat). One IP gets ~10 requests per 30 s; the shared
 token bucket spaces requests 3.5 s apart and honours `Retry-After`. Result
 rows carry no text — `ictihat_getir` per decision. Search syntax: bare words
 AND, `"phrase"`, `+must`, `-not`, `AND/OR/NOT`, no wildcards. Mevzuat search
 defaults to the title; `search_in="fulltext"` sends `phrase` + `basliktaAra=false`.
+Mevzuat page size is capped at **20** by the API (`Kayıt sayısı 20'den fazla olamaz`, HTTP 400 —
+verified 2026-09-20; the schema used to say 50). The same holds for case law: `kararTarihiStart` without `kararTarihiEnd` is ignored (52,993 vs 612 for
+"işe iade" from 2025), so `ictihat_ara` sends both bounds too.
+A one-sided RG date range (`resmiGazeteTarihiStart` without `…End`, or the reverse) is silently
+ignored upstream — 917 laws instead of 6 — so the adapter always sends both bounds.
+Without a query the API lists by type and RG date
+range, which is what `mevzuat_ara(konu=…)` scans.
 Date filters are converted to the UTC boundaries Turkey's UTC+3 implies.
 
 **EPDK**. No search API; the portal search needs reCAPTCHA v3. The Kurul
