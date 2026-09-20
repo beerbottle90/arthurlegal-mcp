@@ -75,6 +75,11 @@ STDLIB_BACKENDS = [
     ("jp", os.path.join(ROOT, "jp-egov-mcp"), "srv_jp", "🇯🇵 Japonya — mevzuat"),
     ("gleif", os.path.join(ROOT, "gleif-mcp"), "srv_gleif",
      "🌍 Tüzel kişi kimliği + grup yapısı (LEI)"),
+    # Not a jurisdiction and not a corpus: it never calls TKGM (Parsel Sorgu terms
+    # art. 3). Under the HTTP transport it also refuses file paths, so the public
+    # endpoint only ever works on parcel text the caller pastes in.
+    ("tkgm", os.path.join(ROOT, "tkgm-mcp"), "srv_tkgm",
+     "🇹🇷 Tapu-kadastro — parsel ölçü, ölçekli kroki, hukuk köprüsü (TKGM'ye bağlanmaz)"),
 ]
 
 # The three older servers expose TOOLS as dicts with a "handler" key rather than
@@ -280,7 +285,7 @@ def _t_status(args: Dict[str, Any]) -> Any:
         "backends_loaded": _loaded,
         "tools_exposed": len(_tools),
         "note": "Every tool is prefixed with its jurisdiction (nl_, pl_, at_, ie_, "
-                "fi_, es_, uk_, eu_, jp_, gleif_, az_, scholar_, contracts_, de_). Across the underlying "
+                "fi_, es_, uk_, eu_, jp_, gleif_, tkgm_, az_, scholar_, contracts_, de_). Across the underlying "
                 "servers `get_act` means five different things, so the prefix is "
                 "what keeps a Spanish question from being answered with Finnish law.",
     }
@@ -334,7 +339,9 @@ ARAÇ ÖNEKLERİ. Her araç ait olduğu yargı çevresinin önekini taşır:
 Resmî Gazete, semantik arşiv; KİK/Sayıştay/TÜRKPATENT/İSTAÇ YOK — resmi uçları cevap vermiyor) · `nl_` Hollanda · `pl_` Polonya ·
 `at_` Avusturya · `ie_` İrlanda · `fi_` Finlandiya · `es_` İspanya · `uk_` Birleşik Krallık ·
 `eu_` AB (CELLAR) · `jp_` Japonya · `az_` Azerbaycan · `de_` Almanya ·
-`gleif_` tüzel kişi kimliği (LEI) · `scholar_` doktrin · `contracts_` sözleşme emsali.
+`gleif_` tüzel kişi kimliği (LEI) · `scholar_` doktrin · `contracts_` sözleşme emsali ·
+`tkgm_` tapu-kadastro parsel araçları (kullanıcının getirdiği GeoJSON/KML'den ölçü, kroki,
+hukuk köprüsü; TKGM servislerine BAĞLANMAZ — önce `tkgm_rehber`).
 
 TÜRKİYE İÇİN GİRİŞ NOKTASI: karmaşık Türk hukuku sorusunda önce `tr_hukuk_arastirma_rehberi`
 (hangi soru için hangi araç), sonra `tr_kurum_listesi` (8 kurumun filtreleri).

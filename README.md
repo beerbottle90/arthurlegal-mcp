@@ -64,6 +64,20 @@ out-of-fold sensitivity 92-100% per topic; on 60 unseen legislation titles vergi
 enerji 0/3. Every response says how many items it dropped, `esik=0` disables it, and `status`
 reports the model and both measurements. Do not use it for publication verification.
 
+## Turkish land-registry parcel tools (`tkgm_`)
+
+`tkgm_` tools work on a parcel file **the user downloads themselves** from TKGM's Parsel Sorgu
+(GeoJSON/KML): plane-projected area and edge lengths, a to-scale A4 SVG sketch, an OSM map, format
+conversion (DXF/KML/CSV), route-corridor intersection, 2026 title-deed fee and revolving-fund
+tariff lookups (every figure stored with a verbatim source quote), and a bridge from the parcel to
+the statutes and case law to check with the `tr_` tools. This server **never calls TKGM**: Parsel
+Sorgu's terms of use forbid direct or indirect access to its web services (art. 3) and commercial
+use of its output (art. 4). Parsel Sorgu exports vertices rounded to 5 decimals (~1.1 m), so the
+tools report the resulting area uncertainty instead of presenting a rounding artefact as a
+cadastral discrepancy. On this hosted endpoint file paths are refused (parcel text is passed in
+`icerik`) and the tools that write files, fetch elevation data or read title records are disabled;
+run `tkgm-mcp/server.py` locally over stdio for those. Source: the `tkgm-mcp/` folder.
+
 ## Tool naming
 
 Every tool carries its jurisdiction as a prefix -- `nl_` `pl_` `at_` `ie_` `fi_`
