@@ -22,8 +22,8 @@ kelime paylaşmadığı kararı da bulabilen bir yerel indeks koyar.
 ## Kurulum
 
 ```bash
-git clone https://github.com/beerbottle90/arthurlegal-mcp
-cd arthurlegal-mcp/ArthurLegalTR
+git clone https://github.com/beerbottle90/ArthurLegalTR
+cd ArthurLegalTR
 pip install pypdf          # opsiyonel ama PDF'ler için gerekli
 python server.py           # stdio
 ```
@@ -52,6 +52,38 @@ HTTP (claude.ai connector, Copilot Studio): `python server.py --transport http -
 
 Her sonuç `citation` taşır ve kayıttan üretilir; model esas/karar numarası uydurmaz. Erişilemeyen
 kaynak `error` / `upstream_blocked` / `unavailable` döner — boş liste değil.
+
+### Konu taraması — `resmi_gazete_tara(konu=…)`
+
+```
+resmi_gazete_tara(konu="enerji", date_from="2026-09-01", date_to="2026-09-19")
+resmi_gazete_tara(konu="icra", query="tarife")      # ikisi VE ile birleşir
+resmi_gazete_tara(konu="vergi", esik=0)             # süzgeç kapalı, skorlar yine gelir
+```
+
+`query` harfi harfine eşleşir; bir konuyu taramak için bu yetmez, çünkü Resmî Gazete başlıkları
+konu adını çoğu zaman taşımaz. Etiketli gövdede ölçüldü:
+
+| konu | gerçek pozitif | başlıkta konu adı geçen |
+|---|---|---|
+| enerji | 179 | 103 (%58) |
+| vergi | 87 | 53 (%61) |
+| rekabet | 37 | 5 (%14) |
+| icra | 52 | 5 (%10) |
+
+"Konkordato Gider Avansı Tarifesi" icradır ama `icra` yazmaz; "Şarj Hizmeti Yönetmeliği"
+enerjidir ama `enerji` yazmaz. `konu` bunları bulur.
+
+Süzgeç yereldir: ağ yok, anahtar yok, ücret yok, ikinci süreç yok — `triyaj.py`, standart
+kütüphane. Karakter 3-5 gramı + tf-idf + lojistik regresyon, Platt ile kalibre, üstünde yalnız
+yukarı çeken bir kural katmanı. Model `arthurlegal-1.9.1-jev-edition` deposunda eğitildi;
+buraya yalnız çıkarım geldi.
+
+**Sınırı:** bu bir ön elemedir. Kat dışı ölçümde 0.20 eşiğinde duyarlılık enerji %97,
+rekabet %100, vergi %93, icra %92 — ve eşiği düşürmek kalanı kurtarmıyor. Her yanıt kaç
+kalemin elendiğini yazar. **Yayım teyidi gibi eksiksizlik gerektiren işlerde `konu`
+kullanmayın**; `query` kullanın ya da `esik=0` ile tam listeyi alın. Modelin durumu ve
+ölçülmüş duyarlılığı `status` çıktısındaki `triyaj` bloğundadır.
 
 ### Kurum arayüzü
 

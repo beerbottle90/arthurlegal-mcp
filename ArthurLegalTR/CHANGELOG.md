@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 — 2026-09-20
+
+- `resmi_gazete_tara` and `resmi_gazete_fihrist` take a `konu` filter
+  (`enerji` · `rekabet` · `vergi` · `icra`): a local, network-free topic triage
+  that finds items whose titles never mention the topic. This is a capability
+  the tools did not have — `query` matches literally, and in the labelled
+  corpus the topic word appears in only 10% of `icra` items, 14% of `rekabet`,
+  58% of `enerji`, 61% of `vergi`. "Konkordato Gider Avansı Tarifesi" is an
+  enforcement matter that no `icra` query will ever return.
+  - `query` is no longer required; `query` or `konu` is. Given both, they AND.
+  - New `triyaj.py` — standard library only, no numpy, no network, no key, no
+    second process. Character 3–5-grams + tf-idf + logistic regression, Platt
+    calibrated, over a rule layer that only ever raises a score. Trained in
+    `arthurlegal-1.9.1-jev-edition`; only inference ships here.
+  - **It is a pre-filter, not a guarantee.** Out-of-fold sensitivity at the
+    measured 0.20 threshold: enerji 97%, rekabet 100%, vergi 93%, icra 92% —
+    and lowering the threshold does not recover the rest. Every response says
+    how many items were dropped; `esik=0` disables the filter and returns the
+    full list with scores. Do not use `konu` for publication verification.
+  - `status` now reports the triage model's presence, threshold and measured
+    sensitivity, so a missing model is visible before it is relied on.
+
 ## 0.2.0 — 2026-09-06
 
 - Removed KİK, Sayıştay, TÜRKPATENT and İSTAÇ: their official endpoints do not answer reliably

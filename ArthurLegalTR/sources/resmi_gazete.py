@@ -25,8 +25,60 @@ from net import Http, HttpError
 from textx import html_to_text, paginate, pdf_to_text, strip_tags, count_hits
 from sources import Source
 
+try:                                    # Konu süzgeci isteğe bağlıdır.
+    import triyaj as _triyaj
+except Exception:                       # pragma: no cover - modül yoksa sessiz
+    _triyaj = None
+
 BASE = "https://www.resmigazete.gov.tr"
 _http = Http(BASE, {"Accept": "text/html,application/pdf,*/*"})
+
+
+def _konu_suz(items: List[Dict[str, Any]], konu: str, esik: Any
+              ) -> Dict[str, Any]:
+    """Fihrist kalemlerini konu olasılığına göre eler. Bkz. ``triyaj`` modülü.
+
+    Neden ayrı bir süzgeç: ``query`` harfi harfine eşleşme arar ve Resmî Gazete
+    başlıkları konu adını çoğu zaman taşımaz. Etiketli gövdede ölçüldü — konu
+    adı, icra kalemlerinin yalnız %10'unda, rekabet kalemlerinin %14'ünde
+    geçiyor. 'Konkordato Gider Avansı Tarifesi' icradır ama 'icra' yazmaz;
+    'Şarj Hizmeti Yönetmeliği' enerjidir ama 'enerji' yazmaz. Konu süzgeci bu
+    kalemleri bulur, metinsel arama bulamaz.
+
+    Elenen kalemler SAYILIR ve çağırana bildirilir. Bir hukukçuya "bulunan
+    budur" demek, arkada kaç kalemin sessizce atıldığını söylemeden dürüst
+    değildir.
+    """
+    if _triyaj is None:
+        return {"error": "Konu süzgeci bu kurulumda yok (triyaj modülü yüklü değil)."}
+    try:
+        motor = _triyaj.motor()
+    except _triyaj.TriyajYok as exc:
+        return {"error": "Konu süzgeci kullanılamıyor: %s" % exc}
+    if konu not in motor.konular:
+        return {"error": "konu '%s' desteklenmiyor; geçerli: %s"
+                         % (konu, ", ".join(motor.konular))}
+    try:
+        e = motor.esik if esik is None or esik == "" else float(esik)
+    except (TypeError, ValueError):
+        return {"error": "esik sayı olmalı (0-1)."}
+    if not 0.0 <= e <= 1.0:
+        return {"error": "esik 0 ile 1 arasında olmalı."}
+
+    tutulan = []
+    for it in items:
+        p = motor.p(konu, (it.get("section") or "") + " " + (it.get("title") or ""))
+        if p >= e:
+            tutulan.append(dict(it, konu_skoru=round(p, 4)))
+    return {"items": tutulan, "elenen": len(items) - len(tutulan), "esik": e,
+            "konu": konu}
+
+
+# Süzgecin sınırı her yanıtta tekrarlanır; çağıran bunu görmeden karar vermesin.
+_KONU_NOT = ("Konu süzgeci bir ÖN ELEMEDİR, kapsam garantisi değildir — ölçülen "
+             "duyarlılık enerji %97, rekabet %100, vergi %93, icra %92. Yayım "
+             "teyidi gibi eksiksizlik gerektiren işlerde konu kullanmayın; "
+             "esik=0 ile süzgeci kapatabilirsiniz.")
 
 
 def _day_url(d: _date, mukerrer: int = 0) -> str:
@@ -66,9 +118,19 @@ def fihrist(args: Dict[str, Any]) -> Dict[str, Any]:
     q = (args.get("query") or "").strip()
     if q:
         items = [i for i in items if all(count_hits(i["title"] + " " + i["section"], t) for t in q.split())]
-    return {"date": d.isoformat(), "number": number, "citation": "RG %s, S. %s" % (d.strftime("%d.%m.%Y"), number or "?"),
-            "url": url, "total": len(items), "items": items,
-            "note": "Belge metni: resmi_gazete_getir(url). Kurul kararları 'KURUL KARARI/KARARLARI' bölümündedir."}
+    out = {"date": d.isoformat(), "number": number, "citation": "RG %s, S. %s" % (d.strftime("%d.%m.%Y"), number or "?"),
+           "url": url, "total": len(items), "items": items,
+           "note": "Belge metni: resmi_gazete_getir(url). Kurul kararları 'KURUL KARARI/KARARLARI' bölümündedir."}
+
+    konu = (args.get("konu") or "").strip()
+    if konu:
+        suz = _konu_suz(items, konu, args.get("esik"))
+        if suz.get("error"):
+            return suz
+        out.update(items=suz["items"], total=len(suz["items"]),
+                   konu=konu, esik=suz["esik"], konu_elenen=suz["elenen"],
+                   konu_notu=_KONU_NOT)
+    return out
 
 
 def get(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -91,10 +153,21 @@ def get(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def scan(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Search fihrist titles across a date range (one request per day)."""
+    """Search fihrist titles across a date range (one request per day).
+
+    İki süzgeç bağımsızdır ve birlikte verilirse VE ile birleşir:
+
+    ``query``  harfi harfine — bilinen bir terimi ararken doğrudur.
+    ``konu``   olasılıksal — bir alanı tararken doğrudur; başlıkta konu adı
+               geçmese bile yakalar. Sınırı için ``triyaj`` modülüne bakın.
+
+    En az biri gerekir: ikisi de boşken 60 günlük fihristi ham dökmek, çağırana
+    yüzlerce ilgisiz kalem göndermekten başka bir şey yapmaz.
+    """
     q = (args.get("query") or "").strip()
-    if not q:
-        return {"error": "query gerekli."}
+    konu = (args.get("konu") or "").strip()
+    if not q and not konu:
+        return {"error": "query veya konu gerekli (biri yeterli, ikisi VE ile birleşir)."}
     try:
         end = datetime.strptime(args["date_to"], "%Y-%m-%d").date() if args.get("date_to") else _date.today()
         start = datetime.strptime(args["date_from"], "%Y-%m-%d").date() if args.get("date_from") else end - timedelta(days=13)
@@ -102,16 +175,33 @@ def scan(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"error": "Tarihler YYYY-MM-DD olmalı."}
     if (end - start).days > 60:
         return {"error": "Aralık en fazla 60 gün olabilir (günde bir istek)."}
-    hits, days = [], 0
+
+    # Konuyu DÖNGÜDEN ÖNCE doğrula. Aksi hâlde model eksikse fihrist her gün
+    # hata döndürür, döngü o günü sessizce atlar ve kullanıcı "o aralıkta hiç
+    # kalem yok" sanır. Bir araştırma aracında sessiz boş sonuç, gürültülü
+    # hatadan çok daha pahalıdır.
+    if konu:
+        on = _konu_suz([], konu, args.get("esik"))
+        if on.get("error"):
+            return on
+
+    hits, days, elenen = [], 0, 0
     d = start
     while d <= end:
-        r = fihrist({"date": d.isoformat(), "query": q})
+        r = fihrist({"date": d.isoformat(), "query": q, "konu": konu,
+                     "esik": args.get("esik")})
         if not r.get("error"):
             days += 1
+            elenen += int(r.get("konu_elenen") or 0)
             for it in r["items"]:
                 hits.append({**it, "date": r["date"], "rg_number": r["number"], "citation": r["citation"]})
         d += timedelta(days=1)
-    return {"query": q, "from": start.isoformat(), "to": end.isoformat(), "days_scanned": days, "total": len(hits), "results": hits}
+    out = {"query": q, "from": start.isoformat(), "to": end.isoformat(),
+           "days_scanned": days, "total": len(hits), "results": hits}
+    if konu:
+        out.update(konu=konu, esik=on["esik"], konu_elenen=elenen,
+                   konu_notu=_KONU_NOT)
+    return out
 
 
 SOURCE = Source(
@@ -121,7 +211,14 @@ SOURCE = Source(
     search_schema={"type": "object", "properties": {
         "date": {"type": "string", "description": "YYYY-MM-DD (varsayılan bugün)"},
         "mukerrer": {"type": "integer", "default": 0},
-        "query": {"type": "string", "description": "Fihrist başlıklarında filtre"}}},
+        "query": {"type": "string", "description": "Fihrist başlıklarında harfi harfine filtre"},
+        "konu": {"type": "string", "enum": ["enerji", "rekabet", "vergi", "icra"],
+                 "description": "Konu ön elemesi (yerel, ağsız). Başlıkta konu adı "
+                                "geçmese de yakalar. ÖN ELEMEDİR: duyarlılık %92-100, "
+                                "yayım teyidinde kullanmayın."},
+        "esik": {"type": "number", "description": "Konu olasılık eşiği (varsayılan 0.20, "
+                                                  "ölçülmüştür). 0 süzgeci kapatır ve tüm "
+                                                  "kalemleri skorlarıyla döndürür."}}},
     get_schema={"type": "object", "properties": {"url": {"type": "string"}, "page": {"type": "integer", "default": 1},
                                                  "page_chars": {"type": "integer", "default": 8000}},
                 "required": ["url"]},

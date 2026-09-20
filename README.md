@@ -53,6 +53,15 @@ Rekabet, SPK, BDDK, KVKK, BTK, GİB, Sigorta Tahkim) behind one
 `tr_kurum_karari_ara` interface, plus a locally indexed
 archive for `tr_semantik_ara`. Source: the `ArthurLegalTR/` folder.
 
+`tr_resmi_gazete_tara` and `tr_resmi_gazete_fihrist` also take a `konu` filter
+(`enerji`, `rekabet`, `vergi`, `icra`): a local, network-free topic triage over
+gazette titles that finds items whose titles never mention the topic (in the
+labelled corpus the topic word appears in only 10% of `icra` items). It is a
+pre-filter, not a guarantee: measured out-of-fold sensitivity at the default
+threshold is 92-100% per topic, every response says how many items it dropped,
+`esik=0` disables it, and `status` reports whether the model is present. Do not
+use it for publication verification.
+
 ## Tool naming
 
 Every tool carries its jurisdiction as a prefix -- `nl_` `pl_` `at_` `ie_` `fi_`

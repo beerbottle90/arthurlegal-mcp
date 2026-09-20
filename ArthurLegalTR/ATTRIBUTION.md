@@ -49,7 +49,7 @@ a paid CAPTCHA solver — deliberately not reproduced), `yargi-cli`,
 `mevzuat-cli`, `yargi-pro-gemma-local` (a local-LLM launcher, not a data
 source).
 
-## `beerbottle90/arthurlegal-mcp`, including its `nl-rechtspraak-mcp/` folder (MIT)
+## `beerbottle90/arthurlegal-mcp`, `beerbottle90/nl-rechtspraak-mcp` (MIT)
 
 `mcpcore.py` (dependency-free MCP JSON-RPC server, stdio + Streamable HTTP) and
 `retrieval.py` (SQLite FTS5 + trigram + vector hybrid retrieval with RRF) are

@@ -48,7 +48,7 @@ import sources  # noqa: E402
 from sources import bedesten_ictihat, bedesten_mevzuat, anayasa, uyusmazlik, resmi_gazete, spk  # noqa: E402
 from textx import HAS_PYPDF  # noqa: E402
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 INDEX_PATH = os.environ.get("INDEX_PATH") or os.path.join(HERE, "data", "index.db")
 
 _index: Optional[retrieval.Index] = None
@@ -201,6 +201,21 @@ def t_ictihat_semantik(args: Dict[str, Any]) -> Any:
 # --------------------------------------------------------------------------- #
 # Status and guide                                                             #
 # --------------------------------------------------------------------------- #
+def _triyaj_durum() -> Dict[str, Any]:
+    """resmi_gazete_tara(konu=…) süzgecinin durumu ve ÖLÇÜLMÜŞ sınırı.
+
+    status'ta yer alması gerekiyor: model dosyası eksikse konu süzgeci hata
+    verir ve kullanıcı bunu ancak çağırınca öğrenir. Ayrıca duyarlılık
+    rakamları burada durmalı — bir ön elemenin ne kadar kaçırdığı, onu
+    kullanmaya karar vermeden önce bilinmesi gereken şeydir.
+    """
+    try:
+        import triyaj
+    except Exception as exc:  # noqa: BLE001
+        return {"var": False, "neden": "triyaj modülü yüklenemedi: %s" % exc}
+    return triyaj.kunye()
+
+
 def t_status(args: Dict[str, Any]) -> Any:
     idx = index()
     by_kurum = {}
@@ -216,6 +231,7 @@ def t_status(args: Dict[str, Any]) -> Any:
         "local_index": {"path": INDEX_PATH, "documents": idx.count(), "vectorised": idx.vector_count(),
                         "by_kurum": by_kurum, "last_crawl": idx.get_state("last_crawl", "")},
         "semantic": retrieval.embeddings_status(),
+        "triyaj": _triyaj_durum(),
         "rate_limits": {"bedesten": "10 istek / 30 sn (yerel kova: %s sn/istek)" % os.environ.get("BEDESTEN_RATE_REFILL_S", "3.5")},
         "note": "Yüklenememiş kaynak = ERİŞİLEMEZ, boş değil. status'u sonuçlar ince göründüğünde çağırın.",
     }
@@ -243,6 +259,12 @@ GUIDE = """ArthurLegalTR — hangi soru için hangi araç
    Kuruma özel filtreler: kurum_listesi. Metin: kurum_karari_getir(kurum, id)
    SPK bülteni içinde: spk_bulten_icinde_ara(bulten="2026/27", query)
    Yayım teyidi ve RG künyesi: resmi_gazete_fihrist(date) / resmi_gazete_tara(query, date_from, date_to)
+   Konu taraması: resmi_gazete_tara(konu="enerji"|"rekabet"|"vergi"|"icra", date_from, date_to)
+     Yerel, ağsız, ücretsiz bir ön eleme. Başlıkta konu adı geçmese de yakalar —
+     "Konkordato Gider Avansı Tarifesi" icradır ama 'icra' yazmaz. Etiketli gövdede
+     konu adı, icra kalemlerinin yalnız %10'unda geçiyor; bu yüzden query yetmez.
+     SINIR: ön elemedir, duyarlılık %92-100. YAYIM TEYİDİNDE KULLANMAYIN — orada
+     eksiksizlik gerekir; query kullanın ya da esik=0 ile tam listeyi alın.
 
 4. SEMANTİK / ARŞİV
    semantik_ara(query, kurum=?) — yerel indeks (crawl edilmiş kurum kararları, SPK bültenleri, Sigorta Tahkim dergileri)
@@ -318,9 +340,18 @@ def build_tools() -> List[Tool]:
         Tool("resmi_gazete_fihrist", "Bir günün Resmî Gazete fihristi (bölüm + başlık + link). Kurul kararlarının yayım teyidi.",
              rg.SOURCE.search_schema, _wrap(rg.fihrist)),
         Tool("resmi_gazete_getir", "Resmî Gazete belge metni (fihrist url'sinden).", rg.SOURCE.get_schema, _wrap(rg.get)),
-        Tool("resmi_gazete_tara", "Tarih aralığında (≤60 gün) fihrist başlıklarında arar; gün başına bir istek.",
-             {"type": "object", "properties": {"query": {"type": "string"}, "date_from": {"type": "string"},
-                                               "date_to": {"type": "string"}}, "required": ["query"]}, _wrap(rg.scan)),
+        Tool("resmi_gazete_tara", "Tarih aralığında (≤60 gün) fihrist tarar; gün başına bir istek. "
+             "query harfi harfine arar; konu ise yerel bir ön eleme ile başlıkta konu adı geçmeyen "
+             "kalemleri de yakalar ('Katı Yakıtların Kontrolü Yönetmeliği' -> enerji). En az biri gerekir.",
+             {"type": "object", "properties": {
+                 "query": {"type": "string", "description": "Harfi harfine terim araması"},
+                 "konu": {"type": "string", "enum": ["enerji", "rekabet", "vergi", "icra"],
+                          "description": "Konu ön elemesi (yerel, ağsız, ücretsiz). ÖN ELEMEDİR: "
+                                         "ölçülen duyarlılık enerji %97, rekabet %100, vergi %93, "
+                                         "icra %92 — yayım teyidi için kullanmayın."},
+                 "esik": {"type": "number", "description": "Konu eşiği (varsayılan 0.20, ölçülmüştür); "
+                                                           "0 süzgeci kapatır, skorlar yine döner"},
+                 "date_from": {"type": "string"}, "date_to": {"type": "string"}}}, _wrap(rg.scan)),
         Tool("kurum_karari_ara", "Düzenleyici kurum kararlarında arama — tek arayüz: " + ", ".join(KURUM_KEYS) +
              ". Kuruma özel filtreler için kurum_listesi.", {"type": "object", "properties": common_kurum_props,
                                                              "required": ["kurum"]}, _wrap(t_kurum_ara)),

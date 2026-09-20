@@ -337,7 +337,7 @@ Resmî Gazete, semantik arşiv; KİK/Sayıştay/TÜRKPATENT/İSTAÇ YOK — resm
 `gleif_` tüzel kişi kimliği (LEI) · `scholar_` doktrin · `contracts_` sözleşme emsali.
 
 TÜRKİYE İÇİN GİRİŞ NOKTASI: karmaşık Türk hukuku sorusunda önce `tr_hukuk_arastirma_rehberi`
-(hangi soru için hangi araç), sonra `tr_kurum_listesi` (12 kurumun filtreleri).
+(hangi soru için hangi araç), sonra `tr_kurum_listesi` (8 kurumun filtreleri).
 
 Bu kozmetik değil: alttaki sunucularda `get_act` beş ayrı şey, `search_legislation`
 üç ayrı şey demek. Önek, İspanyol hukuku sorusunun Fin mevzuatıyla
