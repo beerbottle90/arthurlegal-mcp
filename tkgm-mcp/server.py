@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import datetime
 import json
+import sys
+import threading
 from typing import Any, Dict, List
 
 import tkgm_geo as geo
@@ -30,6 +32,7 @@ import tkgm_koridor as koridor
 import tkgm_parsel as parseller
 import tkgm_rapor as rapor
 import tkgm_tapu as tapu
+import tkgm_ui as arayuz
 from mcpcore import McpError, Tool, run
 from tkgm_aktar import BICIMLER, aktar
 from tkgm_analiz import olc, tr_bicim
@@ -190,8 +193,10 @@ def _t_geometri(args: Dict[str, Any]) -> Any:
         kayma = 0
         for c in tm:
             for k in geo.kenarlar(c[0]):
-                satirlar.append("%d-%d %s m %sg" % (k["bas"] + kayma, k["son"] + kayma,
-                                                    tr_bicim(k["boy"]), tr_bicim(k["semt_g"], 2)))
+                # Kaba dosyada (5 ondalık) santimetre yazmak sahte kesinliktir; kroki ile aynı kural.
+                boy = "≈" + tr_bicim(k["boy"], 1) if "kenar_belirsizligi_m" in olcu else tr_bicim(k["boy"])
+                satirlar.append("%d-%d %s m %sg" % (k["bas"] + kayma, k["son"] + kayma, boy,
+                                                    tr_bicim(k["semt_g"], 1 if "kenar_belirsizligi_m" in olcu else 2)))
             acilar += ["%d:%s" % (i + 1 + kayma, tr_bicim(a, 2))
                        for i, a in enumerate(geo.ic_acilar(c[0]))]
             kayma += len(c[0])
@@ -582,5 +587,20 @@ TOOLS = [
 ]
 
 
+def _bayrak(ad: str) -> bool:
+    """Kendi bayrağımızı argv'den çıkarır; mcpcore'un argparse'ı tanımadığı bayrakta çıkar."""
+    if ad in sys.argv:
+        sys.argv.remove(ad)
+        return True
+    return False
+
+
 if __name__ == "__main__":
-    run(TOOLS, name="tkgm-mcp", version=__version__, instructions=INSTRUCTIONS)
+    # --ui      : yalnız tarayıcı arayüzü (http://127.0.0.1:8765), tarayıcıyı açar.
+    # --ui-ile  : MCP (stdio) + aynı süreçte arayüz; Claude'un okuttuğu parseller arayüzde de görünür.
+    if _bayrak("--ui"):
+        arayuz.calistir(TOOLS)
+    else:
+        if _bayrak("--ui-ile"):
+            threading.Thread(target=arayuz.calistir, args=(TOOLS, 8765, False), daemon=True).start()
+        run(TOOLS, name="tkgm-mcp", version=__version__, instructions=INSTRUCTIONS)

@@ -278,6 +278,11 @@ def getir(ref: str) -> Optional[Dict[str, Any]]:
     return p
 
 
+def bellektekiler() -> List[Dict[str, Any]]:
+    """En son kullanılan önce. Arayüz, aynı süreçte MCP ile okutulmuş parselleri buradan görür."""
+    return list(reversed(_BELLEK.values()))
+
+
 def bellek_sayisi() -> int:
     return len(_BELLEK)
 

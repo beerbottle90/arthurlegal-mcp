@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArthurLegal · Tapu</title>
+<link rel="icon" href="/logo.png">
+<style>
+:root{--lacivert:#0b1f3a;--derin:#071427;--panel:#10294d;--panel2:#15335e;--altin:#c9a44c;--altin2:#e3c77a;
+--krem:#f5efe0;--soluk:#a9b6cc;--cizgi:rgba(201,164,76,.28);--kirmizi:#e2776b;--yesil:#7fc8a0}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--derin);color:var(--krem);font:14px/1.5 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0}
+header{display:flex;align-items:center;gap:14px;padding:10px 20px;background:var(--lacivert);border-bottom:1px solid var(--cizgi)}
+header img{width:42px;height:42px;border-radius:6px}
+header h1{font-size:20px;letter-spacing:.3px}header h1 span{color:var(--altin)}
+header .alt{color:var(--soluk);font-size:12px}
+header .sag{margin-left:auto;font-size:12px;color:var(--soluk);text-align:right}
+main{flex:1;display:grid;grid-template-columns:300px 1fr;min-height:0}
+aside{background:var(--lacivert);border-right:1px solid var(--cizgi);padding:16px;overflow:auto}
+section{display:flex;flex-direction:column;min-width:0;min-height:0}
+.birak{border:1.5px dashed var(--altin);border-radius:10px;padding:18px 12px;text-align:center;color:var(--soluk);cursor:pointer;transition:.15s}
+.birak.ustunde,.birak:hover{background:var(--panel);color:var(--krem)}
+.birak b{color:var(--altin2);display:block;font-size:15px;margin-bottom:4px}
+.adim{font-size:12px;color:var(--soluk);margin:12px 0 0;padding-left:16px}.adim li{margin:3px 0}
+.adim a,.bag{color:var(--altin2)}
+.liste{margin-top:16px;display:flex;flex-direction:column;gap:6px}
+.pk{background:var(--panel);border:1px solid transparent;border-radius:8px;padding:8px 10px;cursor:pointer}
+.pk.secili{border-color:var(--altin);background:var(--panel2)}
+.pk b{display:block;font-size:13px}.pk small{color:var(--soluk)}
+nav{display:flex;gap:2px;padding:0 16px;background:var(--lacivert);border-bottom:1px solid var(--cizgi);overflow-x:auto}
+nav button{background:none;border:0;color:var(--soluk);padding:11px 14px;font:inherit;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button.acik{color:var(--altin2);border-bottom-color:var(--altin)}
+.govde{flex:1;overflow:auto;padding:18px 20px}
+.sek{display:none}.sek.acik{display:block}
+.izgara{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.kart{background:var(--panel);border:1px solid var(--cizgi);border-radius:10px;padding:14px 16px}
+.kart h3{font-size:15px;color:var(--altin2);margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.07);text-align:left;vertical-align:top}
+td:first-child{color:var(--soluk);white-space:nowrap}th{color:var(--altin2);font-weight:600}
+.uyari{background:rgba(201,164,76,.12);border-left:3px solid var(--altin);padding:8px 10px;border-radius:4px;margin:8px 0;font-size:13px}
+.hata{background:rgba(226,119,107,.14);border-left:3px solid var(--kirmizi)}
+.dugmeler{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+button.d,a.d{background:var(--altin);color:#1a1405;border:0;border-radius:7px;padding:8px 13px;font:600 13px inherit;cursor:pointer;text-decoration:none;display:inline-block}
+button.d.ikincil,a.d.ikincil{background:transparent;color:var(--altin2);border:1px solid var(--altin)}
+button.d:disabled{opacity:.5;cursor:wait}
+input,select,textarea{background:var(--derin);color:var(--krem);border:1px solid var(--cizgi);border-radius:6px;padding:7px 9px;font:inherit;width:100%}
+textarea{min-height:170px;font-family:Consolas,monospace;font-size:12px}
+label{display:block;font-size:12px;color:var(--soluk);margin:8px 0 3px}
+.cerceve{width:100%;height:calc(100vh - 210px);min-height:420px;border:1px solid var(--cizgi);border-radius:10px;background:#fff}
+.kroki{background:#fff;border-radius:10px;max-width:100%;height:calc(100vh - 200px);display:block;margin:0 auto}
+.bos{color:var(--soluk);text-align:center;padding:60px 20px}
+.kucuk{font-size:12px;color:var(--soluk)}code{color:var(--altin2)}
+footer{padding:6px 20px;font-size:11px;color:var(--soluk);background:var(--lacivert);border-top:1px solid var(--cizgi)}
+</style>
+</head>
+<body>
+<header>
+  <img src="/logo.png" alt="ArthurLegal">
+  <div><h1>ArthurLegal <span>· Tapu</span></h1><div class="alt">Parsel ölçüsü · ölçekli kroki · harita · 3D arazi · föy</div></div>
+  <div class="sag">Yerel çalışır — veriniz bu bilgisayardan çıkmaz<br><span id="surum"></span></div>
+</header>
+<main>
+<aside>
+  <div class="birak" id="birak"><b>Parsel dosyasını bırakın</b>GeoJSON / KML — ya da tıklayıp seçin<input type="file" id="dosya" accept=".json,.geojson,.kml" multiple hidden></div>
+  <ol class="adim">
+    <li><a href="https://parselsorgu.tkgm.gov.tr/" target="_blank" rel="noopener">Parsel Sorgu</a>'da parseli bulun.</li>
+    <li>Haritada parsele tıklayın; bilgi kutusundaki <b>⋮</b> menüsünden <b>GeoJSON</b> indirin.</li>
+    <li>Dosyayı buraya bırakın. Komşu parselleri de ekleyebilirsiniz.</li>
+  </ol>
+  <div class="liste" id="liste"></div>
+</aside>
+<section>
+  <nav id="nav"></nav>
+  <div class="govde">
+    <div class="sek" data-ad="Özet" id="ozet"></div>
+    <div class="sek" data-ad="Kroki" id="kroki"></div>
+    <div class="sek" data-ad="Harita" id="harita"></div>
+    <div class="sek" data-ad="3D Arazi" id="uc"></div>
+    <div class="sek" data-ad="Hukuk ve Harç" id="hukuk"></div>
+    <div class="sek" data-ad="Koridor" id="koridor"></div>
+    <div class="sek" data-ad="Tapu Kaydı" id="tapu"></div>
+    <div class="sek" data-ad="Dosyalarım" id="dosyalar"></div>
+  </div>
+</section>
+</main>
+<footer>Bilgi amaçlıdır; resmî işlemlerde kullanılamaz (TKGM Parsel Sorgu Kullanım Koşulları md. 4). Bu uygulama TKGM servislerine bağlanmaz; aplikasyon krokisi veya röperli kroki yerine geçmez.</footer>
+
+<script>
+"use strict";
+const $ = (s, k = document) => k.querySelector(s);
+const el = (etiket, ozellik = {}, ...cocuk) => { const e = document.createElement(etiket);
+  for (const [k, v] of Object.entries(ozellik)) { if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v); }
+  for (const c of cocuk.flat()) e.append(c == null ? "" : c); return e; };
+const tr = (x, h = 2) => x == null ? "—" : Number(x).toLocaleString("tr-TR", { minimumFractionDigits: h, maximumFractionDigits: h });
+const dosyaAdi = yol => String(yol).split(/[\\/]/).pop();
+const durum = { parseller: [], secili: null, onbellek: {} };
+
+async function cagir(arac, args = {}) {
+  const r = await fetch("/api/cagir", { method: "POST", headers: { "Content-Type": "application/json", "X-Tkgm": "1" }, body: JSON.stringify({ arac, args }) });
+  const j = await r.json(); if (!j.ok) throw new Error(j.hata); return j.sonuc;
+}
+const hataKutusu = e => el("div", { class: "uyari hata" }, String(e.message || e));
+const bos = m => el("div", { class: "bos" }, m);
+const tablo = satirlar => el("table", {}, satirlar.filter(s => s[1] != null && s[1] !== "").map(([a, b]) => el("tr", {}, el("td", {}, a), el("td", {}, b))));
+const digerleri = () => durum.parseller.filter(p => p.ref !== durum.secili).map(p => p.ref);
+async function mesgul(dugme, is) { dugme.disabled = true; const eski = dugme.textContent; dugme.textContent = "Çalışıyor…"; try { await is(); } finally { dugme.disabled = false; dugme.textContent = eski; } }
+
+/* ---------- sekmeler ---------- */
+const sekmeler = [...document.querySelectorAll(".sek")];
+sekmeler[0].classList.add("acik");
+sekmeler.forEach((s, i) => $("#nav").append(el("button", { onclick: () => sekmeAc(s.id), id: "n-" + s.id, class: i ? "" : "acik" }, s.dataset.ad)));
+function sekmeAc(id) { sekmeler.forEach(s => s.classList.toggle("acik", s.id === id));
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("acik", b.id === "n-" + id)); ciz(id); }
+const aktif = () => sekmeler.find(s => s.classList.contains("acik")).id;
+
+/* ---------- dosya alma ---------- */
+const birak = $("#birak"), girdi = $("#dosya");
+birak.addEventListener("click", () => girdi.click());
+girdi.addEventListener("change", () => yukle(girdi.files));
+["dragover", "dragenter"].forEach(o => birak.addEventListener(o, e => { e.preventDefault(); birak.classList.add("ustunde"); }));
+["dragleave", "drop"].forEach(o => birak.addEventListener(o, e => { e.preventDefault(); birak.classList.remove("ustunde"); }));
+birak.addEventListener("drop", e => yukle(e.dataTransfer.files));
+async function yukle(dosyalar) {
+  for (const d of dosyalar) {
+    try { const s = await cagir("parsel_oku", { icerik: await d.text() });
+      for (const p of s.parseller) if (!durum.parseller.some(x => x.ref === p.ref)) durum.parseller.push(p);
+      if (!durum.secili && s.parseller.length) durum.secili = s.parseller[0].ref;
+    } catch (e) { alert(d.name + ": " + e.message); }
+  }
+  listeCiz(); ciz(aktif());
+}
+function listeCiz() {
+  const l = $("#liste"); l.replaceChildren();
+  for (const p of durum.parseller) l.append(el("div", { class: "pk" + (p.ref === durum.secili ? " secili" : ""), onclick: () => { durum.secili = p.ref; listeCiz(); ciz(aktif()); } },
+    el("b", {}, p.parsel), el("small", {}, (p.nitelik || "").slice(0, 60) + " · " + tr(p.dosyadaki_alan_m2 ?? p.alan_m2) + " m²")));
+}
+const secili = () => durum.parseller.find(p => p.ref === durum.secili);
+
+/* ---------- çizim ---------- */
+async function ciz(id) {
+  const kap = $("#" + id);
+  if (["ozet", "kroki", "harita", "uc"].includes(id) && !durum.secili) return kap.replaceChildren(bos("Başlamak için soldan bir parsel dosyası bırakın."));
+  try { await cizici[id](kap); } catch (e) { kap.replaceChildren(hataKutusu(e)); }
+}
+const cizici = {
+  async ozet(kap) {
+    const p = secili(), g = await cagir("geometri", { ref: p.ref });
+    const indir = (etiket, arac, args, ikincil) => el("button", { class: "d" + (ikincil ? " ikincil" : ""), onclick: e => mesgul(e.target, async () => {
+      const s = await cagir(arac, args); location.href = "/dosya/" + encodeURIComponent(dosyaAdi(s.dosya)); }) }, etiket);
+    const konu = el("select", {}, el("option", { value: "" }, "Föye hukuki konu ekleme"), (await konular()).map(k => el("option", { value: k.konu }, k.baslik)));
+    kap.replaceChildren(el("div", { class: "izgara" },
+      el("div", { class: "kart" }, el("h3", {}, p.parsel), tablo([["Nitelik", p.nitelik], ["Mevkii", p.mevkii], ["Pafta", p.pafta], ["Zemin", p.zemin_tipi], ["Projeksiyon", g.projeksiyon]]),
+        (p.rejim || []).map(r => el("div", { class: "uyari" }, r))),
+      el("div", { class: "kart" }, el("h3", {}, "Ölçü"), tablo([["Kayıtlı alan (dosya)", g.tapu_alani_m2 != null ? tr(g.tapu_alani_m2) + " m²" : null], ["Hesap alanı", tr(g.alan_m2) + " m²"],
+        ["Fark", g.fark_m2 != null ? tr(g.fark_m2) + " m² (%" + tr(g.fark_yuzde, 3) + ")" : null], ["Alan belirsizliği", g.alan_belirsizligi_m2 != null ? "± " + tr(g.alan_belirsizligi_m2, 1) + " m² (%95)" : null],
+        ["Çevre", tr(g.cevre_m) + " m"], ["Köşe", g.kose_sayisi]]),
+        g.fark_yorumu ? el("div", { class: "uyari" }, g.fark_yorumu) : "", g.hassasiyet_notu ? el("div", { class: "kucuk" }, g.hassasiyet_notu) : ""),
+      el("div", { class: "kart" }, el("h3", {}, "Belgeler"), el("label", {}, "Word föyü için konu"), konu,
+        el("div", { class: "dugmeler" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { const s = await cagir("parsel_foyu", { ref: p.ref, komsular: digerleri(), konu: konu.value || undefined });
+            location.href = "/dosya/" + encodeURIComponent(dosyaAdi(s.dosya)); }) }, "Word föy indir"),
+          indir("Excel portföy (" + durum.parseller.length + " parsel)", "portfoy_tablosu", { refs: durum.parseller.map(x => x.ref) }),
+          ...["dxf", "kml", "csv", "geojson"].map(b => indir(b.toUpperCase(), "disa_aktar", { ref: p.ref, bicim: b }, true)))),
+      el("div", { class: "kart" }, el("h3", {}, "Kenarlar"), el("div", { class: "kucuk" }, g.aciklama || ""),
+        el("table", {}, (g.kenarlar || []).map(k => el("tr", {}, el("td", {}, k.split(" ")[0]), el("td", {}, k.split(" ").slice(1).join(" "))))))));
+  },
+  async kroki(kap) {
+    const p = secili(), kom = el("input", { type: "checkbox" }), tab = el("input", { type: "checkbox" });
+    kom.checked = true; kom.style.width = tab.style.width = "auto";
+    const resim = el("img", { class: "kroki", alt: "kroki" }), indir = el("a", { class: "d ikincil", download: "kroki.svg" }, "SVG indir");
+    const yenile = async () => { const s = await cagir("kroki", { ref: p.ref, inline: true, koordinat_tablosu: tab.checked, komsular: kom.checked ? digerleri() : [] });
+      const url = URL.createObjectURL(new Blob([s.svg], { type: "image/svg+xml" })); resim.src = url; indir.href = url; indir.download = p.parsel.replace(/[^\w]+/g, "-") + "_kroki.svg";
+      bilgi.textContent = "Ölçek " + s.olcek + " — %100 ölçekle A4'e yazdırıldığında ölçeklidir." + (s.not ? " " + s.not : ""); };
+    const bilgi = el("span", { class: "kucuk" });
+    kom.onchange = tab.onchange = yenile;
+    kap.replaceChildren(el("div", { class: "dugmeler", style: "margin:0 0 10px;align-items:center" }, el("label", { style: "margin:0" }, kom, " komşuları çiz"), el("label", { style: "margin:0" }, tab, " koordinat tablosu"), indir, bilgi), resim);
+    await yenile();
+  },
+  async harita(kap) { const s = await cagir("harita", { ref: durum.secili, komsular: digerleri(), inline: true });
+    kap.replaceChildren(el("iframe", { class: "cerceve", sandbox: "allow-scripts", srcdoc: s.html })); },
+  async uc(kap) {
+    const p = secili(), onb = durum.onbellek["3d" + p.ref];
+    const goster = s => kap.replaceChildren(el("div", { class: "izgara", style: "margin-bottom:12px" }, el("div", { class: "kart" }, el("h3", {}, "Arazi özeti"),
+      tablo([["Kot (min – maks)", tr(s.arazi.min_kot_m, 1) + " – " + tr(s.arazi.max_kot_m, 1) + " m"], ["Ortalama kot", tr(s.arazi.ortalama_kot_m, 1) + " m"], ["Kot farkı", tr(s.arazi.kot_farki_m, 1) + " m"],
+        ["Ortalama eğim", "% " + tr(s.arazi.ortalama_egim_yuzde, 1)], ["Hâkim bakı", s.arazi.hakim_baki], ["Kaynak", s.kaynak]]), el("div", { class: "kucuk" }, s.arazi.not || ""), s.uyari ? el("div", { class: "uyari" }, s.uyari) : "")),
+      el("iframe", { class: "cerceve", sandbox: "allow-scripts", srcdoc: s.html }));
+    if (onb) return goster(onb);
+    kap.replaceChildren(el("div", { class: "bos" }, "Yükseklik verisi Copernicus GLO-30'dan indirilir (~1–2 MB, tek seferlik).", el("div", { class: "dugmeler", style: "justify-content:center" },
+      el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try { const s = await cagir("arazi_3d", { ref: p.ref, komsular: digerleri(), inline: true }); durum.onbellek["3d" + p.ref] = s; goster(s); } catch (x) { kap.append(hataKutusu(x)); } }) }, "Araziyi getir"))));
+  },
+  async hukuk(kap) {
+    const p = secili(), sonuc = el("div"), hsonuc = el("div"), liste = el("div");
+    const sec = el("select", { onchange: async () => { if (!sec.value) return sonuc.replaceChildren(); try { const s = await cagir("hukuk_koprusu", { konu: sec.value, ref: p ? p.ref : undefined }), k = s.konu;
+      sonuc.replaceChildren(el("table", {}, el("tr", {}, el("th", {}, "Mevzuat"), el("th", {}, "Maddeler")), k.dayanak.map(d => el("tr", {}, el("td", {}, d.mevzuat_no + " — " + d.ad), el("td", {}, d.maddeler)))),
+        k.uyari ? el("div", { class: "uyari hata" }, k.uyari) : "", k.sure ? el("div", { class: "uyari" }, "Süre: " + k.sure) : "", k.parsel_verisi ? el("div", { class: "uyari" }, k.parsel_verisi) : "",
+        el("div", { class: "kucuk" }, "Teyit: " + k.teyit), el("div", { class: "kucuk", style: "margin-top:6px" }, s.dogrulama),
+        el("div", { class: "kucuk", style: "margin-top:6px" }, "Önerilen aramalar: ", (k.ictihat || []).map(c => el("code", { style: "display:block" }, "tr_ictihat_ara " + c.args.query))));
+      } catch (e) { sonuc.replaceChildren(hataKutusu(e)); } } }, el("option", { value: "" }, "Konu seçin…"), (await konular()).map(k => el("option", { value: k.konu }, k.baslik)));
+    const g = id => $("#" + id).value, sayi = id => g(id) ? Number(g(id).replace(/\./g, "").replace(",", ".")) : undefined;
+    const ara = el("input", { placeholder: "işlem ara: satış, ipotek, aplikasyon, kat irtifakı…", oninput: async () => { if (ara.value.length < 2) return liste.replaceChildren();
+      const s = await cagir("tarife_ara", { sorgu: ara.value }); liste.replaceChildren(el("table", {}, s.sonuclar.map(r => el("tr", { style: "cursor:pointer", onclick: () => { $("#" + (r.tablo === "tapu_harci" ? "h-th" : "h-ds")).value = r.kod; } },
+        el("td", {}, r.kod), el("td", {}, r.islem + " — " + r.deger + (r.isaret ? " [" + r.isaret + "]" : "")))))); } });
+    kap.replaceChildren(el("div", { class: "izgara" },
+      el("div", { class: "kart" }, el("h3", {}, "Hukuk köprüsü"), p && p.rejim ? p.rejim.map(r => el("div", { class: "uyari" }, r)) : "", sec, sonuc),
+      el("div", { class: "kart" }, el("h3", {}, "Harç ve döner sermaye (2026)"), ara, liste,
+        el("label", {}, "Tapu harcı kodu"), el("input", { id: "h-th", placeholder: "örn. satis" }), el("label", {}, "Bedel / ipotekte borç (TL)"), el("input", { id: "h-bedel", placeholder: "3.000.000" }),
+        el("label", {}, "Emlak vergisi değeri (TL)"), el("input", { id: "h-evd" }), el("label", {}, "Döner sermaye kodu"), el("input", { id: "h-ds", placeholder: "örn. 1.1.2.1" }),
+        el("label", {}, "Yöresel katsayı · adet"), el("div", { style: "display:flex;gap:8px" }, el("input", { id: "h-yk", placeholder: "katsayı" }), el("input", { id: "h-adet", placeholder: "1" })),
+        el("div", { class: "dugmeler" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try { const s = await cagir("harc_hesapla", { tapu_harci_islem: g("h-th") || undefined, bedel: sayi("h-bedel"),
+          emlak_vergi_degeri: sayi("h-evd"), doner_sermaye_kod: g("h-ds") || undefined, yoresel_katsayi: sayi("h-yk"), adet: sayi("h-adet") }); const t = s.tapu_harci, d = s.doner_sermaye;
+          hsonuc.replaceChildren(t ? el("div", {}, el("b", {}, t.islem), tablo([...t.kalemler.map(k => [k.kalem, tr(k.tutar_tl) + " TL"]), ["Toplam", tr(t.toplam_tl) + " TL"], ["Dayanak", t.dayanak]]), (t.notlar || []).map(n => el("div", { class: "uyari" }, n)), el("div", { class: "kucuk" }, "“" + t.alinti + "”")) : "",
+            d ? el("div", { style: "margin-top:10px" }, el("b", {}, d.islem), tablo([["Tutar", d.toplam_tl != null ? tr(d.toplam_tl) + " TL" : null], ["Hesap", d.hesap], ["Koşul", d.kosul], ["Cetvel s.", d.sayfa]]), d.not ? el("div", { class: "uyari" }, d.not) : "", el("div", { class: "kucuk" }, "“" + d.alinti + "”")) : "",
+            s.genel_toplam_tl != null ? el("div", { class: "uyari" }, "Genel toplam: " + tr(s.genel_toplam_tl) + " TL") : "", el("div", { class: "kucuk" }, s.uyari));
+        } catch (x) { hsonuc.replaceChildren(hataKutusu(x)); } }) }, "Hesapla")), hsonuc)));
+  },
+  async koridor(kap) {
+    let hat = null; const sonuc = el("div"), ad = el("span", { class: "kucuk" }, "hat dosyası seçilmedi"), gen = el("input", { placeholder: "örn. 16", style: "max-width:140px" });
+    const f = el("input", { type: "file", accept: ".json,.geojson,.kml", onchange: async () => { hat = await f.files[0].text(); ad.textContent = f.files[0].name; } }); f.hidden = true;
+    kap.replaceChildren(el("div", { class: "kart" }, el("h3", {}, "Güzergâh – koridor kesişimi"), el("div", { class: "kucuk" }, "Soldaki " + durum.parseller.length + " parsel, verdiğiniz hat (GeoJSON LineString ya da KML) ve toplam koridor genişliğiyle karşılaştırılır."),
+      el("div", { class: "dugmeler", style: "align-items:center" }, el("button", { class: "d ikincil", onclick: () => f.click() }, "Hat dosyası seç"), f, ad, el("label", { style: "margin:0" }, "Genişlik (m)"), gen,
+        el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try { if (!hat) throw new Error("Önce hat dosyası seçin."); const s = await cagir("koridor_kesisim", { refs: durum.parseller.map(p => p.ref), hat_icerik: hat, genislik_m: Number(gen.value.replace(",", ".")) });
+          sonuc.replaceChildren(tablo([["Hat boyu", tr(s.hat_boyu_m) + " m"], ["Etkilenen parsel", s.etkilenen_parsel + " / " + s.incelenen_parsel], ["Toplam kesişim", tr(s.toplam_kesisim_m2) + " m²"], ["Sayısal hata (en kötü)", "% " + tr(s.sayisal_hata_yuzde_en_kotu, 4)]]),
+            el("table", { style: "margin-top:10px" }, s.satirlar.map(x => el("tr", {}, x.split(" | ").map(h => el("td", { style: "color:inherit" }, h))))), s.dosya ? el("div", { class: "dugmeler" }, el("a", { class: "d ikincil", href: "/dosya/" + encodeURIComponent(dosyaAdi(s.dosya)) }, "CSV indir")) : "", el("div", { class: "kucuk" }, s.yontem));
+        } catch (x) { sonuc.replaceChildren(hataKutusu(x)); } }) }, "Hesapla")), sonuc));
+  },
+  async tapu(kap) {
+    const m = el("textarea", { placeholder: "e-Devlet / Web Tapu'dan KENDİ aldığınız tapu kaydının metnini buraya yapıştırın. Metin bu bilgisayardan çıkmaz; T.C. kimlik numaraları maskelenir, hiçbir şey saklanmaz." }), sonuc = el("div");
+    const bolum = (b, l) => l && l.length ? el("div", {}, el("b", {}, b), el("ul", {}, l.map(s => el("li", {}, typeof s === "string" ? s : Object.values(s).join(" · "))))) : "";
+    kap.replaceChildren(el("div", { class: "izgara" }, el("div", { class: "kart" }, el("h3", {}, "Tapu kaydı metni"), m, el("div", { class: "dugmeler" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try {
+      const s = await cagir("tapu_kaydi_oku", { metin: m.value, ref: durum.secili || undefined });
+      sonuc.replaceChildren(tablo(Object.entries(s.tasinmaz)), bolum("Malikler", s.malikler), bolum("Şerhler", s.serhler), bolum("Beyanlar", s.beyanlar), bolum("İrtifaklar", s.irtifaklar), bolum("Rehinler", s.rehinler),
+        (s.isaretler || []).map(i => el("div", { class: "uyari" }, i)), (s.capraz_kontrol || []).map(c => el("div", { class: "uyari" }, c)), el("div", { class: "kucuk" }, "Güven: " + s.guven + " · tanınmayan satır: " + s.taninmayan_satir), el("div", { class: "kucuk" }, s.kvkk));
+      } catch (x) { sonuc.replaceChildren(hataKutusu(x)); } }) }, "Yapılandır ve karşılaştır"))), el("div", { class: "kart" }, el("h3", {}, "Sonuç"), sonuc)));
+  },
+  async dosyalar(kap) { const s = await (await fetch("/api/dosyalar")).json();
+    kap.replaceChildren(el("div", { class: "kart" }, el("h3", {}, "Dosyalarım"), el("div", { class: "kucuk" }, "Klasör: " + s.klasor + " — Claude oturumlarında üretilen çıktılar da burada görünür."),
+      s.dosyalar.length ? el("table", {}, s.dosyalar.map(d => el("tr", {}, el("td", {}, new Date(d.degisim * 1000).toLocaleString("tr-TR")), el("td", {}, el("a", { class: "bag", href: "/dosya/" + encodeURIComponent(d.ad), target: "_blank", rel: "noopener" }, d.ad)), el("td", {}, tr(d.kb, 1) + " KB")))) : bos("Henüz çıktı yok."))); },
+};
+let _konular; const konular = async () => _konular || (_konular = (await cagir("hukuk_koprusu")).konular);
+(async () => { try { const b = await (await fetch("/api/parseller")).json(); durum.parseller = b.parseller || [];
+  if (durum.parseller.length) durum.secili = durum.parseller[0].ref; listeCiz(); } catch (e) { }
+  try { const s = await cagir("server_status"); $("#surum").textContent = "tkgm " + s.version + " · tarife " + (s.tarife.surum || "—"); } catch (e) { } ciz("ozet"); })();
+</script>
+</body>
+</html>

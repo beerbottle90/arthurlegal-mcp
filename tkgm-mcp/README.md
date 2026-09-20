@@ -46,6 +46,17 @@ HTTP taşımasında dosya yolu kabul edilmez: kimlik doğrulamasız bir uçta yo
 sunucunun diskini internete açar. Orada parsel `icerik` ile metin olarak verilir, kroki
 `svg` alanında döner.
 
+## Tarayıcı arayüzü (ArthurLegal · Tapu)
+
+    python server.py --ui        # http://127.0.0.1:8765 açılır: dosyayı bırak, kroki/harita/3D gör, Word föy indir
+    python server.py --ui-ile    # MCP (stdio) + aynı süreçte arayüz: Claude'un okuttuğu parseller arayüzde de görünür
+
+Arayüz ayrı bir API değildir; MCP araç listesini `POST /api/cagir` üzerinden açar. Yalnız 127.0.0.1'e
+bağlanır, yabancı `Host` başlığını ve `X-Tkgm` başlığı taşımayan POST'ları reddeder (açık bir sekmedeki
+başka bir sitenin bu porta istek atmasına karşı); dosya sunumu çıktı klasöründeki düz adlarla sınırlıdır.
+Kroki `<img>` içinde, harita ve 3D `sandbox`'lı iframe içinde gösterilir. "Dosyalarım" sekmesi çıktı
+klasörünü listeler — Claude oturumlarında üretilen dosyalar da orada görünür.
+
 ## Araçlar
 
 | Araç | İş |
