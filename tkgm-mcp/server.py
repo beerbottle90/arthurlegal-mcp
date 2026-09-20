@@ -3,6 +3,7 @@
 
     python server.py                                 # stdio (tam özellik: dosya okur/yazar)
     python server.py --transport http --port 8060    # paylaşılan kip: dosya erişimi kapalı
+    python server.py --ui [--kapi 8765]              # tarayıcı arayüzü (ui/baslat.cmd ve masaüstü kısayolu bunu çağırır)
 
 Bu sunucu TKGM'ye BAĞLANMAZ. Parsel Sorgu Kullanım Koşulları md. 3 uygulamanın
 web servislerine izinsiz doğrudan/dolaylı erişimi, md. 4 ticari kullanımı
@@ -38,7 +39,7 @@ from tkgm_aktar import BICIMLER, aktar
 from tkgm_analiz import olc, tr_bicim
 from tkgm_kroki import ciz
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 PARSEL_SORGU = "https://parselsorgu.tkgm.gov.tr/"
 BAGLANTILAR = {
@@ -419,9 +420,13 @@ def _t_tapu(args: Dict[str, Any]) -> Any:
     metin = str(args.get("metin") or "")
     if len(metin.strip()) < 20:
         raise McpError("`metin`: kullanıcının kendi e-Devlet/Web Tapu oturumundan aldığı belgenin metni.")
-    kayit = tapu.ayristir(metin, maskele=args.get("tc_maskele", True) is not False)
+    kayit = tapu.ayristir(metin,
+                          maskele=args.get("tc_maskele", True) is not False,
+                          ad_maskele=args.get("ad_maskele", True) is not False)
     if args.get("ref"):
         p = _parsel(args)
+        # Çapraz kontrol maskelemeden SONRA çalışır: ada/parsel/yüzölçümü maskelenmeyen
+        # alanlardır, dolayısıyla karşılaştırma maskeden etkilenmez.
         kayit["capraz_kontrol"] = tapu.capraz_kontrol(kayit, p, olc(p)["alan_m2"])
     return _kisa(kayit)
 
@@ -575,11 +580,17 @@ TOOLS = [
     Tool("tapu_kaydi_oku",
          "Kullanıcının KENDİ e-Devlet/Web Tapu oturumundan aldığı tapu kaydı METNİNİ yapılandırır: taşınmaz, "
          "malik-hisse, şerh/beyan/irtifak/rehin, hukuki işaretler; `ref` verilirse geometriyle çapraz kontrol. "
-         "T.C. kimlik no maskelenir, hiçbir şey saklanmaz. Yalnız yerel kipte. Sunucu hiçbir oturuma girmez; "
-         "PDF'i siz okuyup metnini verin.",
+         "VARSAYILAN OLARAK MASKELER: TCKN (sağlama doğrulanır, ayraçlı yazım dâhil), IBAN, etiketli VKN, "
+         "telefon, e-posta ve MALİK ADLARI ({{MALİK-nn}}, kayıdın her yerinde tutarlı). Yanıttaki `kvkk` alanı "
+         "neyin maskelenMEDİĞİNİ de sayar — şerh satırındaki üçüncü kişi/şirket adları maskelenmez. Eşleştirme "
+         "döndürülmez, hiçbir şey saklanmaz. Yalnız yerel kipte; sunucu hiçbir oturuma girmez, PDF'i siz okuyup "
+         "metnini verin.",
          {"type": "object", "properties": {
              "metin": {"type": "string"}, "ref": _REF,
-             "tc_maskele": {"type": "boolean", "default": True}},
+             "tc_maskele": {"type": "boolean", "default": True,
+                            "description": "kimlik no / IBAN / telefon / e-posta maskesi"},
+             "ad_maskele": {"type": "boolean", "default": True,
+                            "description": "false: malik adları AÇIK döner — bilinçli bir karardır"}},
           "required": ["metin"]},
          _t_tapu),
     Tool("server_status", "Çalışma kipi, çıktı klasörü, bellekteki parsel sayısı, canlı kaynak durumu.",
@@ -595,12 +606,25 @@ def _bayrak(ad: str) -> bool:
     return False
 
 
+def _kapi(varsayilan: int = 8765) -> int:
+    """--kapi N; mcpcore'un kendi --port'u MCP taşıması içindir, arayüzünki ayrıdır."""
+    if "--kapi" in sys.argv:
+        i = sys.argv.index("--kapi")
+        deger = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+        del sys.argv[i:i + 2]
+        try:
+            return int(deger)
+        except ValueError:
+            sys.stderr.write("--kapi sayı bekliyor; %d kullanılıyor\n" % varsayilan)
+    return varsayilan
+
+
 if __name__ == "__main__":
     # --ui      : yalnız tarayıcı arayüzü (http://127.0.0.1:8765), tarayıcıyı açar.
     # --ui-ile  : MCP (stdio) + aynı süreçte arayüz; Claude'un okuttuğu parseller arayüzde de görünür.
     if _bayrak("--ui"):
-        arayuz.calistir(TOOLS)
+        arayuz.calistir(TOOLS, _kapi())
     else:
         if _bayrak("--ui-ile"):
-            threading.Thread(target=arayuz.calistir, args=(TOOLS, 8765, False), daemon=True).start()
+            threading.Thread(target=arayuz.calistir, args=(TOOLS, _kapi(), False), daemon=True).start()
         run(TOOLS, name="tkgm-mcp", version=__version__, instructions=INSTRUCTIONS)

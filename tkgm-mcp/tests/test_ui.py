@@ -97,3 +97,46 @@ class Arayuz(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Baslatma(unittest.TestCase):
+    """`--ui` yolunun kullanıcıya dönük davranışı: kapı doluysa traceback değil, cümle."""
+
+    def test_dolu_kapi_traceback_degil_aciklama_dondurur(self):
+        import io as _io
+        import socket
+        import contextlib
+        # SO_REUSEADDR YOK: Windows'ta o seçenek ikinci bind'i BAŞARILI kılar ve
+        # sunucu gerçekten açılıp serve_forever'da asılır (bu test bir kez öyle asıldı).
+        mesgul = socket.socket()
+        mesgul.bind(("127.0.0.1", 0))
+        mesgul.listen(1)
+        kapi = mesgul.getsockname()[1]
+        yakala = _io.StringIO()
+        try:
+            os.environ["TKGM_TARAYICI"] = "0"
+            with contextlib.redirect_stderr(yakala):
+                tkgm_ui.calistir(server.TOOLS, kapi)      # dönmeli, yükselmemeli
+        finally:
+            mesgul.close()
+            os.environ.pop("TKGM_TARAYICI", None)
+        cikti = yakala.getvalue()
+        self.assertIn("kapı dolu", cikti)
+        self.assertIn(str(kapi), cikti)
+        self.assertIn("--kapi", cikti)
+        self.assertNotIn("Traceback", cikti)
+
+    def test_kapi_bayragi_argv_den_ayiklanir(self):
+        eski = sys.argv[:]
+        try:
+            sys.argv = ["server.py", "--ui", "--kapi", "9099"]
+            self.assertTrue(server._bayrak("--ui"))
+            self.assertEqual(server._kapi(), 9099)
+            self.assertEqual(sys.argv, ["server.py"])       # mcpcore'un argparse'ı bunları görmemeli
+            sys.argv = ["server.py", "--kapi", "abc"]
+            self.assertEqual(server._kapi(8765), 8765)      # sayı değilse varsayılan
+        finally:
+            sys.argv = eski
+
+    def test_tarayici_anahtari(self):
+        self.assertIn("TKGM_TARAYICI", open("tkgm_ui.py", encoding="utf-8").read())

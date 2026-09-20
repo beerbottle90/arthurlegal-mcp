@@ -82,6 +82,12 @@ def isleyici(tools: List[Tool]):
             self.send_header("Content-Length", str(len(govde)))
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Cache-Control", "no-store")
+            if kod >= 400:
+                # Reddedilen POST'un gövdesi okunmadan atılıyor. HTTP/1.1 kalıcı
+                # bağlantısında okunmamış gövde, sonraki isteğin başı sanılır ve
+                # bağlantı bozulur (test bunu ConnectionAbortedError olarak yakaladı).
+                self.send_header("Connection", "close")
+                self.close_connection = True
             for k, v in (ek or {}).items():
                 self.send_header(k, v)
             self.end_headers()
@@ -131,6 +137,15 @@ def isleyici(tools: List[Tool]):
                 self._json(404, {"ok": False, "hata": "yol yok"})
 
         def do_POST(self):  # noqa: N802
+            # Gövde, HER ŞEYDEN ÖNCE okunur — reddedilecek olsa bile. İstemci gövdeyi
+            # yollarken soketi kapatmak karşı tarafta bağlantı sıfırlamasıdır: reddin
+            # kendisi görünmez olur, tarayıcı "ağ hatası" der. (Test bunu aralıklı bir
+            # ConnectionAbortedError olarak yakaladı; sebebi buydu.)
+            try:
+                boy = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                boy = -1
+            ham = self.rfile.read(boy) if 0 < boy <= _AZAMI_GOVDE else b""
             if not self._kapi():
                 return
             if self.headers.get("X-Tkgm") != "1":
@@ -140,10 +155,9 @@ def isleyici(tools: List[Tool]):
                 self._json(404, {"ok": False, "hata": "yol yok"})
                 return
             try:
-                boy = int(self.headers.get("Content-Length") or 0)
-                if boy <= 0 or boy > _AZAMI_GOVDE:
-                    raise ValueError("gövde boyu")
-                istek = json.loads(self.rfile.read(boy).decode("utf-8"))
+                if not ham:
+                    raise ValueError("gövde yok ya da sınırı aşıyor")
+                istek = json.loads(ham.decode("utf-8"))
                 arac = by_ad[istek["arac"]]
             except (ValueError, KeyError, UnicodeDecodeError):
                 self._json(400, {"ok": False, "hata": "geçersiz istek ya da bilinmeyen araç"})
@@ -169,7 +183,22 @@ def sunucu(tools: List[Tool], port: int = 8765) -> ThreadingHTTPServer:
 
 
 def calistir(tools: List[Tool], port: int = 8765, tarayici: bool = True) -> None:
-    httpd = sunucu(tools, port)
+    # TKGM_TARAYICI=0: sekme açma. Kısayolun duman testi bunu kullanır; sunucuyu
+    # elle bir terminalde tutan kullanıcının da işine yarar.
+    if os.environ.get("TKGM_TARAYICI", "").strip() == "0":
+        tarayici = False
+    try:
+        httpd = sunucu(tools, port)
+    except OSError as exc:
+        # Çift tıklayan kullanıcı traceback okumaz. En sık sebep zaten açık olan
+        # ikinci bir kopyadır ve doğru çözüm yeni sunucu değil, açık olan sekmedir.
+        sys.stderr.write(
+            "\nArayüz başlatılamadı (%s).\n"
+            "En olası sebep: %d numaralı kapı dolu — arayüz zaten açık olabilir.\n"
+            "Önce http://127.0.0.1:%d/ adresini deneyin.\n"
+            "Başka kapı gerekiyorsa: python server.py --ui --kapi 8766\n"
+            % (exc, port, port))
+        return
     adres = "http://127.0.0.1:%d/" % httpd.server_address[1]
     sys.stderr.write("ArthurLegal · Tapu arayüzü: %s  (çıktılar: %s)\n" % (adres, kaynak.cikti_klasoru()))
     if tarayici:

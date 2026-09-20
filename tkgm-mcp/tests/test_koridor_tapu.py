@@ -146,8 +146,12 @@ class Tapu(unittest.TestCase):
         self.assertEqual(k["tasinmaz"]["yuzolcumu_m2"], 1195.0)
         self.assertEqual(len(k["malikler"]), 2)
         self.assertEqual(k["malikler"][0]["hisse"], "1/2")
+        # v0.2.1'e kadar buradaki iddia `assertIn("*********01", ad)` idi — yani ADIN
+        # açıkta olduğunu doğrulayıp maskeleme sanıyordu. Artık ad da etiketlenir;
+        # sızıntı denetimi alan alan değil, gövdenin tamamında yapılır (test_maskeleme.py).
         self.assertNotIn("12345678901", json.dumps(k, ensure_ascii=False))
-        self.assertIn("*********01", k["malikler"][0]["ad"])
+        self.assertEqual(k["malikler"][0]["ad"], "{{MALİK-01}}")
+        self.assertNotIn("AHMET ÖRNEK", json.dumps(k, ensure_ascii=False))
         self.assertEqual(len(k["serhler"]), 1)
         self.assertTrue(any("TMK 194" in i for i in k["isaretler"]))
         self.assertTrue(any("6292" in i for i in k["isaretler"]))

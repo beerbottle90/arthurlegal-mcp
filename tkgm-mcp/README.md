@@ -71,10 +71,23 @@ klasörünü listeler — Claude oturumlarında üretilen dosyalar da orada gör
 | `koridor_kesisim` | Hat + genişlik → parsel başına kesilen alan ve eksen boyu, ölçülmüş hata payıyla |
 | `parsel_foyu` / `portfoy_tablosu` | Word föyü (.docx) ve Excel dökümü (.xlsx) — yalnız yerel kipte |
 | `tarife_ara` / `harc_hesapla` | 2026 tapu harcı + döner sermaye; her rakam `veri/tarife_2026.json`da alıntısıyla |
-| `tapu_kaydi_oku` | Kullanıcının kendi aldığı tapu kaydı metni → şema; TCKN maskeli, yalnız yerel kipte |
+| `tapu_kaydi_oku` | Kullanıcının kendi aldığı tapu kaydı metni → şema; TCKN/IBAN/telefon/e-posta **ve malik adları** maskeli, yalnız yerel kipte |
 | `disa_aktar` | GeoJSON, KML, DXF (R12, TM koordinatlı), CSV |
 | `koordinat_donustur` | Coğrafi ↔ ITRF96 TM 3° / UTM 6° |
 | `hukuk_koprusu` | Dayanak madde adresleri + hazır `tr_mevzuat_ara` / `tr_ictihat_ara` çağrıları |
+
+## Tapu kaydında ne maskelenir
+
+`tapu_kaydi_oku` iki katmanda maskeler. Kalıp katmanı sağlama doğrular: NVİ basamakları
+tutmayan on bir haneli sayı (yevmiye no) maskelenmez, tutan maskelenir; IBAN mod-97'den,
+VKN ise yalnız satırında "vergi kimlik no"/"VKN" geçiyorsa. Ad katmanı NLP kullanmaz —
+ayrıştırıcı adın hangi dizge olduğunu `Malik:` satırından zaten bilir, bu yüzden ad
+`{{MALİK-nn}}` olur ve şerh/rehin satırları dâhil kayıdın her yerinde aynı etiketi alır.
+
+Yanıt, maskelenMEYENİ de adıyla sayar: şerhteki üçüncü kişi ve şirket adları (alacaklı
+banka, kiracı, mahkeme), adres, doğum tarihi. Bunlar için tam takma adlandırma
+[Arthur Mask](https://github.com/beerbottle90/arthur-mask)'in işidir; bu sunucu yalnız
+standart kütüphane kullandığı için onu içe almaz.
 
 ## Dış ağ çağrıları
 
