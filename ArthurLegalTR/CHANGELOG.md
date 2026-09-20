@@ -37,7 +37,8 @@
 - `crawl.py --backfill-text`: BDDK, BTK and Rekabet were first indexed from their listings, so 13,313 of 19,498
   archive documents had a body equal to their title and `semantik_ara` searched titles, not decisions. The backfill
   fetches full text for exactly those rows (resumable; the vector of a changed row is dropped). 2026-09-20: BDDK
-  964/964, BTK 1,897/1,904. "idari para cezası" occurs in the text of 412 BTK decisions and in the title of none.
+  964/964, BTK 1,897/1,904. "idari para cezası" occurs in the text of 419 BTK decisions and in the title of 9; "dolaylı pay sahipliği" in the text
+  of 60 BDDK decisions and in the title of none.
   Rekabet is left title-only on purpose — its upstream search already matches inside the PDFs. The regulators'
   `notes` (what `kurum_listesi` returns) now say which side holds the text.
 - `triyaj.hazirla()` validates `konu`/`esik` in one place, before any request; `status.triyaj`

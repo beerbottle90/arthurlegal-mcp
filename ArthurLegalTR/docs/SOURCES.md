@@ -24,8 +24,9 @@ time; "Local" = crawled into `data/index.db` for `semantik_ara`.
 **The local index is not equally deep.** Measured 2026-09-20: 13,313 of 19,498 documents (BDDK, BTK, Rekabet) were
 indexed from their listings, so their body was the title and `semantik_ara` searched titles, not decisions.
 `crawl.py --backfill-text` added full text for BDDK (964/964) and BTK (1,897/1,904; seven are scanned PDFs).
-"idari para cezası" occurs in the text of 412 BTK decisions and in the title of none — a question that could not be
-asked before, because BTK's live search is title-only too. Rekabet stays title-only on purpose: its live search
+"idari para cezası" occurs in the text of 419 BTK decisions and in the title of only 9 — for the other 411 the question
+could not be asked before, because BTK's live search is title-only too. (Counted with Turkish-aware case folding:
+SQLite's `lower()` leaves "İ" alone and reports no title at all.) Rekabet stays title-only on purpose: its live search
 already matches inside the PDFs, and ten thousand long PDFs would bloat the baked image. EPDK has text for about half
 of its decisions (the rest have no extractable document); KVKK, SPK and Sigorta Tahkim always had full text.
 
