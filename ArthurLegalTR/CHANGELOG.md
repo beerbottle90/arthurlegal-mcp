@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.0 — 2026-09-22
+
+SMK m.120 olayı (protokole "ŞİRKET'in önalım hakkı" yazıldı; m.120 çalışanın önalım hakkıdır) üzerine:
+
+- `mevzuat_madde_getir` tek çağrıda madde okur: `number="6769", madde_no="120"` (ya da en çok 10 maddelik liste;
+  `geçici 1`, `ek 3`, `169/a`, `12/3`). Her kalem başlık, metin, durum (mülga, iptal, başka kanuna işlenmiş) ve yalnız
+  kayıt alanlarından kurulan `citation` taşır: `SINAİ MÜLKİYET KANUNU (Kanun No. 6769, RG 10.01.2017/29944) m. 120`.
+  Olmayan madde `NOT_FOUND` döner, komşu madde asla dönmez; aynı numaralı birden çok kayıt `AMBIGUOUS_LAW`.
+  Eski `madde_id` kullanımı aynı anahtarlarla çalışır. Ağaçta düğümü olmayan geçici/ek maddeler barındıran düğümden
+  ya da tam metinden kesilir; SMK m.166-184 gibi aralık düğümleri çözülür.
+- `mevzuat_icinde_ara`: madde başlığı artık bir ÖNCEKİ maddenin sonuna eklenmiyor ("önalım" araması 119'u
+  120'nin başlığıyla eşliyordu); sonuçlar madde_no ve başlık taşır, başlığı eşleşen madde önce gelir; 169/a,
+  mükerrer ve "MADDE 166 ila 184" başlıkları doğru bölünür; dipnot ve değişiklik tabloları son maddeye yapışmaz.
+- `mevzuat_icindekiler`: `number`, `compact`, `madde_from`/`madde_to`, `heading_query` (hepsi isteğe bağlı).
+- Atıf: RG tarihi eksik kayıtta RG sayısı korunur (`RG sayı 25134`), `citation_missing` listesi; mükerrer RG.
+- Önbellek: TTL'li, bayt sınırlı, eşzamanlı yüklemede tek istek; boş metin önbelleğe alınmaz.
+- `textx.html_to_text`: kaynak satır kırılmaları ve satır içi etiketlerin böldüğü kelimeler birleştirilir.
+- Talimat: "MADDE ATFI KURALI" hem bu sunucunun hem birleştiricinin talimatının EN BAŞINDA (istemciler uzun
+  talimatı ~2.000 karakterde kesiyordu); hız kuralı "tempo kuralıdır, doğrulanacak madde sayısına sınır değildir".
+- Testler: `tests/test_madde.py` (canlı Bedesten yanıtlarından kısaltılmış fikstürle SMK m.120 regresyonu).
+
 ## 0.4.0 — 2026-09-20
 
 - `mevzuat_ara` takes `konu` (`enerji` · `rekabet` · `vergi` · `icra`), `esik` and `max_pages`, and no

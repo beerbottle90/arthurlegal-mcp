@@ -1,0 +1,199 @@
+{
+ "search": {
+  "mevzuatList": [
+   {
+    "mevzuatId": "104221",
+    "mevzuatNo": 6769,
+    "mevzuatAdi": "SINAİ MÜLKİYET KANUNU",
+    "mevzuatTur": {
+     "id": 1,
+     "name": "KANUN",
+     "description": "Kanunlar",
+     "maddeSonuRegex": ".*Bu.*Kanun.*hükümlerini.*yürütür\\."
+    },
+    "mevzuatTertip": 5,
+    "kayitTarihi": "2022-02-14T16:36:59.09",
+    "guncellemeTarihi": null,
+    "resmiGazeteTarihi": "2017-01-10T00:00:00",
+    "resmiGazeteSayisi": "29944",
+    "url": "https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=6769&MevzuatTur=1&MevzuatTertip=5",
+    "mukerrer": "HAYIR",
+    "ekler": null,
+    "gerekceId": null
+   }
+  ],
+  "total": 1,
+  "start": 0
+ },
+ "tree": {
+  "children": [
+   {
+    "children": [
+     {
+      "children": [
+       {
+        "children": [
+         {
+          "children": [],
+          "maddeId": "1651712",
+          "maddeNo": 113,
+          "title": "Hizmet buluşu ve serbest buluş",
+          "description": null,
+          "maddeBaslik": "Madde No: 113 - Hizmet buluşu ve serbest buluş",
+          "gerekceId": null,
+          "guncellemeTarihi": "2023-05-10T14:29:51.000+00:00",
+          "parentMaddeId": "1651709",
+          "mevzuatId": "104221"
+         },
+         {
+          "children": [],
+          "maddeId": "1651728",
+          "maddeNo": 119,
+          "title": "Serbest buluş, bildirim yükümlülüğü ve teklifte bulunma yükümlülüğü",
+          "description": null,
+          "maddeBaslik": "Madde No: 119 - Serbest buluş, bildirim yükümlülüğü ve teklifte bulunma yükümlülüğü",
+          "gerekceId": null,
+          "guncellemeTarihi": "2023-05-10T14:29:52.000+00:00",
+          "parentMaddeId": "1651709",
+          "mevzuatId": "104221"
+         },
+         {
+          "children": [],
+          "maddeId": "1651731",
+          "maddeNo": 120,
+          "title": "Çalışanın önalım hakkı",
+          "description": null,
+          "maddeBaslik": "Madde No: 120 - Çalışanın önalım hakkı",
+          "gerekceId": null,
+          "guncellemeTarihi": "2023-05-10T14:29:53.000+00:00",
+          "parentMaddeId": "1651709",
+          "mevzuatId": "104221"
+         },
+         {
+          "children": [],
+          "maddeId": "1651734",
+          "maddeNo": 121,
+          "title": "Yükseköğretim kurumlarında gerçekleştirilen buluşlar",
+          "description": null,
+          "maddeBaslik": "Madde No: 121 - Yükseköğretim kurumlarında gerçekleştirilen buluşlar",
+          "gerekceId": null,
+          "guncellemeTarihi": "2023-05-10T14:29:53.000+00:00",
+          "parentMaddeId": "1651709",
+          "mevzuatId": "104221"
+         }
+        ],
+        "maddeId": "1651709",
+        "maddeNo": null,
+        "title": "BEŞİNCİ KISIM",
+        "description": "Çalışanların Buluşları",
+        "maddeBaslik": "BEŞİNCİ KISIM - Çalışanların Buluşları",
+        "gerekceId": null,
+        "guncellemeTarihi": "2023-05-10T14:29:51.000+00:00",
+        "parentMaddeId": "1651591",
+        "mevzuatId": "104221"
+       }
+      ],
+      "maddeId": "1651591",
+      "maddeNo": null,
+      "title": "DÖRDÜNCÜ KİTAP",
+      "description": "Patent ve Faydalı Model",
+      "maddeBaslik": "DÖRDÜNCÜ KİTAP - Patent ve Faydalı Model",
+      "gerekceId": null,
+      "guncellemeTarihi": "2023-05-10T14:29:41.000+00:00",
+      "parentMaddeId": "1651241",
+      "mevzuatId": "104221"
+     },
+     {
+      "children": [
+       {
+        "children": [
+         {
+          "children": [],
+          "maddeId": "1651880",
+          "maddeNo": 166,
+          "title": "184 - Diğer Hükümler",
+          "description": null,
+          "maddeBaslik": "Madde No: 166 - 184 - Diğer Hükümler",
+          "gerekceId": null,
+          "guncellemeTarihi": "2023-05-10T14:30:05.000+00:00",
+          "parentMaddeId": "1651878",
+          "mevzuatId": "104221"
+         },
+         {
+          "children": [],
+          "maddeId": "1651897",
+          "maddeNo": 191,
+          "title": "Yürürlükten kaldırılan mevzuat",
+          "description": null,
+          "maddeBaslik": "Madde No: 191 - Yürürlükten kaldırılan mevzuat",
+          "gerekceId": null,
+          "guncellemeTarihi": "2023-05-10T14:30:07.000+00:00",
+          "parentMaddeId": "1651878",
+          "mevzuatId": "104221"
+         },
+         {
+          "children": [],
+          "maddeId": "1651900",
+          "maddeNo": 192,
+          "title": "Yürürlük",
+          "description": null,
+          "maddeBaslik": "Madde No: 192 - Yürürlük",
+          "gerekceId": null,
+          "guncellemeTarihi": "2023-05-10T14:30:07.000+00:00",
+          "parentMaddeId": "1651878",
+          "mevzuatId": "104221"
+         }
+        ],
+        "maddeId": "1651878",
+        "maddeNo": null,
+        "title": "İKİNCİ KISIM",
+        "description": "Diğer Hükümler",
+        "maddeBaslik": "İKİNCİ KISIM - Diğer Hükümler",
+        "gerekceId": null,
+        "guncellemeTarihi": "2023-05-10T14:30:05.000+00:00",
+        "parentMaddeId": "1651821",
+        "mevzuatId": "104221"
+       }
+      ],
+      "maddeId": "1651821",
+      "maddeNo": null,
+      "title": "BEŞİNCİ KİTAP",
+      "description": "Ortak ve Diğer Hükümler",
+      "maddeBaslik": "BEŞİNCİ KİTAP - Ortak ve Diğer Hükümler",
+      "gerekceId": null,
+      "guncellemeTarihi": "2023-05-10T14:30:00.000+00:00",
+      "parentMaddeId": "1651241",
+      "mevzuatId": "104221"
+     }
+    ],
+    "maddeId": "1651241",
+    "maddeNo": null,
+    "title": "BAŞLANGIÇ HÜKÜMLERİ",
+    "description": "Amaç, Kapsam, Tanımlar ve Korumadan Yararlanacak Kişiler",
+    "maddeBaslik": "BAŞLANGIÇ HÜKÜMLERİ - Amaç, Kapsam, Tanımlar ve Korumadan Yararlanacak Kişiler",
+    "gerekceId": null,
+    "guncellemeTarihi": "2023-05-10T14:29:11.000+00:00",
+    "parentMaddeId": "1651238",
+    "mevzuatId": "104221"
+   }
+  ],
+  "maddeId": "1651238",
+  "maddeNo": null,
+  "title": "6769",
+  "description": "SINAİ MÜLKİYET KANUNU",
+  "maddeBaslik": "6769 - SINAİ MÜLKİYET KANUNU",
+  "gerekceId": null,
+  "guncellemeTarihi": "2023-05-10T14:29:10.000+00:00",
+  "parentMaddeId": "-1",
+  "mevzuatId": "104221"
+ },
+ "madde_1651731": {
+  "content": "PHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9InRleHQtYWxpZ246anVzdGlmeTt0ZXh0LWluZGVudDozNS40NXB0O2xpbmUtaGVpZ2h0Og0KMTI3JTt0ZXh0LWF1dG9zcGFjZTppZGVvZ3JhcGgtb3RoZXIiPjxiPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTIuMHB0Ow0KbGluZS1oZWlnaHQ6MTI3JSI+w4dhbMSxxZ9hbsSxbiDDtm5hbMSxbSBoYWtrxLE8L3NwYW4+PC9iPjwvcD48cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0idGV4dC1hbGlnbjpqdXN0aWZ5O3RleHQtaW5kZW50OjM1LjQ1cHQ7bGluZS1oZWlnaHQ6DQoxMjclO3RleHQtYXV0b3NwYWNlOmlkZW9ncmFwaC1vdGhlciI+PGI+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZToxMi4wcHQ7DQpsaW5lLWhlaWdodDoxMjclIj5NQURERSAxMjAtPC9zcGFuPjwvYj48c3BhbiBzdHlsZT0iZm9udC1zaXplOjEyLjBwdDsNCmxpbmUtaGVpZ2h0OjEyNyUiPiAoMSkgxLDFn3ZlcmVuaW4gaWZsYXMgZXRtZXNpIHZlIGlmbGFzIGlkYXJlc2luaW4gZGUgYnVsdcWfdSBpxZ9sZXRtZWRlbiBheXLEsSBvbGFyYWsgZGV2cmV0bWVrIGlzdGVtZXNpIGjDomxpbmRlIMOnYWzEscWfYW7EsW4sIHlhcG3EscWfIG9sZHXEn3UgdmUgacWfdmVyZW5pbiBkZSB0YW0gaGFrIHRhbGViaW5kZSBidWx1bmR1xJ91IGJ1bHXFn2EgaWxpxZ9raW4gb2xhcmFrIMO2bmFsxLFtIGhha2vEsSB2YXJkxLFyLjwvc3Bhbj48L3A+PHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9InRleHQtYWxpZ246anVzdGlmeTt0ZXh0LWluZGVudDozNS40NXB0O2xpbmUtaGVpZ2h0Og0KMTI3JTt0ZXh0LWF1dG9zcGFjZTppZGVvZ3JhcGgtb3RoZXIiPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTIuMHB0O2xpbmUtaGVpZ2h0Og0KMTI3JSI+KDIpIMOHYWzEscWfYW4gYnVsdcWfdW5kYW4gZG/En2FuIGJlZGVsIGFsYWNhxJ/EsSwgaW10aXlhemzEsSBhbGFjYWtsYXJkYW5kxLFyLiDEsGZsYXMgaWRhcmVzaSBidSBuaXRlbGlrdGVraSBiaXJkZW4gw6dvayBiZWRlbCBhbGFjYcSfxLFuxLEsIGFsYWNha2zEsWxhciBhcmFzxLFuZGEgYWxhY2FrbGFyxLEgb3JhbsSxbmRhIGRhxJ/EsXTEsXIuIMOHYWzEscWfYW4sIGJlZGVsIGFsYWNhxJ/EsSB5ZXJpbmUgYnVsdcWfdW51biBzZXJiZXN0IGJ1bHXFn2EgZMO2bsO8xZ9tZXNpbmkgdGFsZXAgZWRlYmlsaXIuPC9zcGFuPjwvcD4=",
+  "mimeType": "text/html",
+  "version": 1
+ },
+ "mevzuat_104221": {
+  "content": "PHA+U2VyYmVzdCBidWx1xZ8sIGJpbGRpcmltIHnDvGvDvG1sw7xsw7zEn8O8IHZlIHRla2xpZnRlIGJ1bHVubWEgecO8a8O8bWzDvGzDvMSfw7w8L3A+PHA+TUFEREUgMTE5LSAoNCkgLi4uIMSwxZ92ZXJlbiwgdGVrbGlmaW4ga2VuZGlzaW5lIHVsYcWfdMSxxJ/EsSB0YXJpaHRlbiBpdGliYXJlbiDDvMOnIGF5IGnDp2luZGUgY2V2YXAgdmVybWV6c2UsIGJ1IGtvbnVkYWtpIMO2bmNlbGlrIGhha2vEsW7EsSBrYXliZWRlci48L3A+PHA+w4dhbMSxxZ9hbsSxbiDDtm5hbMSxbSBoYWtrxLE8L3A+PHA+TUFEREUgMTIwLSAoMSkgxLDFn3ZlcmVuaW4gaWZsYXMgZXRtZXNpIHZlIGlmbGFzIGlkYXJlc2luaW4gZGUgYnVsdcWfdSBpxZ9sZXRtZWRlbiBheXLEsSBvbGFyYWsgZGV2cmV0bWVrIGlzdGVtZXNpIGjDomxpbmRlIMOnYWzEscWfYW7EsW4sIHlhcG3EscWfIG9sZHXEn3UgdmUgacWfdmVyZW5pbiBkZSB0YW0gaGFrIHRhbGViaW5kZSBidWx1bmR1xJ91IGJ1bHXFn2EgaWxpxZ9raW4gb2xhcmFrIMO2bmFsxLFtIGhha2vEsSB2YXJkxLFyLjwvcD48cD5Zw7xrc2Vrw7bEn3JldGltIGt1cnVtbGFyxLFuZGEgZ2Vyw6dla2xlxZ90aXJpbGVuIGJ1bHXFn2xhcjwvcD48cD5NQURERSAxMjEtICgxKSBZw7xrc2Vrw7bEn3JldGltIGt1cnVtbGFyxLFuZGEgLi4uPC9wPg==",
+  "mimeType": "text/html"
+ }
+}

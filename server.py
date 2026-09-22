@@ -332,7 +332,9 @@ def build() -> None:
     ))
 
 
-INSTRUCTIONS_HEADER = """ArthurLegal — 15 yargı çevresi tek uçta.
+INSTRUCTIONS_HEADER = """MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın, "doğrulanmadı" diye işaretleyin.
+
+ArthurLegal — 15 yargı çevresi tek uçta.
 
 ARAÇ ÖNEKLERİ. Her araç ait olduğu yargı çevresinin önekini taşır:
 `tr_` Türkiye (içtihat, mevzuat, EPDK/Rekabet/SPK/BDDK/KVKK/BTK/GİB/Sigorta Tahkim,

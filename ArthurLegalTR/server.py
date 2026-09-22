@@ -48,7 +48,7 @@ import sources  # noqa: E402
 from sources import bedesten_ictihat, bedesten_mevzuat, anayasa, uyusmazlik, resmi_gazete, spk  # noqa: E402
 from textx import HAS_PYPDF  # noqa: E402
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 INDEX_PATH = os.environ.get("INDEX_PATH") or os.path.join(HERE, "data", "index.db")
 
 _index: Optional[retrieval.Index] = None
@@ -242,8 +242,9 @@ GUIDE = """ArthurLegalTR — hangi soru için hangi araç
 
 1. MEVZUAT (kanun, KHK, CBK, yönetmelik, tebliğ)
    mevzuat_ara(query="Elektrik Piyasası", types=["KANUN"]) → mevzuat_id
-   mevzuat_icindekiler(mevzuat_id) → madde_id → mevzuat_madde_getir
-   Belirli hüküm: mevzuat_icinde_ara(mevzuat_id, query)
+   Madde okuma (tek çağrı): tr_mevzuat_madde_getir(number="6769", madde_no=["115","120","geçici 1"])  → başlık + metin + citation
+   Madde ağacı: tr_mevzuat_icindekiler(number="6769", compact=true, heading_query="önalım")
+   Konu araması (madde numarası araması DEĞİL): tr_mevzuat_icinde_ara(number="6769", query="önalım")
    Gerekçe: mevzuat_gerekce(gerekce_id)   (yalnız gerekce_id dolu kanunlarda)
    Sektörel düzenleme: types=["KKY","TEBLIGLER"] + query="Enerji Piyasası" / "Sermaye Piyasası" / "Bankacılık"
    Konu taraması: mevzuat_ara(types=["KANUN"], rg_date_from="2024-09-01", konu="icra", max_pages=3)
@@ -280,7 +281,9 @@ ALINTI DİSİPLİNİ
    Her sonuçtaki `citation` alanını birebir kullanın; esas/karar numarası, tarih, RG künyesi ezberden yazılmaz.
    source_url olmayan belgeler (madde metni) için URL uydurmayın; belge adı + madde numarası ile atıf yapın.
    Özelge bağlayıcı değildir. Rekabet/EPDK/BDDK kararlarının RG'de yayımlandığını fihristle teyit edin.
-   Bedesten hız sınırı: art arda 5'ten fazla arama yapmayın; 429 alınca birkaç saniye bekleyin.
+   Madde atfı: yazılan her kanun maddesi (sözleşme ve dilekçe gövdesi dâhil) tr_mevzuat_madde_getir ile çekilir;
+   başlık ve metin, maddeye yüklenen içerikle karşılaştırılır. Çekilemeyen madde ezberden yazılmaz.
+   Bedesten hız sınırı: 10 istek / 30 sn; aynı turda 5'ten fazla çağrı göndermeyin, bu bir tempo kuralıdır, doğrulanacak madde sayısına sınır değildir; 429 alınca birkaç saniye bekleyin.
 """
 
 
@@ -334,18 +337,20 @@ def build_tools() -> List[Tool]:
              "geçmeyen mevzuatı ve torba kanunları (değiştirilen kanun adlarından) yakalar; sınırı şemada yazar.",
              mv.SEARCH_SCHEMA, _wrap(mv.search)),
         Tool("mevzuat_getir", "Mevzuat tam metni (sayfalı).", mv.GET_SCHEMA, _wrap(mv.get)),
-        Tool("mevzuat_icindekiler", "Mevzuatın madde ağacı (bölüm/madde başlıkları, madde_id'ler).",
-             {"type": "object", "properties": {"mevzuat_id": {"type": "string"}}, "required": ["mevzuat_id"]}, _wrap(mv.toc)),
-        Tool("mevzuat_madde_getir", "Tek madde metni (madde_id mevzuat_icindekiler'den).",
-             {"type": "object", "properties": {"madde_id": {"type": "string"}}, "required": ["madde_id"]}, _wrap(mv.article)),
+        Tool("mevzuat_icindekiler", "Mevzuatın madde ağacı (madde başlıkları, madde_id'ler). number ile de çağrılır; "
+             "compact=true, madde_from/madde_to ve heading_query çıktıyı küçültür. Tek madde için tr_mevzuat_madde_getir yeter.",
+             mv.TOC_SCHEMA, _wrap(mv.toc)),
+        Tool("mevzuat_madde_getir", "Madde metni + başlık + hazır atıf TEK ÇAĞRIDA: number=\"6769\", madde_no=\"120\" "
+             "(ya da en çok 10 maddelik liste; \"geçici 1\", \"ek 3\", \"169/a\"). Bir maddeye atıf yapmadan ÖNCE bununla "
+             "doğrulayın; olmayan madde NOT_FOUND döner, komşu madde değil. Eski madde_id kullanımı geçerli.",
+             mv.MADDE_SCHEMA, _wrap(mv.article)),
         Tool("mevzuat_gerekce", "Kanun gerekçesi (genel gerekçe, komisyon raporları, madde gerekçeleri).",
              {"type": "object", "properties": {"gerekce_id": {"type": "string"}, "page": {"type": "integer", "default": 1},
                                                "page_chars": {"type": "integer", "default": 8000}}, "required": ["gerekce_id"]},
              _wrap(mv.gerekce)),
-        Tool("mevzuat_icinde_ara", "Bir mevzuatın maddelerinde anahtar kelime arar; isabete göre sıralı madde listesi döner.",
-             {"type": "object", "properties": {"mevzuat_id": {"type": "string"}, "query": {"type": "string"},
-                                               "limit": {"type": "integer", "default": 8}}, "required": ["mevzuat_id", "query"]},
-             _wrap(mv.search_within)),
+        Tool("mevzuat_icinde_ara", "Bir mevzuatın maddelerinde anahtar kelime arar (konu araması; madde numarasıyla madde "
+             "bulmak için değil). Her sonuç kendi madde_no ve başlığını taşır; başlığı eşleşen madde önce gelir.",
+             mv.WITHIN_SCHEMA, _wrap(mv.search_within)),
         Tool("resmi_gazete_fihrist", "Bir günün Resmî Gazete fihristi (bölüm + başlık + link). Kurul kararlarının yayım teyidi.",
              rg.SOURCE.search_schema, _wrap(rg.fihrist)),
         Tool("resmi_gazete_getir", "Resmî Gazete belge metni (fihrist url'sinden).", rg.SOURCE.get_schema, _wrap(rg.get)),
@@ -395,7 +400,9 @@ def build_tools() -> List[Tool]:
     return tools
 
 
-INSTRUCTIONS = """ArthurLegalTR — Türk hukuku araştırma sunucusu (içtihat + mevzuat + 8 düzenleyici kurum + semantik arama).
+INSTRUCTIONS = """MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın, "doğrulanmadı" diye işaretleyin.
+
+ArthurLegalTR — Türk hukuku araştırma sunucusu (içtihat + mevzuat + 8 düzenleyici kurum + semantik arama).
 
 ARAÇ AİLELERİ. `ictihat_*` Yargıtay/Danıştay/BAM/yerel/KYB · `aym_*` Anayasa Mahkemesi · `uyusmazlik_*` ·
 `mevzuat_*` kanun–tebliğ, madde ağacı, gerekçe · `resmi_gazete_*` · `kurum_karari_*` (rekabet, epdk, spk, bddk,
@@ -411,7 +418,7 @@ ALINTI. Her sonuçtaki `citation` alanı birebir kullanılır; esas/karar numara
 yazılmaz. `source_url` olmayan belgeler için URL uydurulmaz. Özelge bağlayıcı değildir. Karar listeleri metin
 içermez: yorum yapmadan önce `*_getir` ile metni okuyun.
 
-HIZ. Bedesten (içtihat + mevzuat) 10 istek / 30 sn: art arda 5'ten fazla arama yapmayın; `retry: true`
+HIZ. Bedesten (içtihat + mevzuat) 10 istek / 30 sn; aynı turda 5'ten fazla çağrı göndermeyin, bu bir tempo kuralıdır, doğrulanacak madde sayısına sınır değildir; `retry: true`
 gelirse birkaç saniye bekleyip yineleyin. ictihat_semantik_ara karar başına ~4 sn sürer.
 
 SEMANTİK. `semantik_ara` yalnız yerel indekse (crawl edilmiş kurum kararları, SPK bültenleri, Sigorta Tahkim
