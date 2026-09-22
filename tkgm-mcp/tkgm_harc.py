@@ -82,27 +82,67 @@ def ara(sorgu: str, sinir: int = 12) -> List[Dict[str, Any]]:
     return out[:sinir]
 
 
-def tapu_harci(kod: str, bedel: float, emlak_vergi_degeri: Optional[float] = None) -> Dict[str, Any]:
+# Tarifede işlem değil, kural/dayanak olan satırlar: hesaplanırsa anlamsız tutar üretir
+# ("satis_oran_dayanagi" tek taraflı yarım satış harcı, "asgari_nispi_harc" 346 TL işlem gibi).
+_HESAPLANMAZ = {"satis_oran_dayanagi", "asgari_nispi_harc"}
+
+
+def _matrah(r: Dict[str, Any], bedel: float, ev: Optional[float]) -> tuple:
+    """Matrah kuralı KOD değil VERİDİR: her satırın `matrah` alanı tarifenin kendi
+    tanımını taşır. m. 63/2'nin emlak vergisi değeri tabanı yalnız devir ve iktisaba
+    uygulanır; ipotekte borç, kira şerhinde kira toplamı esastır."""
+    k = _katla(r.get("matrah") or "")
+    notlar: List[str] = []
+    if "kayitli deger" in k:
+        if not ev:
+            raise HarcHatasi("Bu işlemin matrahı kayıtlı değerdir (emlak vergisi değeri, 492 s. K. m. 63): "
+                             "`emlak_vergi_degeri` verin.")
+        return float(ev), ["Matrah kayıtlı değer: emlak vergisi değeri (%s)." % r["matrah"]]
+    m = float(bedel or 0)
+    if m <= 0 and ev and "bedelsiz" in k:
+        m = float(ev)
+        notlar.append("Bedel yok: matrah emlak vergisi değeri (%s)." % r["matrah"])
+    if m <= 0:
+        raise HarcHatasi("Nispi harç için `bedel` (TL) gerekli (%s)." % (r.get("matrah") or "matrah"))
+    sinirli = "emlak vergisi deger" in k
+    alt = ust = None
+    if ev:
+        if "emlak vergisi degerinden az" in k:
+            alt = float(ev)
+        if "yarisindan az" in k:
+            alt = float(ev) / 2.0
+        if "iki katindan cok olamaz" in k:
+            ust = float(ev) * 2.0
+    elif sinirli:
+        notlar.append("Emlak vergisi değeri verilmedi; bu işlemin matrahı ona göre sınırlıdır ve sınır "
+                      "UYGULANMADI: %s." % r["matrah"])
+    if alt is not None and m < alt:
+        m = alt
+        notlar.append("Matrah, emlak vergisi değerine bağlı alt sınıra çekildi (%s)." % r["matrah"])
+    if ust is not None and m > ust:
+        m = ust
+        notlar.append("Matrah, emlak vergisi değerine bağlı üst sınıra çekildi (%s)." % r["matrah"])
+    kesirsiz = float(int(m // 10) * 10)
+    if kesirsiz != m:
+        notlar.append("10 TL'ye kadar matrah kesri dikkate alınmadı (492 s. K. m. 63/5).")
+    return kesirsiz, notlar
+
+
+def tapu_harci(kod: str, bedel: float, emlak_vergi_degeri: Optional[float] = None,
+               adet: int = 1) -> Dict[str, Any]:
     r = _TH.get(kod)
-    if r is None or r["tur"] not in ("nispi", "maktu"):
-        raise HarcHatasi("Tapu harcı kodu bulunamadı ya da hesaplanabilir değil: %s. `tarife_ara` ile arayın." % kod)
+    if r is None or r["tur"] not in ("nispi", "maktu") or kod in _HESAPLANMAZ:
+        raise HarcHatasi("Tapu harcı kodu bulunamadı ya da hesaplanabilir bir işlem değil: %s. "
+                         "`tarife_kalemi` ile arayın." % kod)
     out: Dict[str, Any] = {"islem": r["islem"], "dayanak": r["dayanak"], "alinti": r["alinti"][:240]}
     if r["tur"] == "maktu":
-        out.update({"kalemler": [{"kalem": r["islem"], "tutar_tl": r["maktu_tl"]}], "toplam_tl": r["maktu_tl"]})
+        out.update({"kalemler": [{"kalem": "%s × %d" % (r["islem"], adet) if adet > 1 else r["islem"],
+                                  "tutar_tl": round(r["maktu_tl"] * adet, 2)}],
+                    "toplam_tl": round(r["maktu_tl"] * adet, 2)})
         return out
     if r.get("oran_binde") is None:
         raise HarcHatasi("Bu satır oran taşımıyor (kural/indirim satırı): %s" % r["islem"])
-    if not bedel or bedel <= 0:
-        raise HarcHatasi("Nispi harç için `bedel` (TL) gerekli.")
-    matrah = float(bedel)
-    notlar: List[str] = []
-    alt = _TH.get("matrah_alt_siniri")
-    if emlak_vergi_degeri and emlak_vergi_degeri > matrah:
-        matrah = float(emlak_vergi_degeri)
-        notlar.append("Beyan edilen bedel emlak vergisi değerinin altında; matrah emlak vergisi değerine "
-                      "çekildi (%s)." % (alt["dayanak"] if alt else "492 s. K. m. 63"))
-    elif emlak_vergi_degeri is None and alt:
-        notlar.append("Emlak vergisi değeri verilmedi: matrah ondan düşük olamaz (%s)." % alt["dayanak"])
+    matrah, notlar = _matrah(r, bedel, emlak_vergi_degeri)
     tutar = round(matrah * r["oran_binde"] / 1000.0, 2)
     asgari = _TH.get("asgari_nispi_harc")
     if asgari and asgari.get("maktu_tl") and tutar < asgari["maktu_tl"]:
@@ -111,10 +151,15 @@ def tapu_harci(kod: str, bedel: float, emlak_vergi_degeri: Optional[float] = Non
     yukumlu = r.get("yukumlu") or "yükümlü tarifede belirtilmemiş; 492 s. K. m. 58"
     if "ayrı ayrı" in yukumlu:
         kalemler = [{"kalem": "devir eden", "tutar_tl": tutar}, {"kalem": "devir alan", "tutar_tl": tutar}]
+    elif "devir alan" in yukumlu and "devir eden" in yukumlu:
+        # I/20-b ayni sermaye: devir alan, gayrimenkul devrinde devir eden de öder.
+        kalemler = [{"kalem": "devir alan", "tutar_tl": tutar},
+                    {"kalem": "devir eden (gayrimenkul devrinde)", "tutar_tl": tutar}]
     else:
         kalemler = [{"kalem": yukumlu, "tutar_tl": tutar}]
-    out.update({"matrah_tl": matrah, "oran_binde": r["oran_binde"], "kanuni_oran": r.get("kanuni_miktar"),
-                "kalemler": kalemler, "toplam_tl": round(sum(k["tutar_tl"] for k in kalemler), 2)})
+    out.update({"matrah_tl": matrah, "matrah_kurali": r.get("matrah"), "oran_binde": r["oran_binde"],
+                "kanuni_oran": r.get("kanuni_miktar"), "kalemler": kalemler,
+                "toplam_tl": round(sum(k["tutar_tl"] for k in kalemler), 2)})
     if notlar:
         out["notlar"] = notlar
     return out
@@ -139,7 +184,7 @@ def _carpan(kosul: str, adet: int) -> Optional[Dict[str, float]]:
 def doner_sermaye(kod: str, yoresel_katsayi: Optional[float] = None, adet: int = 1) -> Dict[str, Any]:
     r = _DS.get(kod)
     if r is None:
-        raise HarcHatasi("Döner sermaye kodu bulunamadı: %s. `tarife_ara` ile arayın." % kod)
+        raise HarcHatasi("Döner sermaye kodu bulunamadı: %s. `tarife_kalemi` ile arayın." % kod)
     isaret = _isaret(r)
     out: Dict[str, Any] = {"kod": kod, "islem": r["islem"], "isaret": isaret, "birim": r.get("birim"),
                            "kosul": r.get("kosul"), "sayfa": r.get("sayfa"), "alinti": r["alinti"][:240]}

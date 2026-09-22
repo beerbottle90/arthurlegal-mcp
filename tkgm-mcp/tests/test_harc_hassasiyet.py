@@ -142,3 +142,63 @@ class Harc(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(harc.durum()["hata"], "tarife verisi yüklenemedi")
+class MatrahKurallari(unittest.TestCase):
+    """v0.3.0 incelemesi: m. 63/2 tabanı her satıra uygulanıyordu; ipotek 10-16 kat şişiyordu."""
+
+    def test_ipotek_ve_kira_emlak_vergisi_tabanina_takilmaz(self):
+        for kod in ("ipotek", "ipotek_derece_degisikligi", "kira_serhi"):
+            h = harc.tapu_harci(kod, 100_000.0, emlak_vergi_degeri=5_000_000.0)
+            self.assertEqual(h["matrah_tl"], 100_000.0, kod)
+
+    def test_kayitli_deger_satirlari_emlak_vergisi_ister(self):
+        with self.assertRaises(harc.HarcHatasi):
+            harc.tapu_harci("bagis", 1_000_000.0)
+        self.assertEqual(harc.tapu_harci("bagis", 0, emlak_vergi_degeri=750_000.0)["matrah_tl"], 750_000.0)
+
+    def test_ust_hakki_alt_ve_ust_sinir(self):
+        self.assertEqual(harc.tapu_harci("ust_hakki_daimi_mustakil", 10_000.0, 1_000_000.0)["matrah_tl"], 500_000.0)
+        self.assertEqual(harc.tapu_harci("ust_hakki_daimi_mustakil", 9_000_000.0, 1_000_000.0)["matrah_tl"], 2_000_000.0)
+
+    def test_ayni_sermaye_iki_taraf(self):
+        self.assertEqual(len(harc.tapu_harci("ayni_sermaye", 1_000_000.0)["kalemler"]), 2)
+
+    def test_on_tl_kesri(self):
+        self.assertEqual(harc.tapu_harci("ipotek", 100_009.99)["matrah_tl"], 100_000.0)
+
+    def test_maktu_adetle_carpilir(self):
+        tek = harc.tapu_harci("cins_degisikligi_bina", 0)["toplam_tl"]
+        self.assertAlmostEqual(harc.tapu_harci("cins_degisikligi_bina", 0, adet=12)["toplam_tl"], 12 * tek, places=2)
+
+    def test_kural_satirlari_hesaplanmaz(self):
+        for kod in ("satis_oran_dayanagi", "asgari_nispi_harc", "matrah_alt_siniri"):
+            with self.assertRaises(harc.HarcHatasi, msg=kod):
+                harc.tapu_harci(kod, 1_000_000.0)
+
+    def test_arac_girdi_dogrulamasi(self):
+        import json as _json
+        from mcpcore import McpError
+        for kotu in ({"bedel": -5}, {"bedel": float("nan")}, {"bedel": 1e308}, {"adet": 0}, {"adet": 2.5},
+                     {"bedel": True}):
+            with self.assertRaises(McpError, msg=kotu):
+                server._t_harc(dict({"tapu_harci_islem": "ipotek", "bedel": 1000}, **kotu))
+        h = _json.loads(server._t_harc({"tapu_harci_islem": "ipotek", "bedel": "3.000.000"}))
+        self.assertEqual(h["tapu_harci"]["matrah_tl"], 3_000_000.0)
+
+
+class HukukGuncel(unittest.TestCase):
+    """7571 ve 7579 değişiklikleri: yanlış hak düşürücü süre kaçırılmış bir dava demektir."""
+
+    def test_onalim_mutlak_sure_bir_yil(self):
+        import tkgm_hukuk as hukuk
+        k = hukuk.KONULAR["onalim"]
+        self.assertIn("BİR YIL", k["sure"])
+        self.assertNotIn("üç ay / iki yıl", k["sure"])
+        self.assertIn("geçici m. 1", k["sure"])   # 25.12.2025 öncesi satışlarda eski hüküm sürer
+        self.assertIn("734/2", k["uyari"])
+
+    def test_izin_yolu_elektronik_kabul_beyani(self):
+        import tkgm_kaynak as kaynak
+        self.assertIn("elektronik kabul beyanı", kaynak.canli_durum()["yol"])

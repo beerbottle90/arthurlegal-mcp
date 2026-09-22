@@ -75,11 +75,12 @@ STDLIB_BACKENDS = [
     ("jp", os.path.join(ROOT, "jp-egov-mcp"), "srv_jp", "🇯🇵 Japonya — mevzuat"),
     ("gleif", os.path.join(ROOT, "gleif-mcp"), "srv_gleif",
      "🌍 Tüzel kişi kimliği + grup yapısı (LEI)"),
-    # Not a jurisdiction and not a corpus: it never calls TKGM (Parsel Sorgu terms
-    # art. 3). Under the HTTP transport it also refuses file paths, so the public
-    # endpoint only ever works on parcel text the caller pastes in.
+    # Not a jurisdiction and not a corpus. It fetches single parcels from TKGM Parsel
+    # Sorgu through one rate-limited gate (tkgm_canli: one request in flight, at most
+    # 30 a minute for all users together, backs off on 429/503, stops on 403; see
+    # tkgm-mcp/docs/MANIFESTO.md). Under the HTTP transport it refuses file paths.
     ("tkgm", os.path.join(ROOT, "tkgm-mcp"), "srv_tkgm",
-     "🇹🇷 Tapu-kadastro — parsel ölçü, ölçekli kroki, hukuk köprüsü (TKGM'ye bağlanmaz)"),
+     "🇹🇷 Tapu-kadastro — canlı parsel (TKGM Parsel Sorgu, dakikada en çok 30 istek), rapor, kroki"),
 ]
 
 # The three older servers expose TOOLS as dicts with a "handler" key rather than
@@ -342,8 +343,9 @@ Resmî Gazete, semantik arşiv; KİK/Sayıştay/TÜRKPATENT/İSTAÇ YOK — resm
 `at_` Avusturya · `ie_` İrlanda · `fi_` Finlandiya · `es_` İspanya · `uk_` Birleşik Krallık ·
 `eu_` AB (CELLAR) · `jp_` Japonya · `az_` Azerbaycan · `de_` Almanya ·
 `gleif_` tüzel kişi kimliği (LEI) · `scholar_` doktrin · `contracts_` sözleşme emsali ·
-`tkgm_` tapu-kadastro parsel araçları (kullanıcının getirdiği GeoJSON/KML'den ölçü, kroki,
-hukuk köprüsü; TKGM servislerine BAĞLANMAZ — önce `tkgm_rehber`).
+`tkgm_` tapu-kadastro: parseli TKGM Parsel Sorgu'dan canlı getirir (il/ilçe/mahalle + ada/parsel,
+koordinat ya da yer adı; dosya İSTEMEYİN), rapor, ölçü, kroki; ilk canlı çağrıda onay kartı döner,
+önce `tkgm_baslangic`.
 
 TÜRKİYE İÇİN GİRİŞ NOKTASI: karmaşık Türk hukuku sorusunda önce `tr_hukuk_arastirma_rehberi`
 (hangi soru için hangi araç), sonra `tr_kurum_listesi` (8 kurumun filtreleri).

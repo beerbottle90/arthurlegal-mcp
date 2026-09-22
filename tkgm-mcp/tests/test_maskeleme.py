@@ -111,8 +111,10 @@ class Kaliplar(unittest.TestCase):
         self.assertIn("4521987650", tapu._maskele("Yevmiye: 4521987650"))
 
     def test_turkce_buyuk_kucuk(self):
-        self.assertIn("AHMET ÖRNEK", tapu._tr_varyant("Ahmet Örnek"))
-        self.assertIn("İNCİ IŞIK", tapu._tr_varyant("İnci Işık"))
+        d = tapu._ad_deseni(["AHMET", "İNCE"])
+        for yazim in ("Ahmet İnce", "AHMET İNCE", "Ahmet Ince", "ahmet ince", "Ahmet  İNCE", "AHMET\nİNCE"):
+            self.assertTrue(d.search(yazim), yazim)
+        self.assertFalse(d.search("AHMET İNCEOĞLU"))
 
 
 class Arac(unittest.TestCase):

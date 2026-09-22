@@ -252,7 +252,12 @@ class Hukuk(unittest.TestCase):
         self.assertIn("KALDIRILDI", k["uyari"])
         self.assertNotIn("sınırdaş", " ".join(d["maddeler"] for d in k["dayanak"]))
         self.assertTrue(k["teyit"].startswith("2026-"))
-        self.assertTrue(hukuk.kopru("gecit_hakki")["teyit"].startswith("YOK"))
+        # 2026-09-22'den beri her konu teyitli; teyit kaydı olmayan konu yine "YOK" döner.
+        kayit = hukuk.TEYIT.pop("gecit_hakki")
+        try:
+            self.assertTrue(hukuk.kopru("gecit_hakki")["teyit"].startswith("YOK"))
+        finally:
+            hukuk.TEYIT["gecit_hakki"] = kayit
 
     def test_nitelik_tam_sozcuk_esler(self):
         self.assertTrue(hukuk.nitelik_rejimleri("Bağ"))

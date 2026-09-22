@@ -38,7 +38,9 @@ class Arayuz(unittest.TestCase):
         os.environ.pop("TKGM_CIKTI", None)
         os.environ.pop("TKGM_DOSYA_ERISIMI", None)
 
-    def _iste(self, yol, govde=None, basliklar=None):
+    def _iste(self, yol, govde=None, basliklar=None, belirtec=True):
+        if belirtec and govde is None and yol.startswith(("/api/", "/dosya/")):
+            yol += ("&" if "?" in yol else "?") + "t=" + tkgm_ui.BELIRTEC
         req = urllib.request.Request(self.kok + yol, data=govde, headers=basliklar or {},
                                      method="POST" if govde is not None else "GET")
         try:
@@ -48,7 +50,7 @@ class Arayuz(unittest.TestCase):
             return e.code, e.read(), dict(e.headers)
 
     def _cagir(self, arac, args, basliklar=None):
-        h = {"Content-Type": "application/json", "X-Tkgm": "1"} if basliklar is None else basliklar
+        h = {"Content-Type": "application/json", "X-Tkgm": tkgm_ui.BELIRTEC} if basliklar is None else basliklar
         kod, govde, _ = self._iste("/api/cagir", json.dumps({"arac": arac, "args": args}).encode(), h)
         return kod, json.loads(govde)
 
@@ -59,14 +61,14 @@ class Arayuz(unittest.TestCase):
         self.assertEqual(self._iste("/logo.png")[1][:4], b"\x89PNG")
 
     def test_baslik_olmadan_post_reddedilir(self):
-        kod, j = self._cagir("rehber", {}, {"Content-Type": "application/json"})
+        kod, j = self._cagir("baslangic", {}, {"Content-Type": "application/json"})
         self.assertEqual(kod, 403)
         self.assertFalse(j["ok"])
 
     def test_yabanci_host_reddedilir(self):
         kod, _, _ = self._iste("/", basliklar={"Host": "kotu.example:80"})
         self.assertEqual(kod, 403)
-        kod, _ = self._cagir("rehber", {}, {"Content-Type": "application/json", "X-Tkgm": "1", "Host": "kotu.example"})
+        kod, _ = self._cagir("baslangic", {}, {"Content-Type": "application/json", "X-Tkgm": tkgm_ui.BELIRTEC, "Host": "kotu.example"})
         self.assertEqual(kod, 403)
 
     def test_arac_cagrisi_ve_ortak_bellek(self):
@@ -97,6 +99,43 @@ class Arayuz(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Kilitler(Arayuz):
+    """v0.4 kapısı: süreç başına belirteç, köken denetimi, çerçeveleme ve Referer."""
+
+    def test_belirtecsiz_get_ve_post_reddedilir(self):
+        for yol in ("/api/parseller", "/api/dosyalar", "/api/cevaplar", "/dosya/a_kroki.svg"):
+            self.assertEqual(self._iste(yol, belirtec=False)[0], 403, yol)
+        kod, _ = self._cagir("baslangic", {}, {"Content-Type": "application/json", "X-Tkgm": "1"})
+        self.assertEqual(kod, 403)       # eski sabit başlık artık geçmez
+
+    def test_yabanci_koken_ve_capraz_site(self):
+        h = {"Content-Type": "application/json", "X-Tkgm": tkgm_ui.BELIRTEC}
+        self.assertEqual(self._cagir("baslangic", {}, dict(h, Origin="https://kotu.example"))[0], 403)
+        self.assertEqual(self._cagir("baslangic", {}, dict(h, **{"Sec-Fetch-Site": "cross-site"}))[0], 403)
+        self.assertEqual(self._cagir("baslangic", {}, dict(h, Origin=self.kok))[0], 200)
+
+    def test_sayfa_belirteci_tasir_ve_cercevelenemez(self):
+        kod, govde, basliklar = self._iste("/")
+        self.assertIn(tkgm_ui.BELIRTEC, govde.decode("utf-8"))
+        self.assertNotIn("__TKGM_BELIRTEC__", govde.decode("utf-8"))
+        self.assertEqual(basliklar.get("X-Frame-Options"), "DENY")
+        self.assertEqual(basliklar.get("Referrer-Policy"), "no-referrer")
+        self.assertEqual(self._iste("/dosya/a_kroki.svg")[2].get("Referrer-Policy"), "no-referrer")
+
+    def test_cevap_teslimi(self):
+        kod, j = self._cagir("arayuze_yaz", {"baslik": "Önalım", "metin": "<script>x</script> cevap"})
+        self.assertTrue(j["ok"], j)
+        _, govde, _ = self._iste("/api/cevaplar")
+        c = json.loads(govde)["cevaplar"][0]
+        self.assertEqual(c["baslik"], "Önalım")
+        self.assertIn("<script>", c["metin"])   # düz metin olarak saklanır; arayüz textContent ile basar
+
+    def test_buyuk_govde_aciklamayla_reddedilir(self):
+        kod, govde, _ = self._iste("/api/cagir", b"x" * (tkgm_ui._AZAMI_GOVDE + 10),
+                                   {"Content-Type": "application/json", "X-Tkgm": tkgm_ui.BELIRTEC})
+        self.assertEqual(kod, 413)
 
 
 class Baslatma(unittest.TestCase):
@@ -139,4 +178,5 @@ class Baslatma(unittest.TestCase):
             sys.argv = eski
 
     def test_tarayici_anahtari(self):
-        self.assertIn("TKGM_TARAYICI", open("tkgm_ui.py", encoding="utf-8").read())
+        with open("tkgm_ui.py", encoding="utf-8") as fh:
+            self.assertIn("TKGM_TARAYICI", fh.read())

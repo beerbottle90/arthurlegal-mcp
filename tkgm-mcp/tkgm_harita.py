@@ -104,13 +104,24 @@ def onbellegi_bosalt() -> None:
         _ONBELLEK_BAYT[0] = 0
 
 
+class _YonlendirmeYok(urllib.request.HTTPRedirectHandler):
+    """Beyaz liste yalnız istenen adresi görür; yönlendirme izlenirse listede olmayan bir
+    sunucuya bağlanılır. Kova yönlendirmez; yönlendirme hata sayılır."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        raise HaritaHatasi("DEM sunucusu yönlendirme döndürdü (%s); izlenmedi." % code)
+
+
+_ACICI = urllib.request.build_opener(_YonlendirmeYok)
+
+
 def _indir(url: str, bas: int, son: int) -> bytes:
     if not any(url.startswith(k["kok"]) for k in VERI_KUMELERI):
         raise HaritaHatasi("İzin verilmeyen adres: bu modül yalnız Copernicus DEM kovalarına bağlanır.")
     istek = urllib.request.Request(url, headers={"Range": "bytes=%d-%d" % (bas, son),
                                                  "User-Agent": KULLANICI_AJANI})
     try:
-        with urllib.request.urlopen(istek, timeout=ZAMAN_ASIMI) as yanit:
+        with _ACICI.open(istek, timeout=ZAMAN_ASIMI) as yanit:
             durum = yanit.status
             govde = yanit.read()
     except urllib.error.HTTPError as exc:
@@ -782,9 +793,9 @@ h.fitBounds(p.getBounds(),{padding:[70,70]});
 def harita_html(parsel: Dict[str, Any], komsular: Optional[List[Dict[str, Any]]] = None) -> str:
     """Tek dosyalık Leaflet haritası: OSM altlığı, vurgulu parsel, gri komşular.
 
-    Altlık karoları dosyayı AÇAN tarayıcı çeker; bu işlev ağa çıkmaz. Harita kabı
-    açık gri zeminlidir: karo gelmese de (çevrimdışı, OSM erişimi kısıtlı) parsel
-    ve komşuları okunur kalır.
+    Altlık karoları ve Leaflet betiği dosyayı AÇAN tarayıcı tarafından çekilir; bu işlev
+    ağa çıkmaz. Çevrimdışıyken Leaflet yüklenemez ve harita çizilmez — çevrimdışı
+    çizim için kroki (SVG) kullanılır.
     """
     olcu = olc(parsel)
     boylam, enlem = _etiket_noktasi(parsel)

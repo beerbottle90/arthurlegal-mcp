@@ -165,13 +165,40 @@ class Tapu(unittest.TestCase):
         self.assertFalse(any("uyuşmuyor" in n for n in notlar))
 
     def test_paylasilan_sunucuda_calismaz(self):
-        os.environ["TKGM_DOSYA_ERISIMI"] = "0"
+        # Dosya erişimini açmak (TKGM_DOSYA_ERISIMI=1) KVKK kapısını açmaz: kapı taşımaya bakar.
+        os.environ["MCP_TRANSPORT"] = "http"
+        os.environ["TKGM_DOSYA_ERISIMI"] = "1"
         try:
             with self.assertRaises(McpError):
                 server._t_tapu({"metin": ORNEK_TAPU})
         finally:
+            os.environ.pop("MCP_TRANSPORT", None)
             os.environ.pop("TKGM_DOSYA_ERISIMI", None)
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KoridorOlayNoktalari(unittest.TestCase):
+    """v0.3.0: doğu-batı koridor dar şerit parselde %5-14 sapıyor, bildirilen hata %0,0 diyordu."""
+
+    SERIT = [[[(0.0, 0.0), (30.0, 0.0), (30.0, 1000.0), (0.0, 1000.0)]]]
+
+    def test_dogu_bati_koridor_serit_parsel(self):
+        import math
+        import tkgm_koridor as koridor
+        for y, egim in ((500.05, 0.0), (500.25, 0.0), (500.0, 0.4), (733.3, -0.02)):
+            s = koridor._parsel_kesisimi(self.SERIT, [[(-100.0, y), (130.0, y + egim)]], 1.1)
+            kesin = 30 * 2.2 / math.cos(math.atan2(egim, 230.0))
+            self.assertAlmostEqual(s["alan"], kesin, places=3, msg=(y, egim))
+
+    def test_hata_olcusu_koridoru_olcer(self):
+        import tkgm_koridor as koridor
+        s = koridor._parsel_kesisimi(self.SERIT, [[(-100.0, 500.05), (130.0, 500.05)]], 1.1)
+        self.assertLess(s["hata_yuzde"], 1e-6)
+        # bükümlü hat: 4 ve 2 noktalı kural farkı sıfır değil ama küçük
+        kare = [[[(0.0, 0.0), (200.0, 0.0), (200.0, 150.0), (0.0, 150.0)]]]
+        s = koridor._parsel_kesisimi(kare, [[(-20.0, 30.0), (80.0, 31.0), (120.0, 120.0), (230.0, 119.5)]], 5.0)
+        self.assertAlmostEqual(s["alan"], 2572.3, delta=0.5)   # kaba kuvvet ızgarası 2572,5 (±0,3)
+        self.assertLess(s["hata_yuzde"], 0.05)

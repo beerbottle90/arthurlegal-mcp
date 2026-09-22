@@ -24,6 +24,8 @@ section{display:flex;flex-direction:column;min-width:0;min-height:0}
 .birak b{color:var(--altin2);display:block;font-size:15px;margin-bottom:4px}
 .adim{font-size:12px;color:var(--soluk);margin:12px 0 0;padding-left:16px}.adim li{margin:3px 0}
 .adim a,.bag{color:var(--altin2)}
+.canli{margin-bottom:16px}.canli b{color:var(--altin2);display:block;font-size:15px;margin-bottom:6px}
+.canli .dugmeler{margin-top:6px}.veya{font-size:12px;color:var(--soluk);text-align:center;margin:0 0 10px}
 .liste{margin-top:16px;display:flex;flex-direction:column;gap:6px}
 .pk{background:var(--panel);border:1px solid transparent;border-radius:8px;padding:8px 10px;cursor:pointer}
 .pk.secili{border-color:var(--altin);background:var(--panel2)}
@@ -51,6 +53,8 @@ label{display:block;font-size:12px;color:var(--soluk);margin:8px 0 3px}
 .kroki{background:#fff;border-radius:10px;max-width:100%;height:calc(100vh - 200px);display:block;margin:0 auto}
 .bos{color:var(--soluk);text-align:center;padding:60px 20px}
 .kucuk{font-size:12px;color:var(--soluk)}code{color:var(--altin2)}
+pre.metin{white-space:pre-wrap;word-break:break-word;font:13px/1.5 "Segoe UI",system-ui,sans-serif;margin:6px 0 0}
+.cevap{border-top:1px solid var(--cizgi);padding:10px 0}.cevap:first-child{border-top:0}
 footer{padding:6px 20px;font-size:11px;color:var(--soluk);background:var(--lacivert);border-top:1px solid var(--cizgi)}
 </style>
 </head>
@@ -58,15 +62,21 @@ footer{padding:6px 20px;font-size:11px;color:var(--soluk);background:var(--laciv
 <header>
   <img src="/logo.png" alt="ArthurLegal">
   <div><h1>ArthurLegal <span>· Tapu</span></h1><div class="alt">Parsel ölçüsü · ölçekli kroki · harita · 3D arazi · föy</div></div>
-  <div class="sag">Yerel çalışır — veriniz bu bilgisayardan çıkmaz<br><span id="surum"></span></div>
+  <div class="sag" title="Parsel dosyası ve tapu metni bu bilgisayarda işlenir. Canlı parsel sorgusu TKGM Parsel Sorgu'ya bu bilgisayardan, dakikada en çok 30 istekle gider. Harita ve 3D sekmeleri yalnız siz açınca OpenStreetMap karolarını ve Copernicus yükseklik verisini çeker; bu, parselin konumunu o sunuculara bildirir.">Yerel çalışır — parsel ve tapu verisi bu bilgisayarda işlenir<br><span id="surum"></span></div>
 </header>
 <main>
 <aside>
+  <div class="canli"><b>TKGM'den getir</b>
+    <input id="canli-metin" placeholder="İstanbul Kadıköy Caferağa 123 ada 45 parsel">
+    <div class="dugmeler"><button class="d" id="canli-dugme">Getir</button></div>
+    <div id="canli-sonuc"></div>
+  </div>
+  <div class="veya">ya da dosyayla</div>
   <div class="birak" id="birak"><b>Parsel dosyasını bırakın</b>GeoJSON / KML — ya da tıklayıp seçin<input type="file" id="dosya" accept=".json,.geojson,.kml" multiple hidden></div>
   <ol class="adim">
-    <li><a href="https://parselsorgu.tkgm.gov.tr/" target="_blank" rel="noopener">Parsel Sorgu</a>'da parseli bulun.</li>
-    <li>Haritada parsele tıklayın; bilgi kutusundaki <b>⋮</b> menüsünden <b>GeoJSON</b> indirin.</li>
-    <li>Dosyayı buraya bırakın. Komşu parselleri de ekleyebilirsiniz.</li>
+    <li>İl, ilçe, mahalle ile ada ve parsel yazın ya da bir koordinat girin (40.98765, 29.02345).</li>
+    <li>İlk sorguda bir onay kartı çıkar; parsel bilgisi TKGM Parsel Sorgu'nun herkese açık verisinden gelir.</li>
+    <li>Elinizde <a href="https://parselsorgu.tkgm.gov.tr/" target="_blank" rel="noopener">Parsel Sorgu</a>'dan indirilmiş GeoJSON/KML varsa yukarıya bırakın.</li>
   </ol>
   <div class="liste" id="liste"></div>
 </aside>
@@ -74,6 +84,7 @@ footer{padding:6px 20px;font-size:11px;color:var(--soluk);background:var(--laciv
   <nav id="nav"></nav>
   <div class="govde">
     <div class="sek" data-ad="Özet" id="ozet"></div>
+    <div class="sek" data-ad="Sor" id="sor"></div>
     <div class="sek" data-ad="Kroki" id="kroki"></div>
     <div class="sek" data-ad="Harita" id="harita"></div>
     <div class="sek" data-ad="3D Arazi" id="uc"></div>
@@ -84,7 +95,7 @@ footer{padding:6px 20px;font-size:11px;color:var(--soluk);background:var(--laciv
   </div>
 </section>
 </main>
-<footer>Bilgi amaçlıdır; resmî işlemlerde kullanılamaz (TKGM Parsel Sorgu Kullanım Koşulları md. 4). Bu uygulama TKGM servislerine bağlanmaz; aplikasyon krokisi veya röperli kroki yerine geçmez.</footer>
+<footer>Bilgi amaçlıdır; resmî işlemlerde kullanılamaz, aplikasyon krokisi veya röperli kroki yerine geçmez. Canlı sorgu TKGM'ye tek sırayla, dakikada en çok 30 istekle gider: <a class="bag" href="https://github.com/beerbottle90/arthurlegal-mcp/blob/master/tkgm-mcp/docs/MANIFESTO.md" target="_blank" rel="noopener">nasıl tasarlandı</a>.</footer>
 
 <script>
 "use strict";
@@ -95,9 +106,13 @@ const el = (etiket, ozellik = {}, ...cocuk) => { const e = document.createElemen
 const tr = (x, h = 2) => x == null ? "—" : Number(x).toLocaleString("tr-TR", { minimumFractionDigits: h, maximumFractionDigits: h });
 const dosyaAdi = yol => String(yol).split(/[\\/]/).pop();
 const durum = { parseller: [], secili: null, onbellek: {} };
+// Süreç başına belirteç: sunucu sayfayı verirken yerleştirir; başka köken okuyamaz.
+const T = "__TKGM_BELIRTEC__";
+const dosyaUrl = ad => "/dosya/" + encodeURIComponent(dosyaAdi(ad)) + "?t=" + encodeURIComponent(T);
+const al = async yol => (await fetch(yol + "?t=" + encodeURIComponent(T))).json();
 
 async function cagir(arac, args = {}) {
-  const r = await fetch("/api/cagir", { method: "POST", headers: { "Content-Type": "application/json", "X-Tkgm": "1" }, body: JSON.stringify({ arac, args }) });
+  const r = await fetch("/api/cagir", { method: "POST", headers: { "Content-Type": "application/json", "X-Tkgm": T }, body: JSON.stringify({ arac, args }) });
   const j = await r.json(); if (!j.ok) throw new Error(j.hata); return j.sonuc;
 }
 const hataKutusu = e => el("div", { class: "uyari hata" }, String(e.message || e));
@@ -130,6 +145,35 @@ async function yukle(dosyalar) {
   }
   listeCiz(); ciz(aktif());
 }
+/* ---------- TKGM'den canlı getirme (sohbetteki parsel_sorgula ile aynı araç) ---------- */
+async function canliGetir(metin, ek = {}) {
+  const args = Object.assign({ metin, onay: durum.canliOnay || undefined }, ek);
+  let s = await cagir("parsel_sorgula", args);
+  if (s.onay_gerekli) {
+    if (!confirm(s.kart)) return { mesaj: "Canlı sorgu yapılmadı. Parsel dosyasını soldaki alana bırakabilirsiniz." };
+    durum.canliOnay = true;
+    s = await cagir("parsel_sorgula", Object.assign(args, { onay: true }));
+  }
+  if (s.belirsiz) return { belirsiz: s };
+  const kayit = Object.assign({}, s, { alan_m2: s.hesap_alani_m2, dosyadaki_alan_m2: s.tapu_alani_m2 });
+  if (!durum.parseller.some(x => x.ref === kayit.ref)) durum.parseller.push(kayit);
+  durum.secili = kayit.ref; listeCiz();
+  return { kayit, s };
+}
+const adayKutusu = (b, sec) => el("div", { class: "uyari" }, "'" + b.aranan + "' için birden çok " + b.belirsiz + " var" + (b.belirsiz === "mahalle" ? "; seçin: " : ". İl ve ilçeyi tam yazın: "),
+  ...(b.belirsiz === "mahalle" ? b.adaylar.map(a => el("button", { class: "d ikincil", style: "margin:4px 4px 0 0", onclick: () => sec(a) }, a.ad)) : [b.adaylar.map(a => a.ad).join(", ")]));
+async function canliFormu(ek = {}) {
+  const metin = $("#canli-metin").value.trim(), kutu = $("#canli-sonuc");
+  if (!metin && !ek.mahalle_id) return;
+  kutu.replaceChildren(el("div", { class: "kucuk" }, "TKGM'ye soruluyor…"));
+  try { const y = await canliGetir(metin, ek);
+    if (y.belirsiz) return kutu.replaceChildren(adayKutusu(y.belirsiz, a => canliFormu({ mahalle_id: a.id, ada: y.belirsiz.ada, parsel: y.belirsiz.parsel })));
+    if (y.mesaj) return kutu.replaceChildren(el("div", { class: "kucuk" }, y.mesaj));
+    kutu.replaceChildren(el("div", { class: "kucuk" }, y.s.kaynak)); sekmeAc("ozet");
+  } catch (e) { kutu.replaceChildren(hataKutusu(e)); }
+}
+$("#canli-dugme").addEventListener("click", e => mesgul(e.target, () => canliFormu()));
+$("#canli-metin").addEventListener("keydown", e => { if (e.key === "Enter") canliFormu(); });
 function listeCiz() {
   const l = $("#liste"); l.replaceChildren();
   for (const p of durum.parseller) l.append(el("div", { class: "pk" + (p.ref === durum.secili ? " secili" : ""), onclick: () => { durum.secili = p.ref; listeCiz(); ciz(aktif()); } },
@@ -140,25 +184,25 @@ const secili = () => durum.parseller.find(p => p.ref === durum.secili);
 /* ---------- çizim ---------- */
 async function ciz(id) {
   const kap = $("#" + id);
-  if (["ozet", "kroki", "harita", "uc"].includes(id) && !durum.secili) return kap.replaceChildren(bos("Başlamak için soldan bir parsel dosyası bırakın."));
+  if (["ozet", "kroki", "harita", "uc"].includes(id) && !durum.secili) return kap.replaceChildren(bos("Başlamak için soldan bir parseli TKGM'den getirin ya da dosyasını bırakın."));
   try { await cizici[id](kap); } catch (e) { kap.replaceChildren(hataKutusu(e)); }
 }
 const cizici = {
   async ozet(kap) {
     const p = secili(), g = await cagir("geometri", { ref: p.ref });
     const indir = (etiket, arac, args, ikincil) => el("button", { class: "d" + (ikincil ? " ikincil" : ""), onclick: e => mesgul(e.target, async () => {
-      const s = await cagir(arac, args); location.href = "/dosya/" + encodeURIComponent(dosyaAdi(s.dosya)); }) }, etiket);
+      const s = await cagir(arac, args); location.href = dosyaUrl(s.dosya); }) }, etiket);
     const konu = el("select", {}, el("option", { value: "" }, "Föye hukuki konu ekleme"), (await konular()).map(k => el("option", { value: k.konu }, k.baslik)));
     kap.replaceChildren(el("div", { class: "izgara" },
       el("div", { class: "kart" }, el("h3", {}, p.parsel), tablo([["Nitelik", p.nitelik], ["Mevkii", p.mevkii], ["Pafta", p.pafta], ["Zemin", p.zemin_tipi], ["Projeksiyon", g.projeksiyon]]),
         (p.rejim || []).map(r => el("div", { class: "uyari" }, r))),
-      el("div", { class: "kart" }, el("h3", {}, "Ölçü"), tablo([["Kayıtlı alan (dosya)", g.tapu_alani_m2 != null ? tr(g.tapu_alani_m2) + " m²" : null], ["Hesap alanı", tr(g.alan_m2) + " m²"],
+      el("div", { class: "kart" }, el("h3", {}, "Ölçü"), tablo([["Kayıtlı alan", g.tapu_alani_m2 != null ? tr(g.tapu_alani_m2) + " m²" : null], ["Hesap alanı", tr(g.alan_m2) + " m²"],
         ["Fark", g.fark_m2 != null ? tr(g.fark_m2) + " m² (%" + tr(g.fark_yuzde, 3) + ")" : null], ["Alan belirsizliği", g.alan_belirsizligi_m2 != null ? "± " + tr(g.alan_belirsizligi_m2, 1) + " m² (%95)" : null],
         ["Çevre", tr(g.cevre_m) + " m"], ["Köşe", g.kose_sayisi]]),
         g.fark_yorumu ? el("div", { class: "uyari" }, g.fark_yorumu) : "", g.hassasiyet_notu ? el("div", { class: "kucuk" }, g.hassasiyet_notu) : ""),
       el("div", { class: "kart" }, el("h3", {}, "Belgeler"), el("label", {}, "Word föyü için konu"), konu,
         el("div", { class: "dugmeler" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { const s = await cagir("parsel_foyu", { ref: p.ref, komsular: digerleri(), konu: konu.value || undefined });
-            location.href = "/dosya/" + encodeURIComponent(dosyaAdi(s.dosya)); }) }, "Word föy indir"),
+            location.href = dosyaUrl(s.dosya); }) }, "Word föy indir"),
           indir("Excel portföy (" + durum.parseller.length + " parsel)", "portfoy_tablosu", { refs: durum.parseller.map(x => x.ref) }),
           ...["dxf", "kml", "csv", "geojson"].map(b => indir(b.toUpperCase(), "disa_aktar", { ref: p.ref, bicim: b }, true)))),
       el("div", { class: "kart" }, el("h3", {}, "Kenarlar"), el("div", { class: "kucuk" }, g.aciklama || ""),
@@ -176,8 +220,12 @@ const cizici = {
     kap.replaceChildren(el("div", { class: "dugmeler", style: "margin:0 0 10px;align-items:center" }, el("label", { style: "margin:0" }, kom, " komşuları çiz"), el("label", { style: "margin:0" }, tab, " koordinat tablosu"), indir, bilgi), resim);
     await yenile();
   },
-  async harita(kap) { const s = await cagir("harita", { ref: durum.secili, komsular: digerleri(), inline: true });
-    kap.replaceChildren(el("iframe", { class: "cerceve", sandbox: "allow-scripts", srcdoc: s.html })); },
+  async harita(kap) {
+    const goster = async () => { const s = await cagir("harita", { ref: durum.secili, komsular: digerleri(), inline: true });
+      kap.replaceChildren(el("iframe", { class: "cerceve", sandbox: "allow-scripts", srcdoc: s.html })); };
+    if (durum.haritaOnay) return goster();
+    kap.replaceChildren(el("div", { class: "bos" }, "Harita altlığı OpenStreetMap'ten, Leaflet betiği CDN'den yüklenir: parselin konumu (karo koordinatları) o sunuculara gider. Kroki sekmesi hiçbir yere bağlanmaz.",
+      el("div", { class: "dugmeler", style: "justify-content:center" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { durum.haritaOnay = true; await goster(); }) }, "Haritayı yükle")))); },
   async uc(kap) {
     const p = secili(), onb = durum.onbellek["3d" + p.ref];
     const goster = s => kap.replaceChildren(el("div", { class: "izgara", style: "margin-bottom:12px" }, el("div", { class: "kart" }, el("h3", {}, "Arazi özeti"),
@@ -190,7 +238,7 @@ const cizici = {
   },
   async hukuk(kap) {
     const p = secili(), sonuc = el("div"), hsonuc = el("div"), liste = el("div");
-    const sec = el("select", { onchange: async () => { if (!sec.value) return sonuc.replaceChildren(); try { const s = await cagir("hukuk_koprusu", { konu: sec.value, ref: p ? p.ref : undefined }), k = s.konu;
+    const sec = el("select", { onchange: async () => { if (!sec.value) return sonuc.replaceChildren(); try { const s = await cagir("dayanak_koprusu", { konu: sec.value, ref: p ? p.ref : undefined }), k = s.konu;
       sonuc.replaceChildren(el("table", {}, el("tr", {}, el("th", {}, "Mevzuat"), el("th", {}, "Maddeler")), k.dayanak.map(d => el("tr", {}, el("td", {}, d.mevzuat_no + " — " + d.ad), el("td", {}, d.maddeler)))),
         k.uyari ? el("div", { class: "uyari hata" }, k.uyari) : "", k.sure ? el("div", { class: "uyari" }, "Süre: " + k.sure) : "", k.parsel_verisi ? el("div", { class: "uyari" }, k.parsel_verisi) : "",
         el("div", { class: "kucuk" }, "Teyit: " + k.teyit), el("div", { class: "kucuk", style: "margin-top:6px" }, s.dogrulama),
@@ -198,7 +246,7 @@ const cizici = {
       } catch (e) { sonuc.replaceChildren(hataKutusu(e)); } } }, el("option", { value: "" }, "Konu seçin…"), (await konular()).map(k => el("option", { value: k.konu }, k.baslik)));
     const g = id => $("#" + id).value, sayi = id => g(id) ? Number(g(id).replace(/\./g, "").replace(",", ".")) : undefined;
     const ara = el("input", { placeholder: "işlem ara: satış, ipotek, aplikasyon, kat irtifakı…", oninput: async () => { if (ara.value.length < 2) return liste.replaceChildren();
-      const s = await cagir("tarife_ara", { sorgu: ara.value }); liste.replaceChildren(el("table", {}, s.sonuclar.map(r => el("tr", { style: "cursor:pointer", onclick: () => { $("#" + (r.tablo === "tapu_harci" ? "h-th" : "h-ds")).value = r.kod; } },
+      const s = await cagir("tarife_kalemi", { sorgu: ara.value }); liste.replaceChildren(el("table", {}, s.sonuclar.map(r => el("tr", { style: "cursor:pointer", onclick: () => { $("#" + (r.tablo === "tapu_harci" ? "h-th" : "h-ds")).value = r.kod; } },
         el("td", {}, r.kod), el("td", {}, r.islem + " — " + r.deger + (r.isaret ? " [" + r.isaret + "]" : "")))))); } });
     kap.replaceChildren(el("div", { class: "izgara" },
       el("div", { class: "kart" }, el("h3", {}, "Hukuk köprüsü"), p && p.rejim ? p.rejim.map(r => el("div", { class: "uyari" }, r)) : "", sec, sonuc),
@@ -214,32 +262,97 @@ const cizici = {
         } catch (x) { hsonuc.replaceChildren(hataKutusu(x)); } }) }, "Hesapla")), hsonuc)));
   },
   async koridor(kap) {
-    let hat = null; const sonuc = el("div"), ad = el("span", { class: "kucuk" }, "hat dosyası seçilmedi"), gen = el("input", { placeholder: "örn. 16", style: "max-width:140px" });
+    let hat = null; const sonuc = el("div"), ad = el("span", { class: "kucuk" }, "hat dosyası seçilmedi"), gen = el("input", { placeholder: "örn. 16", style: "max-width:140px", value: durum.koridorGen || "" });
     const f = el("input", { type: "file", accept: ".json,.geojson,.kml", onchange: async () => { hat = await f.files[0].text(); ad.textContent = f.files[0].name; } }); f.hidden = true;
     kap.replaceChildren(el("div", { class: "kart" }, el("h3", {}, "Güzergâh – koridor kesişimi"), el("div", { class: "kucuk" }, "Soldaki " + durum.parseller.length + " parsel, verdiğiniz hat (GeoJSON LineString ya da KML) ve toplam koridor genişliğiyle karşılaştırılır."),
       el("div", { class: "dugmeler", style: "align-items:center" }, el("button", { class: "d ikincil", onclick: () => f.click() }, "Hat dosyası seç"), f, ad, el("label", { style: "margin:0" }, "Genişlik (m)"), gen,
         el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try { if (!hat) throw new Error("Önce hat dosyası seçin."); const s = await cagir("koridor_kesisim", { refs: durum.parseller.map(p => p.ref), hat_icerik: hat, genislik_m: Number(gen.value.replace(",", ".")) });
           sonuc.replaceChildren(tablo([["Hat boyu", tr(s.hat_boyu_m) + " m"], ["Etkilenen parsel", s.etkilenen_parsel + " / " + s.incelenen_parsel], ["Toplam kesişim", tr(s.toplam_kesisim_m2) + " m²"], ["Sayısal hata (en kötü)", "% " + tr(s.sayisal_hata_yuzde_en_kotu, 4)]]),
-            el("table", { style: "margin-top:10px" }, s.satirlar.map(x => el("tr", {}, x.split(" | ").map(h => el("td", { style: "color:inherit" }, h))))), s.dosya ? el("div", { class: "dugmeler" }, el("a", { class: "d ikincil", href: "/dosya/" + encodeURIComponent(dosyaAdi(s.dosya)) }, "CSV indir")) : "", el("div", { class: "kucuk" }, s.yontem));
+            el("table", { style: "margin-top:10px" }, s.satirlar.map(x => el("tr", {}, x.split(" | ").map(h => el("td", { style: "color:inherit" }, h))))), s.dosya ? el("div", { class: "dugmeler" }, el("a", { class: "d ikincil", href: dosyaUrl(s.dosya) }, "CSV indir")) : "", el("div", { class: "kucuk" }, s.yontem));
         } catch (x) { sonuc.replaceChildren(hataKutusu(x)); } }) }, "Hesapla")), sonuc));
   },
   async tapu(kap) {
-    const m = el("textarea", { placeholder: "e-Devlet / Web Tapu'dan KENDİ aldığınız tapu kaydının metnini buraya yapıştırın. Metin bu bilgisayardan çıkmaz; T.C. kimlik numaraları maskelenir, hiçbir şey saklanmaz." }), sonuc = el("div");
+    const m = el("textarea", { placeholder: "e-Devlet / Web Tapu'dan KENDİ aldığınız tapu kaydının metnini buraya yapıştırın. Metin bu bilgisayardan çıkmaz; kimlik numaraları, IBAN, telefon, e-posta ve malik adları maskelenir, hiçbir şey saklanmaz." }), sonuc = el("div");
     const bolum = (b, l) => l && l.length ? el("div", {}, el("b", {}, b), el("ul", {}, l.map(s => el("li", {}, typeof s === "string" ? s : Object.values(s).join(" · "))))) : "";
     kap.replaceChildren(el("div", { class: "izgara" }, el("div", { class: "kart" }, el("h3", {}, "Tapu kaydı metni"), m, el("div", { class: "dugmeler" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try {
       const s = await cagir("tapu_kaydi_oku", { metin: m.value, ref: durum.secili || undefined });
       sonuc.replaceChildren(tablo(Object.entries(s.tasinmaz)), bolum("Malikler", s.malikler), bolum("Şerhler", s.serhler), bolum("Beyanlar", s.beyanlar), bolum("İrtifaklar", s.irtifaklar), bolum("Rehinler", s.rehinler),
-        (s.isaretler || []).map(i => el("div", { class: "uyari" }, i)), (s.capraz_kontrol || []).map(c => el("div", { class: "uyari" }, c)), el("div", { class: "kucuk" }, "Güven: " + s.guven + " · tanınmayan satır: " + s.taninmayan_satir), el("div", { class: "kucuk" }, s.kvkk));
+        el("div", {}, (s.isaretler || []).map(i => el("div", { class: "uyari" }, i))), el("div", {}, (s.capraz_kontrol || []).map(c => el("div", { class: "uyari" }, c))),
+        el("div", { class: "kucuk" }, "Güven: " + s.guven + " · tanınmayan satır: " + s.taninmayan_satir),
+        s.kvkk ? el("div", { class: "kucuk" }, el("b", {}, "Maskelenen: "), (s.kvkk.maskelenen || []).join(" · "), el("br"), el("b", {}, "Maskelenmeyen: "), (s.kvkk.maskelenmeyen || []).join(" · ")) : "");
       } catch (x) { sonuc.replaceChildren(hataKutusu(x)); } }) }, "Yapılandır ve karşılaştır"))), el("div", { class: "kart" }, el("h3", {}, "Sonuç"), sonuc)));
   },
-  async dosyalar(kap) { const s = await (await fetch("/api/dosyalar")).json();
+  async dosyalar(kap) { const s = await al("/api/dosyalar");
     kap.replaceChildren(el("div", { class: "kart" }, el("h3", {}, "Dosyalarım"), el("div", { class: "kucuk" }, "Klasör: " + s.klasor + " — Claude oturumlarında üretilen çıktılar da burada görünür."),
-      s.dosyalar.length ? el("table", {}, s.dosyalar.map(d => el("tr", {}, el("td", {}, new Date(d.degisim * 1000).toLocaleString("tr-TR")), el("td", {}, el("a", { class: "bag", href: "/dosya/" + encodeURIComponent(d.ad), target: "_blank", rel: "noopener" }, d.ad)), el("td", {}, tr(d.kb, 1) + " KB")))) : bos("Henüz çıktı yok."))); },
+      s.dosyalar.length ? el("table", {}, s.dosyalar.map(d => el("tr", {}, el("td", {}, new Date(d.degisim * 1000).toLocaleString("tr-TR")), el("td", {}, el("a", { class: "bag", href: dosyaUrl(d.ad), target: "_blank", rel: "noopener" }, d.ad)), el("td", {}, tr(d.kb, 1) + " KB")))) : bos("Henüz çıktı yok."))); },
 };
-let _konular; const konular = async () => _konular || (_konular = (await cagir("hukuk_koprusu")).konular);
-(async () => { try { const b = await (await fetch("/api/parseller")).json(); durum.parseller = b.parseller || [];
+/* ---------- Sor: yerel yönlendirici, eşleşmeyen metin Claude'a kopyalanacak komut olur ---------- */
+const HARC_KODLARI = [["ayni sermaye", "ayni_sermaye"], ["üst hakkı", "ust_hakki_daimi_mustakil"], ["satış vaadi", "satis_vaadi_serhi"], ["ipotek", "ipotek"],
+  ["satış", "satis"], ["satis", "satis"], ["bağış", "bagis"], ["bagis", "bagis"], ["kira", "kira_serhi"], ["intifa", "irtifak_intifa_tesisi"], ["irtifak", "irtifak_intifa_tesisi"]];
+const SEKME_SOZCUKLERI = [["kroki", "kroki"], ["harita", "harita"], ["3d", "uc"], ["arazi", "uc"], ["koridor", "koridor"], ["tapu kaydı", "tapu"], ["dosyalar", "dosyalar"]];
+function tutarBul(k) { const m = k.match(/(\d{1,3}(?:[.\s]\d{3})+(?:,\d+)?|\d+(?:,\d+)?)\s*(?:tl|₺|lira|milyon|bin)?/);
+  if (!m) return null; let x = Number(m[1].replace(/[.\s]/g, "").replace(",", ".")); if (/milyon/.test(m[0])) x *= 1e6; else if (/\bbin\b/.test(m[0])) x *= 1e3; return x; }
+async function yonlendir(metin) {
+  const k = metin.toLocaleLowerCase("tr-TR");
+  const ap = k.match(/(\d+)\s*ada\D{0,15}?(\d+)\s*(?:no'?lu\s*)?parsel/) || k.match(/ada\s*[:.]?\s*(\d+)\D{1,15}parsel\s*[:.]?\s*(\d+)/) || k.match(/\b(\d+)\s*\/\s*(\d+)\b\s*(?:parsel|parselini|parselin)/);
+  const koordinat = /(\d{2}[.,]\d{3,})\s*[,;/ ]\s*(\d{2}[.,]\d{3,})/.test(k);
+  if (ap || koordinat) { const et = ap ? ap[1] + "/" + ap[2] : "", p = ap && durum.parseller.find(x => x.parsel === et || x.parsel.endsWith(" " + et));
+    if (p) { durum.secili = p.ref; listeCiz(); return { mesaj: et + " seçildi; Özet sekmesi açılıyor.", sekme: "ozet" }; }
+    try { const y = await canliGetir(metin);
+      if (y.belirsiz) return { dugum: adayKutusu(y.belirsiz, async a => { try { const z = await canliGetir(metin, { mahalle_id: a.id, ada: y.belirsiz.ada, parsel: y.belirsiz.parsel }); if (z.kayit) sekmeAc("ozet"); } catch (e) { alert(e.message); } }) };
+      if (y.mesaj) return { mesaj: y.mesaj };
+      return { mesaj: y.s.parsel + " getirildi (" + y.s.kaynak + "); Özet sekmesi açılıyor.", sekme: "ozet" };
+    } catch (e) {
+      // Yer adı yoksa canlı sorgu olmaz; metin harç/koridor/konu yönlendirmesine devam eder.
+      if (!/İl adı bulunamadı|ada\/parsel bulunamadı/.test(e.message)) throw e;
+      if (/^\s*\d+\s*ada\s*\d+\s*parsel\s*$/.test(k)) return { mesaj: et + " yüklü değil: il, ilçe ve mahalleyi de yazın (örn. İstanbul Kadıköy Caferağa " + ap[1] + " ada " + ap[2] + " parsel)." };
+    } }
+  const harc = HARC_KODLARI.find(([s]) => k.includes(s)), tutar = tutarBul(k);
+  if (harc && tutar && /(harç|harc|masraf|ne kadar|hesapla|tutar)/.test(k)) {
+    const s = await cagir("harc_hesapla", { tapu_harci_islem: harc[1], bedel: tutar }), t = s.tapu_harci;
+    return { dugum: el("div", {}, el("b", {}, t.islem), tablo([["Matrah", tr(t.matrah_tl) + " TL"], ...t.kalemler.map(x => [x.kalem, tr(x.tutar_tl) + " TL"]), ["Toplam", tr(t.toplam_tl) + " TL"], ["Dayanak", t.dayanak]]),
+      el("div", {}, (t.notlar || []).map(n => el("div", { class: "uyari" }, n))), el("div", { class: "kucuk" }, s.uyari + " Döner sermaye için Hukuk ve Harç sekmesinde yöresel katsayıyı girin.")) }; }
+  const kor = k.match(/koridor\D{0,20}?(\d+(?:,\d+)?)\s*m/);
+  if (kor) { durum.koridorGen = kor[1]; return { mesaj: "Koridor sekmesi açılıyor; genişlik " + kor[1] + " m. Hat dosyasını seçin.", sekme: "koridor" }; }
+  const konu = (await konular()).find(x => x.baslik.toLocaleLowerCase("tr-TR").split(/[^a-zçğıöşü]+/).some(w => w.length >= 5 && k.includes(w)));
+  if (konu && k.split(/\s+/).length <= 6) { const s = await cagir("dayanak_koprusu", { konu: konu.konu, ref: durum.secili || undefined }), x = s.konu;
+    return { dugum: el("div", {}, el("b", {}, x.baslik), el("table", {}, x.dayanak.map(d => el("tr", {}, el("td", {}, d.mevzuat_no + " — " + d.ad), el("td", {}, d.maddeler)))),
+      x.uyari ? el("div", { class: "uyari hata" }, x.uyari) : "", x.sure ? el("div", { class: "uyari" }, "Süre: " + x.sure) : "", el("div", { class: "kucuk" }, "Teyit: " + x.teyit)) }; }
+  const sek = SEKME_SOZCUKLERI.find(([s]) => k.trim() === s || k.trim() === s + " aç" || k.trim() === s + "ı aç");
+  if (sek) return { mesaj: "", sekme: sek[1] };
+  return null;
+}
+function komut(metin) {
+  const p = secili(); let c = "ArthurLegal'de sor: " + metin.trim();
+  if (p) c += "\n(tkgm_ref: " + p.ref + ", parsel: " + p.parsel + (p.nitelik ? ", nitelik: " + p.nitelik : "") + ")";
+  return c + "\nCevabını sohbette ver ve arayuze_yaz aracıyla (birleşik uçta tkgm_arayuze_yaz) arayüze de gönder.";
+}
+cizici.sor = async kap => {
+  const giris = el("textarea", { placeholder: "Sorunuzu yazın: \"İstanbul Kadıköy Caferağa 123 ada 45 parsel\" (TKGM'den getirir), \"satış harcı 3.000.000 TL\", \"koridor 16 m\", \"önalım\" gibi girdiler burada yanıtlanır; gerisi Claude'a yapıştıracağınız bir komut olur.", style: "min-height:90px" });
+  const sonuc = el("div"), liste = el("div"), el_cevap = el("textarea", { placeholder: "Claude'un cevabını buraya yapıştırıp kaydedebilirsiniz (yerel tkgm-mcp yoksa).", style: "min-height:60px" });
+  const gonder = async () => { const metin = giris.value.trim(); if (!metin) return;
+    try { const y = await yonlendir(metin);
+      if (y) { sonuc.replaceChildren(y.dugum || el("div", { class: "uyari" }, y.mesaj)); if (y.sekme) sekmeAc(y.sekme); if (!y.dugum && !y.mesaj) sonuc.replaceChildren(); return; }
+      const c = komut(metin), kopya = el("button", { class: "d", onclick: async () => { try { await navigator.clipboard.writeText(c); kopya.textContent = "Kopyalandı"; } catch (e) { kopya.textContent = "Seçip kopyalayın"; } } }, "Kopyala");
+      sonuc.replaceChildren(el("div", { class: "kart" }, el("h3", {}, "Claude'a yapıştırılacak komut"), el("pre", { class: "metin" }, c), el("div", { class: "dugmeler" }, kopya),
+        el("div", { class: "kucuk", style: "margin-top:8px" }, "Claude Desktop'ta yerel tkgm-mcp kuruluysa cevap aşağıdaki listeye kendiliğinden düşer. claude.ai bağlayıcısı (paylaşılan uç) bu bilgisayara yazamaz; o durumda cevabı aşağıya yapıştırıp kaydedin.")));
+    } catch (e) { sonuc.replaceChildren(hataKutusu(e)); } };
+  const listele = async () => { try { const j = await al("/api/cevaplar");
+    liste.replaceChildren(...(j.cevaplar.length ? j.cevaplar.map(c => el("div", { class: "cevap" }, el("b", {}, c.baslik), el("span", { class: "kucuk" }, "  " + new Date((c.zaman || 0) * 1000).toLocaleString("tr-TR")), el("pre", { class: "metin" }, c.metin))) : [bos("Henüz cevap yok.")])); } catch (e) { } };
+  giris.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) gonder(); });
+  kap.replaceChildren(el("div", { class: "izgara" },
+    el("div", { class: "kart" }, el("h3", {}, "Sor"), giris, el("div", { class: "dugmeler" }, el("button", { class: "d", onclick: gonder }, "Sor (Ctrl+Enter)")), sonuc),
+    el("div", { class: "kart" }, el("h3", {}, "Cevaplar"), liste, el("label", {}, "Cevabı elle kaydet"), el_cevap,
+      el("div", { class: "dugmeler" }, el("button", { class: "d ikincil", onclick: e => mesgul(e.target, async () => { if (!el_cevap.value.trim()) return;
+        await cagir("arayuze_yaz", { baslik: giris.value.trim().slice(0, 80) || "Cevap", metin: el_cevap.value, ref: durum.secili || undefined }); el_cevap.value = ""; await listele(); }) }, "Kaydet")))));
+  await listele();
+  clearInterval(durum.yoklama); durum.yoklama = setInterval(() => { if (aktif() === "sor") listele(); else clearInterval(durum.yoklama); }, 4000);
+};
+let _konular; const konular = async () => _konular || (_konular = (await cagir("dayanak_koprusu")).konular);
+(async () => { try { const b = await al("/api/parseller"); durum.parseller = b.parseller || [];
   if (durum.parseller.length) durum.secili = durum.parseller[0].ref; listeCiz(); } catch (e) { }
-  try { const s = await cagir("server_status"); $("#surum").textContent = "tkgm " + s.version + " · tarife " + (s.tarife.surum || "—"); } catch (e) { } ciz("ozet"); })();
+  try { const s = await cagir("server_status"); $("#surum").textContent = "tkgm " + s.version + " · tarife " + (s.tarife.surum || "—"); } catch (e) { }
+  const h = location.hash.slice(1); if (h && sekmeler.some(x => x.id === h)) sekmeAc(h); else ciz("ozet"); })();
 </script>
 </body>
 </html>

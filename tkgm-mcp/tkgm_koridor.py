@@ -8,9 +8,14 @@ kenar durumlarında (teğet kenar, çakışan köşe) kırılgandır. Yerine yar
 tarama kullanılır: yatay tarama çizgilerinde sağa-değer doğrultusu TAM çözülür
 (parsel aralıkları kenar kesişimlerinden, kapsül aralığı kapalı formülden —
 noktanın doğru parçasına uzaklığı dışbükey olduğundan her tarama çizgisinde tek
-aralıktır), yalnız yukarı-değer doğrultusu sayısaldır. Aynı taramayla parselin
-kendi alanı da hesaplanıp Gauss alanıyla karşılaştırılır; böylece her sonuç
-yanında ÖLÇÜLMÜŞ bir sayısal hata taşır, varsayılmış değil.
+aralıktır), yalnız yukarı-değer doğrultusu sayısaldır. O doğrultuda integral
+OLAY NOKTALARINDA bölünür: parsel köşeleri, kapsül kenarlarının uçları, kapsül
+kenarı–parsel kenarı ve kapsül kenarı–kapsül kenarı kesişimleri, daire–parsel
+kenarı kesişimleri. Aralar düzgündür ve Gauss-Legendre ile integre edilir. Orta
+nokta taraması bunu yapmıyordu: doğu-batı yönlü bir koridor kenarı dar bir parseli
+W·tanθ kalınlığında bir bantta keser, 0,5 m adım o bandı atlar ve alan %5-14
+sapar. Sayısal hata 4 ve 2 noktalı kuralın farkından ÖLÇÜLÜR; parselin kendi
+alanıyla kıyas koridor kenarının hatasını hiç göremezdi.
 
 Her parsel kendi TM 3° diliminde hesaplanır ve hat o dilime izdüşürülür: uzun bir
 hat birkaç dilim geçer, tek dilimde hesap komşu dilimdeki alanları ~%0,16 şişirir.
@@ -31,7 +36,11 @@ from tkgm_parsel import etiket
 Nokta = Tuple[float, float]
 Aralik = Tuple[float, float]
 
-_AZAMI_TARAMA = 4000
+_AZAMI_PARCA_M = 2.0        # olay aralığı bundan uzunsa bölünür
+_AZAMI_PARCA_SAYISI = 6000  # parsel başına; aşılırsa parça boyu büyür
+_GL4 = ((-0.8611363115940526, 0.3478548451374538), (-0.3399810435848563, 0.6521451548625461),
+        (0.3399810435848563, 0.6521451548625461), (0.8611363115940526, 0.3478548451374538))
+_GL2 = ((-0.5773502691896257, 1.0), (0.5773502691896257, 1.0))
 
 
 class KoridorHatasi(ValueError):
@@ -187,10 +196,70 @@ def _eksen_boyu(a: Nokta, b: Nokta, halkalar: Sequence[Sequence[Nokta]]) -> floa
     return toplam
 
 
+def _parca_kesisim_v(p1: Nokta, p2: Nokta, q1: Nokta, q2: Nokta) -> Optional[float]:
+    """İki doğru parçasının kesişim noktasının v'si; kesişmiyorsa None."""
+    dx, dy, ex, ey = p2[0] - p1[0], p2[1] - p1[1], q2[0] - q1[0], q2[1] - q1[1]
+    payda = dx * ey - dy * ex
+    if abs(payda) < 1e-15:
+        return None
+    t = ((q1[0] - p1[0]) * ey - (q1[1] - p1[1]) * ex) / payda
+    u = ((q1[0] - p1[0]) * dy - (q1[1] - p1[1]) * dx) / payda
+    if -1e-12 <= t <= 1 + 1e-12 and -1e-12 <= u <= 1 + 1e-12:
+        return p1[1] + t * dy
+    return None
+
+
+def _daire_parca_v(c: Nokta, r: float, p1: Nokta, p2: Nokta) -> List[float]:
+    dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+    fx, fy = p1[0] - c[0], p1[1] - c[1]
+    a = dx * dx + dy * dy
+    if a < 1e-18:
+        return []
+    b, cc = 2 * (fx * dx + fy * dy), fx * fx + fy * fy - r * r
+    d = b * b - 4 * a * cc
+    if d < 0:
+        return []
+    kok = math.sqrt(d)
+    return [p1[1] + t * dy for t in ((-b - kok) / (2 * a), (-b + kok) / (2 * a)) if 0.0 <= t <= 1.0]
+
+
+def _olaylar(halkalar: Sequence[Sequence[Nokta]], parcalar: List[Tuple[Nokta, Nokta]],
+             r: float, v0: float, v1: float) -> List[float]:
+    """İntegrandın düzgünlüğünü bozan bütün v'ler. Aralarında integrand düzgündür."""
+    kenarlar = [(h[i], h[(i + 1) % len(h)]) for h in halkalar for i in range(len(h))]
+    vs = {v0, v1}
+    vs.update(pt[1] for h in halkalar for pt in h)
+    yanlar = []
+    for a, b in parcalar:
+        for cu, cv in (a, b):
+            vs.update((cv - r, cv, cv + r))
+            for k1, k2 in kenarlar:
+                vs.update(_daire_parca_v((cu, cv), r, k1, k2))
+        boy = math.dist(a, b)
+        if boy > 1e-9:
+            nu, nv = -(b[1] - a[1]) / boy * r, (b[0] - a[0]) / boy * r
+            for sg in (1.0, -1.0):
+                y = ((a[0] + sg * nu, a[1] + sg * nv), (b[0] + sg * nu, b[1] + sg * nv))
+                yanlar.append(y)
+                vs.update((y[0][1], y[1][1]))
+    for y1, y2 in yanlar:
+        for k1, k2 in kenarlar:
+            v = _parca_kesisim_v(y1, y2, k1, k2)
+            if v is not None:
+                vs.add(v)
+    if len(yanlar) <= 400:
+        for i in range(len(yanlar)):
+            for j in range(i + 1, len(yanlar)):
+                v = _parca_kesisim_v(yanlar[i][0], yanlar[i][1], yanlar[j][0], yanlar[j][1])
+                if v is not None:
+                    vs.add(v)
+    return sorted(v for v in vs if v0 <= v <= v1)
+
+
 def _parsel_kesisimi(cokgenler: Sequence[Sequence[Sequence[Nokta]]],
                      hatlar: Sequence[Sequence[Nokta]], r: float) -> Dict[str, float]:
     """Tek parsel (tek dilimde izdüşürülmüş) için kesişim alanı, eksen boyu ve sayısal hata."""
-    alan = eksen = tarama_alani = gauss = 0.0
+    alan = alan2 = eksen = gauss = 0.0
     for c in cokgenler:
         gauss += geo.cokgen_alani(c)
         u0, v0, u1, v1 = geo.sinir_kutusu(c[0])
@@ -201,23 +270,30 @@ def _parsel_kesisimi(cokgenler: Sequence[Sequence[Sequence[Nokta]]],
                         and max(a[1], b[1]) + r >= v0 and min(a[1], b[1]) - r <= v1):
                     parcalar.append((a, b))
         if not parcalar:
-            tarama_alani += geo.cokgen_alani(c)     # taranmadı; hata ölçüsüne nötr katkı
             continue
         for a, b in parcalar:
             eksen += _eksen_boyu(a, b, c)
-        adim = min(0.5, max(0.02, (v1 - v0) / 2000.0))
-        n = min(_AZAMI_TARAMA, max(1, int(math.ceil((v1 - v0) / adim))))
-        adim = (v1 - v0) / n
-        for k in range(n):
-            v = v0 + (k + 0.5) * adim
+
+        def f(v: float) -> float:
             ic = _cokgen_araliklari(c, v)
             if not ic:
-                continue
-            tarama_alani += sum(b - a for a, b in ic) * adim
+                return 0.0
             kapsuller = [x for x in (_kapsul_araligi(a, b, r, v) for a, b in parcalar) if x]
-            if kapsuller:
-                alan += _kesisim_boyu(ic, _birlestir(kapsuller)) * adim
-    hata = abs(tarama_alani - gauss) / gauss * 100.0 if gauss > 0 else 0.0
+            return _kesisim_boyu(ic, _birlestir(kapsuller)) if kapsuller else 0.0
+
+        olaylar = _olaylar(c, parcalar, r, v0, v1)
+        parca_boyu = max(_AZAMI_PARCA_M, (v1 - v0) / _AZAMI_PARCA_SAYISI)
+        for va, vb in zip(olaylar, olaylar[1:]):
+            boy = vb - va
+            if boy <= 1e-12:
+                continue
+            k = max(1, int(math.ceil(boy / parca_boyu)))
+            h = boy / k
+            for j in range(k):
+                orta = va + (j + 0.5) * h
+                alan += sum(w * f(orta + x * h / 2) for x, w in _GL4) * h / 2
+                alan2 += sum(w * f(orta + x * h / 2) for x, w in _GL2) * h / 2
+    hata = abs(alan - alan2) / alan * 100.0 if alan > 1e-9 else 0.0
     return {"alan": alan, "eksen": eksen, "parsel_alani": gauss, "hata_yuzde": hata}
 
 
@@ -264,10 +340,22 @@ def kesisim(parseller: Sequence[Dict[str, Any]], hatlar_cografi: Sequence[Sequen
     }
 
 
+def _csv_alan(v: Any) -> str:
+    """Parsel dosyasından gelen metin: "=HYPERLINK(...)" Excel'de çalışmasın, ";" ve satır
+    sonu sütun/satır uydurmasın (RFC 4180 tırnaklama + OWASP formül önlemi)."""
+    s = re.sub(r"[\r\n]+", " ", str(v if v is not None else ""))
+    if s[:1] in ("=", "+", "-", "@", "\t"):
+        s = "'" + s
+    return '"%s"' % s.replace('"', '""')
+
+
 def csv_yaz(sonuc: Dict[str, Any]) -> str:
-    out = ["parsel;nitelik;parsel_alani_m2;kesisim_m2;oran_yuzde;eksen_m;eksen_geciyor;ref"]
+    def sayi(x: float) -> str:
+        return ("%.2f" % x).replace(".", ",")
+
+    out = ["\ufeffparsel;nitelik;parsel_alani_m2;kesisim_m2;oran_yuzde;eksen_m;eksen_geciyor;ref"]
     for s in sonuc["satirlar"]:
-        out.append("%s;%s;%.2f;%.2f;%.2f;%.2f;%s;%s" % (
-            s["parsel"], s["nitelik"], s["parsel_alani_m2"], s["kesisim_m2"], s["oran_yuzde"],
-            s["eksen_m"], "evet" if s["eksen_geciyor"] else "hayır", s["ref"]))
+        out.append(";".join([_csv_alan(s["parsel"]), _csv_alan(s["nitelik"]), sayi(s["parsel_alani_m2"]),
+                             sayi(s["kesisim_m2"]), sayi(s["oran_yuzde"]), sayi(s["eksen_m"]),
+                             "evet" if s["eksen_geciyor"] else "hayır", _csv_alan(s["ref"])]))
     return "\n".join(out) + "\n"

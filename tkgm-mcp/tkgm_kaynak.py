@@ -2,12 +2,11 @@
 
 İki ayrı sınır burada çizilir:
 
-1. **TKGM sınırı.** Parsel Sorgu Kullanım Koşulları md. 3, uygulamanın web
-   servislerine TKGM izni olmadan doğrudan/dolaylı erişimi yasaklar. Bu yüzden
-   canlı kaynak bir *kapıdır*, gövde değil: izin belgesi ve TKGM'nin verdiği
-   servis adresi tanımlanmadıkça hiçbir ağ çağrısı yapılmaz. Belgelenmemiş
-   Parsel Sorgu uç adresleri bu depoya bilerek yazılmadı — herkese açık bir
-   depoda duran hazır bir istemci, md. 3'ün yasakladığı şeyin ta kendisidir.
+1. **Veri kaynağı.** Bugünkü canlı sorgu `tkgm_canli`dedir: Parsel Sorgu'nun herkese açık
+   verisi, tek sıra ve dakikada en çok 30 istekle (docs/MANIFESTO.md). `canli_durum`
+   ayrı bir kapıdır: TKGM ile resmî bir veri paylaşım kanalı kurulursa (izin belgesi ve
+   TKGM'nin verdiği servis adresi) o kanal buraya bağlanır. Gövdesi, o kanalın servis
+   sözleşmesine göre yazılacaktır.
 
 2. **Dosya sistemi sınırı.** Birleşik uç (Fly) kimlik doğrulamasızdır. Orada
    yol alan bir araç, sunucunun diskini internete açar. Dosya okuma/yazma
@@ -16,10 +15,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import secrets
 import sys
-from typing import Any, Dict
+import time
+from typing import Any, Dict, List
 
 _UZANTILAR = (".geojson", ".json", ".kml")
 _AZAMI_BOYUT = 5_000_000
@@ -30,16 +32,31 @@ class ErisimHatasi(Exception):
     """İstenen dosya işlemi bu çalışma kipinde yapılamaz."""
 
 
+def paylasilan_mi() -> bool:
+    """Taşıma HTTP mi: kimlik doğrulamasız, herkesin paylaştığı uç.
+
+    argv elle taranmaz: argparse kısaltmayı kabul eder (`--tr http`), elle tarama
+    kabul etmez ve sunucu HTTP'de dosya erişimi AÇIK çalışırdı. mcpcore'un kendi
+    ayrıştırıcısı kullanılır — taşımayı seçen şeyin aynısı. Ortam değişkeni ayrıca
+    ihtiyatla okunur ("Http", "http "): şüphede paylaşılan sayılır.
+    """
+    if os.environ.get("MCP_TRANSPORT", "").strip().lower() == "http":
+        return True
+    try:
+        from mcpcore import build_parser
+        ns, _ = build_parser("tkgm").parse_known_args(sys.argv[1:])
+        return ns.transport == "http"
+    except SystemExit:  # geçersiz taşıma değeri: ihtiyatla paylaşılan
+        return True
+
+
 def uzak_mi() -> bool:
-    """HTTP taşıması = paylaşılan sunucu. TKGM_DOSYA_ERISIMI=1/0 ile ezilebilir."""
+    """Dosya erişimi kapalı mı. TKGM_DOSYA_ERISIMI=1/0 ile ezilebilir; KVKK kapısı
+    (tapu kaydı) bu bayrağa DEĞİL `paylasilan_mi`ye bakar."""
     zorla = os.environ.get("TKGM_DOSYA_ERISIMI")
     if zorla is not None:
         return zorla.strip().lower() not in ("1", "true", "evet")
-    argv = sys.argv[1:]
-    for i, a in enumerate(argv):
-        if a == "--transport=http" or (a == "--transport" and argv[i + 1:i + 2] == ["http"]):
-            return True
-    return os.environ.get("MCP_TRANSPORT", "").lower() == "http"
+    return paylasilan_mi()
 
 
 def dosya_oku(yol: str) -> str:
@@ -85,17 +102,63 @@ def dosya_yaz(ad: str, icerik) -> str:
     return yol
 
 
+_CEVAP_SINIRI = 200_000     # karakter
+_CEVAP_SAYISI = 200         # klasörde tutulan en yeni cevap
+
+
+def _cevap_klasoru() -> str:
+    return os.path.join(cikti_klasoru(), "cevaplar")
+
+
+def cevap_yaz(baslik: str, metin: str, ref: Any = None) -> str:
+    """Claude'un cevabını yerel arayüze teslim eder (arayuze_yaz). Arayüz ayrı bir süreçtir;
+    ortak nokta çıktı klasörüdür. Yazım atomiktir: arayüz yarım dosya okumaz."""
+    if uzak_mi():
+        raise ErisimHatasi("arayuze_yaz yalnız yerel kipte çalışır: paylaşılan uç kullanıcının diskine yazamaz.")
+    klasor = _cevap_klasoru()
+    os.makedirs(klasor, exist_ok=True)
+    kayit = {"baslik": str(baslik)[:200], "metin": str(metin)[:_CEVAP_SINIRI],
+             "ref": None if ref is None else str(ref)[:64], "zaman": time.time()}
+    ad = "%d_%s.json" % (int(kayit["zaman"] * 1000), secrets.token_hex(3))
+    gecici = os.path.join(klasor, ad + ".tmp")
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(kayit, fh, ensure_ascii=False)
+    os.replace(gecici, os.path.join(klasor, ad))
+    eskiler = sorted(f for f in os.listdir(klasor) if f.endswith(".json"))[:-_CEVAP_SAYISI]
+    for f in eskiler:
+        try:
+            os.remove(os.path.join(klasor, f))
+        except OSError:
+            pass
+    return os.path.join(klasor, ad)
+
+
+def cevaplar(sinir: int = 30) -> List[Dict[str, Any]]:
+    klasor = _cevap_klasoru()
+    if not os.path.isdir(klasor):
+        return []
+    out = []
+    for f in sorted((f for f in os.listdir(klasor) if f.endswith(".json")), reverse=True)[:sinir]:
+        try:
+            with open(os.path.join(klasor, f), encoding="utf-8") as fh:
+                k = json.load(fh)
+            out.append({"id": f[:-5], "baslik": str(k.get("baslik", "")), "metin": str(k.get("metin", "")),
+                        "ref": k.get("ref"), "zaman": k.get("zaman")})
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+_IZIN_YOLU = ("Tapu ve Kadastro Verilerinin İşlenmesi ve Elektronik Ortamda Yapılacak İşlemler Hakkında "
+              "Yönetmelik (RG 08.06.2022/31860) m. 6/1: veri talebi ve sorgu için Genel Müdürlük ile protokol VEYA elektronik kabul beyanı; toplu paylaşım için protokol (m. 34/c; Veri Paylaşımı Üst Komisyonu, m. 33-34). TKGM 2026 döner sermaye cetveli §8 tekil sorguyu da fiyatlar: günlük 10 sorguya kadar ücretsiz kota (8.1), aylık abonelik (8.2), protokolsüz ücretli parsel geometrisi (8.3.1).")
+
+
 def canli_durum() -> Dict[str, Any]:
-    """Canlı TKGM kaynağının durumu. Bu sürümde hiçbir koşulda ağ çağrısı yapılmaz."""
+    """Resmî veri paylaşım kanalının (protokol) durumu. Bu kapı ağ çağrısı yapmaz; bugünkü
+    canlı sorgu tkgm_canli'dedir."""
     izin = os.environ.get("TKGM_IZIN_BELGESI", "").strip()
     adres = os.environ.get("TKGM_SERVIS_URL", "").strip()
     if not (izin and adres):
-        return {"acik": False,
-                "neden": "TKGM izni/protokolü tanımlı değil (Kullanım Koşulları md. 3). "
-                         "Yol: Tapu ve Kadastro Verilerinin İşlenmesi ve Elektronik Ortamda "
-                         "Yapılacak İşlemler Hakkında Yönetmelik (RG 08.06.2022/31860) m. 6 ve 10 "
-                         "uyarınca Genel Müdürlük ile protokol; talebi Veri Paylaşımı Üst "
-                         "Komisyonu karara bağlar (m. 33-34)."}
-    return {"acik": False, "izin_belgesi": izin,
-            "neden": "İzin tanımlı; ancak canlı adaptör, TKGM'nin protokolle vereceği servis "
-                     "sözleşmesine göre yazılacak — henüz uygulanmadı."}
+        return {"protokol_kanali": "tanımlı değil", "yol": _IZIN_YOLU}
+    return {"protokol_kanali": "tanımlı; adaptör TKGM'nin servis sözleşmesine göre yazılacak",
+            "izin_belgesi": izin}

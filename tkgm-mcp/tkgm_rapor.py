@@ -670,7 +670,7 @@ def _hukuk_notlari(parsel: Dict[str, Any], konu: Optional[str]) -> str:
         s.append(_par(_run("Nitelikten doğan rejim uyarıları (nitelik: %s)" % nitelik, kalin=True),
                       birlikte=True))
         for r in rejim:
-            ek = "  [hukuk_koprusu konu=%s]" % r["konu"] if r.get("konu") else ""
+            ek = "  [dayanak_koprusu konu=%s]" % r["konu"] if r.get("konu") else ""
             s.append(_par(_run("•  " + r["uyari"] + ek), girinti=284))
     else:
         # Sessizlik "kısıt yok" diye okunur; uyarının yokluğu yalnız sözcük eşleşmediğini gösterir.
@@ -928,6 +928,8 @@ def _hucre_xml(sutun: int, satir: int, deger: Any, stil: int) -> str:
     if deger is None or deger == "":
         return ""
     konum = "%s%d" % (_sutun_adi(sutun), satir)
+    if isinstance(deger, float) and not math.isfinite(deger):
+        return ""
     if isinstance(deger, (int, float)) and not isinstance(deger, bool):
         return '<c r="%s" s="%d"><v>%s</v></c>' % (konum, stil, repr(deger))
     if stil in (_S_IKI, _S_UC, _S_TAM, _S_ALTI):
