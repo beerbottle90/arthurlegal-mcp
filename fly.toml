@@ -8,6 +8,9 @@ primary_region = "ams"
 [env]
   EMBEDDINGS_URL = "https://api.voyageai.com/v1/embeddings"
   EMBEDDINGS_MODEL = "voyage-4-lite"
+  # tkgm_canli bütçesi süreç başınadır; iki makine toplamda dakikada 30 TKGM isteğini aşmasın diye
+  # aralık makine sayısıyla çarpılır (tkgm-mcp/docs/MANIFESTO.md). Makine sayısı değişirse bu da değişir.
+  TKGM_MAKINE_SAYISI = "2"
 
 [http_service]
   internal_port = 8080

@@ -20,31 +20,33 @@ User-Agent'ta taşır):
 
 | Sınır | Değer | Nerede |
 | --- | --- | --- |
-| Aynı anda TKGM'de | en çok **1** istek | `Sinirlayici` |
-| İki isteğin başlangıcı arası | en az **2 sn** → **dakikada en çok 30** (bütün kullanıcılar) | `TKGM_ARALIK_SN` |
-| Sırada bekleme | en çok 20 sn → sıra en çok 10 istek; taşan istek TKGM'ye gitmez, "yoğun" döner | `TKGM_KUYRUK_SN` |
+| Aynı anda TKGM'de | makine başına en çok **1** istek | `Sinirlayici` |
+| İki isteğin başlangıcı arası | en az **2 sn** → **dakikada en çok 30** (bütün kullanıcılar); paylaşılan uçta aralık makine sayısıyla çarpılır (2 makine → 4 sn), toplam yine 30 | `TKGM_ARALIK_SN`, `TKGM_MAKINE_SAYISI` |
+| Sırada bekleme | en çok 20 sn → sıra `20 / aralık` istek; taşan istek TKGM'ye gitmez, "yoğun" döner | `TKGM_KUYRUK_SN` |
 | TKGM yavaşlarsa | yanıt > 2 sn → aralık ×2, en çok 16 sn (dakikada ~4); 20 hızlı yanıtta yarıya | `Sinirlayici.cik` |
 | 429 / 503 | en az 60 sn hiç istek yok, Retry-After'a uyulur, tekrarında 15 dk'ya kadar | `Devre` |
 | Üst üste 3 ağ/sunucu hatası, JSON olmayan yanıt, yönlendirme | aynı geri çekilme; yönlendirme izlenmez | `Devre`, `_YonlendirmeYok` |
 | 401 / 403 | 24 saat duruş; kimlik, adres, IP değiştirilmez | `Devre.reddedildi` |
 | Önbellek | parsel 24 sa, "bulunamadı" 1 sa, il/ilçe/mahalle listeleri 30 gün; yalnız bellek | `Onbellek` |
 | Toplu tarama | aynı adada 10 dk'da 12 ayrı parsel, 6 ardışık numara (ada 1 sa kapanır), mahallede saatte 40, ~1 km²'de saatte 20 nokta | `TaramaKorumasi` |
-| Günlük toplam | 3.000 istek (Türkiye saatiyle) | `TKGM_GUNLUK_AZAMI` |
+| Günlük toplam | 3.000 istek (Türkiye saatiyle; makinelere bölünür) | `TKGM_GUNLUK_AZAMI` |
 | Uçlar | il (statik dosya), ilçe, mahalle listesi, parsel, konum; ada/parsel **listeleme** uçları hiç kullanılmaz | `UCLAR` |
-| Yer adı | OpenStreetMap Nominatim, 1,1 sn aralık (koşulu: saniyede en çok 1), 24 sa önbellek | `OSM` |
+| Yer adı | OpenStreetMap Nominatim, bütün makinelerin toplamı 1,1 sn'de bir istek (koşulu: saniyede en çok 1), 24 sa önbellek | `OSM` |
 | Kapatma | `TKGM_CANLI=0` bütün canlı istekleri kapatır | `Kapi.acik` |
 | Onay kartı | her sohbette ilk canlı sorgudan önce bir kez; `onay=true` ile geçilir | `server._onay` |
 
 **Dakikada 30 nasıl hesaplandı.** Hedef, TKGM'ye Parsel Sorgu'yu kullanan tek bir kişiden fazla
 yük bindirmemekti. Web arayüzü bir parseli bulmak için ilçe, mahalle, ada ve parsel listeleriyle
 parselin kendisini ayrı ayrı çağırır ve harita karolarını yükler; bağlayıcı aynı parseli, listeler
-önbelleğe girdikten sonra tek çağrıyla ve karosuz getirir. Aynı anda tek istek olduğu için
-ortalama eşzamanlı yük `hız × yanıt süresi`dir: 0,5 istek/sn × 0,5 sn = 0,25, yani zamanın en az
-dörtte üçünde TKGM'de hiç isteğimiz yoktur. Sıra kapasitesi `kuyruk / aralık` = 20 / 2 = 10'dur:
-bir anda bin çağrı gelse de TKGM'ye giden dakikada 30 istektir, kalanı burada geri çevrilir.
-Sınırlar süreç başınadır: birleşik uç (Fly) tek makinede çalışır; makine sayısı artarsa
-`TKGM_ARALIK_SN` makine sayısıyla çarpılmalıdır. Yerel kurulumda aynı sınırlar o bilgisayar için
-geçerlidir.
+önbelleğe girdikten sonra tek çağrıyla ve karosuz getirir. Ortalama eşzamanlı yük
+`hız × yanıt süresi`dir: 0,5 istek/sn × 0,5 sn = 0,25, yani zamanın en az dörtte üçünde TKGM'de hiç
+isteğimiz yoktur. Sıra kapasitesi `kuyruk / aralık`tır (yerelde 20 / 2 = 10, paylaşılan uçta makine
+başına 20 / 4 = 5): bir anda bin çağrı gelse de TKGM'ye giden dakikada 30 istektir, kalanı burada
+geri çevrilir.
+Sınırlar süreç başınadır. Birleşik uç (Fly) iki makinede çalışır (`fly status`, 23.09.2026):
+`TKGM_MAKINE_SAYISI` aralığı çarpar, günlük tavanı ve Nominatim hızını böler; Fly'da bu değişken
+yoksa ihtiyatla 2 alınır. Makine sayısı değişirse değişken de değişmelidir. Yerel kurulumda aynı
+sınırlar o bilgisayar için geçerlidir.
 
 **Canlı doğrulama (23.09.2026).** Beş uç, bağlayıcının kendi aracıyla ve kendi sınırından geçerek
 sınandı: koordinat → TBMM parseli (Ankara/Çankaya/Devlet 7955/5), aynı parsel ad yoluyla (il listesi
@@ -65,7 +67,8 @@ TKGM ile resmî bir veri paylaşım kanalı kurulursa `tkgm_kaynak.canli_durum` 
 | `TKGM_CIKTI` | Çıktı klasörü (varsayılan `~/ArthurLegal/tkgm`) |
 | `TKGM_DOSYA_ERISIMI` | `1`/`0`: taşıma türünden bağımsız olarak dosya erişimini aç/kapat |
 | `TKGM_CANLI` | `0`: canlı TKGM ve Nominatim isteklerini kapatır (varsayılan açık) |
-| `TKGM_ARALIK_SN` | İki TKGM isteği arası en az süre (varsayılan 2, en az 1) |
+| `TKGM_ARALIK_SN` | İki TKGM isteği arası en az süre (varsayılan 2, en az 1); makine sayısıyla çarpılır |
+| `TKGM_MAKINE_SAYISI` | Paylaşılan ucun makine sayısı (Fly'da verilmezse 2, başka yerde 1) |
 | `TKGM_KUYRUK_SN` | Sırada en uzun bekleme (varsayılan 20) |
 | `TKGM_GUNLUK_AZAMI` | Günlük istek tavanı (varsayılan 3.000) |
 | `TKGM_ZAMAN_ASIMI` | Tek isteğin zaman aşımı, sn (varsayılan 10) |

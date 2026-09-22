@@ -208,6 +208,23 @@ class SiraTesti(unittest.TestCase):
             s.cik(0.001)
         self.assertAlmostEqual(s.aralik, 0.04)
 
+    def test_makine_sayisi_toplami_otuzda_tutar(self):
+        """Paylaşılan uç iki makinede: süreç başına sınır yarıya iner, toplam dakikada 30 kalır."""
+        import subprocess
+        betik = ("import tkgm_canli as c; print(c.MAKINE, c.ARALIK_SN, c.GUNLUK_AZAMI, c.OSM.sinir.taban, "
+                 "c.dakikada_toplam()); print(c.sinir_metni())")
+        for ortam, beklenen in (({"TKGM_MAKINE_SAYISI": "2"}, "2 4.0 1500 2.2 30"),
+                                ({"FLY_APP_NAME": "arthurlegal-mcp"}, "2 4.0 1500 2.2 30"),
+                                ({"FLY_APP_NAME": "x", "TKGM_MAKINE_SAYISI": "3"}, "3 6.0 1000"),
+                                ({}, "1 2.0 3000 1.1 30")):
+            env = {k: v for k, v in os.environ.items() if k not in ("TKGM_MAKINE_SAYISI", "FLY_APP_NAME")}
+            env.update(ortam, PYTHONIOENCODING="utf-8")
+            cikti = subprocess.run([sys.executable, "-c", betik], cwd=KOK, env=env, capture_output=True,
+                                   text=True, encoding="utf-8", timeout=60).stdout
+            self.assertTrue(cikti.startswith(beklenen), (ortam, cikti))
+            self.assertIn("dakikada en çok 30 TKGM isteği", cikti)
+            self.assertIn("günde en çok 3000 istek", cikti)
+
     def test_varsayilan_dakikada_otuz(self):
         self.assertEqual(canli.ARALIK_SN, 2.0)
         self.assertEqual(canli.Sinirlayici(canli.ARALIK_SN, canli.KUYRUK_SN).dakikada(), 30)

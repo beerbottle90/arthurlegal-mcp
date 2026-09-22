@@ -76,9 +76,10 @@ STDLIB_BACKENDS = [
     ("gleif", os.path.join(ROOT, "gleif-mcp"), "srv_gleif",
      "🌍 Tüzel kişi kimliği + grup yapısı (LEI)"),
     # Not a jurisdiction and not a corpus. It fetches single parcels from TKGM Parsel
-    # Sorgu through one rate-limited gate (tkgm_canli: one request in flight, at most
-    # 30 a minute for all users together, backs off on 429/503, stops on 403; see
-    # tkgm-mcp/docs/MANIFESTO.md). Under the HTTP transport it refuses file paths.
+    # Sorgu through one rate-limited gate (tkgm_canli: one request in flight per machine,
+    # at most 30 a minute for all users and machines together, backs off on 429/503,
+    # stops on 403; see tkgm-mcp/docs/MANIFESTO.md). Under the HTTP transport it refuses
+    # file paths.
     ("tkgm", os.path.join(ROOT, "tkgm-mcp"), "srv_tkgm",
      "🇹🇷 Tapu-kadastro — canlı parsel (TKGM Parsel Sorgu, dakikada en çok 30 istek), rapor, kroki"),
 ]

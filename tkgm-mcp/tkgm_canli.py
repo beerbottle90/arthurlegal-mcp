@@ -27,8 +27,8 @@ sekmesinden fazla yük bindirmemek.
   taklidi yok.
 - Tek anahtar. TKGM_CANLI=0 bütün canlı istekleri kapatır.
 
-Sınırlar süreç başınadır. Birleşik uç (Fly) tek makinede çalışır; makine sayısı artarsa
-TKGM_ARALIK_SN makine sayısıyla çarpılmalıdır.
+Sınırlar süreç başınadır. Birleşik uç (Fly) birden çok makinede çalışırsa TKGM_MAKINE_SAYISI
+aralığı çarpar, günlük tavanı böler: toplam yine dakikada 30'dur. Fly'da sayı verilmezse 2 alınır.
 """
 
 from __future__ import annotations
@@ -63,10 +63,23 @@ def _ortam(ad: str, varsayilan: float, alt: float, ust: float) -> float:
     return min(max(x, alt), ust) if math.isfinite(x) else varsayilan
 
 
-# Ortamdan en çok gevşetilebilecek hâl dakikada 60 istektir (alt sınır 1 sn).
-ARALIK_SN = _ortam("TKGM_ARALIK_SN", 2.0, 1.0, 60.0)
+def _makine_sayisi() -> int:
+    """Sınırlar süreç başınadır; paylaşılan uç birden çok makinede çalışırsa bütçe makinelere
+    bölünür. Fly'da sayı bildirilmemişse ihtiyatla 2 alınır (arthurlegal-mcp iki makinededir)."""
+    deger = os.environ.get("TKGM_MAKINE_SAYISI", "").strip()
+    if not deger:
+        return 2 if os.environ.get("FLY_APP_NAME") else 1
+    try:
+        return min(max(int(deger), 1), 10)
+    except ValueError:
+        return 2 if os.environ.get("FLY_APP_NAME") else 1
+
+
+MAKINE = _makine_sayisi()
+# Ortamdan en çok gevşetilebilecek hâl, makine başına dakikada 60 istektir (alt sınır 1 sn).
+ARALIK_SN = _ortam("TKGM_ARALIK_SN", 2.0, 1.0, 60.0) * MAKINE
 KUYRUK_SN = _ortam("TKGM_KUYRUK_SN", 20.0, 2.0, 60.0)
-GUNLUK_AZAMI = int(_ortam("TKGM_GUNLUK_AZAMI", 3000, 1, 20000))
+GUNLUK_AZAMI = max(1, int(_ortam("TKGM_GUNLUK_AZAMI", 3000, 1, 20000)) // MAKINE)
 ZAMAN_ASIMI = _ortam("TKGM_ZAMAN_ASIMI", 10.0, 2.0, 30.0)
 YAVAS_SN = 2.0
 AZAMI_ARALIK_SN = 16.0
@@ -462,9 +475,12 @@ class Kapi:
         return veri
 
 
-TKGM = Kapi("TKGM", ARALIK_SN, KUYRUK_SN, GUNLUK_AZAMI, anahtar="TKGM_CANLI")
-# Nominatim kullanım koşulu en çok saniyede bir istek; 1,1 sn aralık o sınırın altında kalır.
-OSM = Kapi("OpenStreetMap Nominatim", 1.1, 10.0, 2000, anahtar="TKGM_CANLI", azami_aralik=8.0)
+TKGM = Kapi("TKGM", ARALIK_SN, KUYRUK_SN, GUNLUK_AZAMI, anahtar="TKGM_CANLI",
+            azami_aralik=AZAMI_ARALIK_SN * MAKINE)
+# Nominatim kullanım koşulu en çok saniyede bir istek; bütün makinelerin toplamı 1,1 sn aralıkla o
+# sınırın altında kalır.
+OSM = Kapi("OpenStreetMap Nominatim", 1.1 * MAKINE, 10.0 + 1.1 * MAKINE, max(1, 2000 // MAKINE),
+           anahtar="TKGM_CANLI", azami_aralik=8.0 * MAKINE)
 
 
 # --------------------------------------------------------------------------- #
@@ -1015,18 +1031,24 @@ def onay_karti() -> str:
         "· Aynı parsel bir gün önbellekten gelir\n"
         "· Bilgi amaçlıdır; malik, şerh, rehin içermez\n\n"
         "Nasıl tasarlandı: %s\n\n"
-        "Devam edilsin mi? (evet / hayır)" % (int(60 // TKGM.sinir.taban), MANIFESTO))
+        "Devam edilsin mi? (evet / hayır)" % (dakikada_toplam(), MANIFESTO))
 
 
 def onay_gerekli() -> bool:
     return os.environ.get("TKGM_ONAY_KARTI", "1").strip().lower() not in ("0", "false", "hayir", "hayır", "off")
 
 
+def dakikada_toplam() -> int:
+    """Bütün makinelerin toplamı: makine başına 60 / aralık × makine sayısı."""
+    return int(60 // TKGM.sinir.taban) * MAKINE
+
+
 def sinir_metni() -> str:
-    return ("dakikada en çok %d TKGM isteği (aynı anda tek istek, başlangıçlar arası en az %s sn), sırada en çok "
-            "%d sn bekleme, günde en çok %d istek" % (
-                int(60 // TKGM.sinir.taban), ("%g" % TKGM.sinir.taban).replace(".", ","),
-                int(TKGM.sinir.kuyruk_sn), TKGM.gunluk.azami))
+    makine = " (%d makinenin toplamı; makine başına" % MAKINE if MAKINE > 1 else " ("
+    return ("dakikada en çok %d TKGM isteği%s aynı anda tek istek, başlangıçlar arası en az %s sn), sırada en "
+            "çok %d sn bekleme, günde en çok %d istek" % (
+                dakikada_toplam(), makine, ("%g" % TKGM.sinir.taban).replace(".", ","),
+                int(TKGM.sinir.kuyruk_sn), TKGM.gunluk.azami * MAKINE))
 
 
 def durum(sayilar: bool = False) -> Dict[str, Any]:

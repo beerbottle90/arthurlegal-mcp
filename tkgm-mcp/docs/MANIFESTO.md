@@ -23,12 +23,13 @@ Bağlayıcı, TKGM sunucularına Parsel Sorgu'yu kullanan tek bir kişiden fazla
 şekilde kuruldu. Aşağıdaki sınırlar bugünkü kodda, `tkgm_canli.py` dosyasının başında tanımlıdır ve
 testlerle sınanır.
 
-- **Tek sıra.** Bütün kullanıcıların istekleri tek kuyruktan geçer. TKGM'de aynı anda en fazla bir
-  isteğimiz bulunur ve iki isteğin başlangıcı arasında en az 2 saniye vardır. Üst sınır dakikada en
-  çok 30 istektir; bu sayı kullanıcı sayısıyla artmaz. Bir avukatın kendi bilgisayarına kurduğu
-  sürümde aynı sınırlar o bilgisayar için geçerlidir.
+- **Tek sıra.** Bütün kullanıcıların istekleri kuyruktan geçer. Bağlayıcının her kopyası TKGM'ye
+  aynı anda en fazla bir istek gönderir ve iki isteğin başlangıcı arasında en az 2 saniye bekler.
+  Paylaşılan sunucu iki makinede çalıştığı için orada aralık makine başına 4 saniyedir. Her iki
+  durumda üst sınır dakikada en çok 30 istektir ve bu sayı kullanıcı sayısıyla artmaz. Bir
+  avukatın kendi bilgisayarına kurduğu sürümde aynı sınırlar o bilgisayar için geçerlidir.
 - **Taşan istek gönderilmez.** Kuyrukta bekleme 20 saniyeyi aşacaksa istek TKGM'ye iletilmez, bizim
-  sunucumuzda "yoğun" yanıtıyla geri çevrilir. Kuyruk en fazla 10 istek tutar; yoğunluk bizde kalır.
+  sunucumuzda "yoğun" yanıtıyla geri çevrilir. Yoğunluk bizde kalır.
 - **TKGM yavaşlayınca geri çekilir.** Yanıtlar 2 saniyeyi aşınca aralık kendiliğinden ikiye katlanır
   ve 16 saniyeye kadar açılır, yani dakikada yaklaşık 4 isteğe iner.
 - **Durması istendiğinde durur.** 429 ya da 503 yanıtında en az bir dakika hiç istek gönderilmez,
@@ -52,9 +53,10 @@ Parsel Sorgu'nun web arayüzünde bir parseli bulmak; ilçe, mahalle, ada ve par
 parselin kendisi için birkaç API çağrısı yapar ve haritanın karolarını yükler. Bağlayıcı aynı
 sorguyu, listeler önbelleğe girdikten sonra tek çağrıyla yapar ve harita karosu indirmez.
 
-Dakikada 30 çağrı, arayüzde art arda sorgu yapan bir iki kişinin API yükü kadardır. Aynı anda tek
-istek bulunduğu için yanıt yarım saniye sürse bile TKGM'deki ortalama eşzamanlı yükümüz 0,25
-isteğin altında kalır: zamanın en az dörtte üçünde TKGM'de hiç isteğimiz yoktur. İlk denemede
+Dakikada 30 çağrı, arayüzde art arda sorgu yapan bir iki kişinin API yükü kadardır. Ortalama
+eşzamanlı yük, istek hızı ile yanıt süresinin çarpımıdır: yanıt yarım saniye sürse bile TKGM'deki
+ortalama eşzamanlı yükümüz 0,25 isteğin altında kalır, yani zamanın en az dörtte üçünde TKGM'de hiç
+isteğimiz yoktur. İlk denemede
 ölçülen yanıt süreleri 0,09 ile 0,31 saniye arasındaydı; bu sürelerle oran yüzde 8 dolayındadır.
 Bir anda bin kişi sorsa da TKGM'ye giden, dakikada 30 istektir; kalanı kuyrukta bekler ya da bizde
 geri çevrilir.
