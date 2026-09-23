@@ -1,4 +1,4 @@
-# CLAUDE.md — ArthurLegalTR
+# CLAUDE.md — arthur-tr-hukuk-mcp (eski adı ArthurLegalTR)
 
 Turkish legal research MCP server. Standard library only (+ optional `pypdf`).
 

@@ -449,7 +449,7 @@ class AdresGuvenligi(unittest.TestCase):
 class AracAdlari(unittest.TestCase):
     """Birleşik uçta (arthurlegal-mcp) tkgm_ araçları tr_ araçlarıyla yan yana listelenir. Ortak sözcük
     taşıyan ad (tkgm_rehber / tr_hukuk_arastirma_rehberi, tkgm_tarife_ara / tr_mevzuat_ara) modeli yanlış
-    araca yöneltir. Liste, arthurlegal-mcp master'daki ArthurLegalTR v0.5.0 araç adlarıdır."""
+    araca yöneltir. Liste, arthurlegal-mcp master'daki arthur-tr-hukuk-mcp (eski ArthurLegalTR) v0.5.0 araç adlarıdır."""
 
     TR = ("aym_ara aym_getir belge_getir hukuk_arastirma_rehberi ictihat_ara ictihat_getir ictihat_semantik_ara "
           "kurum_karari_ara kurum_karari_getir kurum_listesi mevzuat_ara mevzuat_gerekce mevzuat_getir "

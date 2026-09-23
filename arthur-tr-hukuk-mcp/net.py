@@ -1,4 +1,4 @@
-"""HTTP helpers for ArthurLegalTR — standard library only.
+"""HTTP helpers for arthur-tr-hukuk-mcp — standard library only.
 
 Every upstream in this server is a Turkish public-sector site. They share three
 habits this module exists to absorb:

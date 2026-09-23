@@ -1,6 +1,6 @@
 # Attribution
 
-ArthurLegalTR stands on work by others. What was taken, from where, and what
+arthur-tr-hukuk-mcp (formerly ArthurLegalTR) stands on work by others. What was taken, from where, and what
 was done with it:
 
 ## Said Sürücü — `saidsurucu/yargi-mcp`, `saidsurucu/mevzuat-mcp` (MIT)

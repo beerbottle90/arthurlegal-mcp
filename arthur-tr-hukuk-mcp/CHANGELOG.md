@@ -1,5 +1,10 @@
 # Changelog
 
+## Ad — 2026-09-23
+
+- Depo ve klasör adı `ArthurLegalTR` → `arthur-tr-hukuk-mcp`: ArthurLegal paket deposuyla karışıyordu.
+  İşlev değişmedi, araç adları (`tr_`) aynı; `status`taki `server` alanı ve talimat başlığı yeni adı taşır.
+
 ## 0.5.0 — 2026-09-22
 
 SMK m.120 olayı (protokole "ŞİRKET'in önalım hakkı" yazıldı; m.120 çalışanın önalım hakkıdır) üzerine:

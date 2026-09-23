@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ArthurLegalTR — Türk hukuku MCP sunucusu: içtihat, mevzuat, düzenleyici kurum
+"""arthur-tr-hukuk-mcp (eski adı ArthurLegalTR) — Türk hukuku MCP sunucusu: içtihat, mevzuat, düzenleyici kurum
 kararları ve semantik arama tek uçta.
 
     python server.py                                  # stdio (Claude Desktop, Claude Code)
@@ -225,7 +225,7 @@ def t_status(args: Dict[str, Any]) -> Any:
     except Exception:  # noqa: BLE001
         pass
     out = {
-        "server": "ArthurLegalTR", "version": __version__, "pypdf": HAS_PYPDF,
+        "server": "arthur-tr-hukuk-mcp", "version": __version__, "pypdf": HAS_PYPDF,
         "sources": [s.describe() for s in sources.load_all().values()],
         "sources_failed": sources.failed(),
         "local_index": {"path": INDEX_PATH, "documents": idx.count(), "vectorised": idx.vector_count(),
@@ -238,7 +238,7 @@ def t_status(args: Dict[str, Any]) -> Any:
     return out
 
 
-GUIDE = """ArthurLegalTR — hangi soru için hangi araç
+GUIDE = """arthur-tr-hukuk-mcp — hangi soru için hangi araç
 
 1. MEVZUAT (kanun, KHK, CBK, yönetmelik, tebliğ)
    mevzuat_ara(query="Elektrik Piyasası", types=["KANUN"]) → mevzuat_id
@@ -402,7 +402,7 @@ def build_tools() -> List[Tool]:
 
 INSTRUCTIONS = """MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın, "doğrulanmadı" diye işaretleyin.
 
-ArthurLegalTR — Türk hukuku araştırma sunucusu (içtihat + mevzuat + 8 düzenleyici kurum + semantik arama).
+arthur-tr-hukuk-mcp — Türk hukuku araştırma sunucusu (içtihat + mevzuat + 8 düzenleyici kurum + semantik arama).
 
 ARAÇ AİLELERİ. `ictihat_*` Yargıtay/Danıştay/BAM/yerel/KYB · `aym_*` Anayasa Mahkemesi · `uyusmazlik_*` ·
 `mevzuat_*` kanun–tebliğ, madde ağacı, gerekçe · `resmi_gazete_*` · `kurum_karari_*` (rekabet, epdk, spk, bddk,
@@ -435,6 +435,6 @@ _t_status = t_status   # the aggregator looks for this name when composing its s
 
 if __name__ == "__main__":
     tools = TOOLS
-    sys.stderr.write("ArthurLegalTR %s: %d araç, %d kaynak (%d yüklenemedi), indeks %s\n" % (
+    sys.stderr.write("arthur-tr-hukuk-mcp %s: %d araç, %d kaynak (%d yüklenemedi), indeks %s\n" % (
         __version__, len(tools), len(sources.load_all()), len(sources.failed()), INDEX_PATH))
-    run(tools, name="ArthurLegalTR", version=__version__, instructions=INSTRUCTIONS)
+    run(tools, name="arthur-tr-hukuk-mcp", version=__version__, instructions=INSTRUCTIONS)

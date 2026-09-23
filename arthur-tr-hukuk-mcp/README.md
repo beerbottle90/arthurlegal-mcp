@@ -1,4 +1,7 @@
-# ArthurLegalTR
+# arthur-tr-hukuk-mcp
+
+> Eski adı **ArthurLegalTR** (23.09.2026'da değişti: ArthurLegal paket deposuyla karışıyordu).
+> İşlev ve araç adları (`tr_`) aynı.
 
 **Türk hukuku tek MCP ucunda: içtihat, mevzuat, 8 düzenleyici kurum, Resmî Gazete ve semantik arama.**
 
@@ -22,8 +25,8 @@ kelime paylaşmadığı kararı da bulabilen bir yerel indeks koyar.
 ## Kurulum
 
 ```bash
-git clone https://github.com/beerbottle90/ArthurLegalTR
-cd ArthurLegalTR
+git clone https://github.com/beerbottle90/arthur-tr-hukuk-mcp
+cd arthur-tr-hukuk-mcp
 pip install pypdf          # opsiyonel ama PDF'ler için gerekli
 python server.py           # stdio
 ```
@@ -31,7 +34,7 @@ python server.py           # stdio
 Claude Desktop / Claude Code (`claude_desktop_config.json` ya da `claude mcp add`):
 
 ```json
-{ "mcpServers": { "ArthurLegalTR": { "command": "python", "args": ["C:/…/ArthurLegalTR/server.py"] } } }
+{ "mcpServers": { "arthur-tr-hukuk-mcp": { "command": "python", "args": ["C:/…/arthur-tr-hukuk-mcp/server.py"] } } }
 ```
 
 HTTP (claude.ai connector, Copilot Studio): `python server.py --transport http --port 8080` →

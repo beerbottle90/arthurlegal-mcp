@@ -19,7 +19,7 @@ fi
 
 APP="$(cd "$(dirname "$0")" && pwd)"
 INDEX_SRC="${INDEX_SOURCE:-/data/index}"
-JURISDICTIONS="ArthurLegalTR nl-rechtspraak-mcp pl-sejm-mcp es-boe-mcp ie-statutebook-mcp fi-finlex-mcp"
+JURISDICTIONS="arthur-tr-hukuk-mcp nl-rechtspraak-mcp pl-sejm-mcp es-boe-mcp ie-statutebook-mcp fi-finlex-mcp"
 
 # Seed the indexes from an attached storage bucket when one is mounted.
 #
@@ -33,6 +33,10 @@ expected=0
 for j in $JURISDICTIONS; do
     expected=$((expected + 1))
     src="$INDEX_SRC/$j.db"
+    # arthur-tr-hukuk-mcp 23.09.2026'ya kadar ArthurLegalTR'ydi; baked/ indeksi o adla durabilir.
+    if [ ! -f "$src" ] && [ "$j" = "arthur-tr-hukuk-mcp" ] && [ -f "$INDEX_SRC/ArthurLegalTR.db" ]; then
+        src="$INDEX_SRC/ArthurLegalTR.db"
+    fi
     dst="$APP/$j/data/index.db"
     if [ -f "$dst" ]; then
         seeded=$((seeded + 1))
@@ -73,8 +77,8 @@ fi
 # configured model are filled here, in the background, with the platform
 # secret. `embed_missing` is idempotent -- a machine that already has them
 # does nothing -- and tr_semantik_ara reports semantic: off until it is done.
-if [ -n "$EMBEDDINGS_API_KEY" ] && [ -f "$APP/ArthurLegalTR/data/index.db" ]; then
-    (cd "$APP/ArthurLegalTR" && python crawl.py --embed-only >/tmp/tr-embed.log 2>&1         && echo "ArthurLegalTR vectors ready" >&2 || echo "ArthurLegalTR embedding failed (see /tmp/tr-embed.log)" >&2) &
+if [ -n "$EMBEDDINGS_API_KEY" ] && [ -f "$APP/arthur-tr-hukuk-mcp/data/index.db" ]; then
+    (cd "$APP/arthur-tr-hukuk-mcp" && python crawl.py --embed-only >/tmp/tr-embed.log 2>&1         && echo "arthur-tr-hukuk-mcp vectors ready" >&2 || echo "arthur-tr-hukuk-mcp embedding failed (see /tmp/tr-embed.log)" >&2) &
 fi
 
 cd "$APP"

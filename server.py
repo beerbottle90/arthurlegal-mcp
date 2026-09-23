@@ -57,10 +57,10 @@ AL = HERE
 # tool answers for, so a reader of a tool name always knows which law they are in.
 STDLIB_BACKENDS = [
     # Türkiye loads FIRST on purpose: every backend does `import retrieval` by bare
-    # name and Python caches the first copy. ArthurLegalTR's retrieval.py is the
+    # name and Python caches the first copy. arthur-tr-hukuk-mcp's retrieval.py is the
     # same module plus dotless-ı query expansion, so letting it win costs the
     # others nothing and keeps Turkish queries working.
-    ("tr", os.path.join(AL, "ArthurLegalTR"), "srv_tr",
+    ("tr", os.path.join(AL, "arthur-tr-hukuk-mcp"), "srv_tr",
      "🇹🇷 Türkiye — içtihat + mevzuat + 8 düzenleyici kurum + Resmî Gazete"),
     ("nl", os.path.join(ROOT, "nl-rechtspraak-mcp"), "srv_nl", "🇳🇱 Hollanda — içtihat + mevzuat"),
     ("pl", os.path.join(ROOT, "pl-sejm-mcp"), "srv_pl", "🇵🇱 Polonya — mevzuat"),

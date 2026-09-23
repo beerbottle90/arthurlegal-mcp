@@ -1,4 +1,4 @@
-"""Source registry for ArthurLegalTR.
+"""Source registry for arthur-tr-hukuk-mcp.
 
 Every upstream is a module in this package exposing a ``SOURCE`` object. The
 server iterates the registry to build tools and the ``status`` report; the

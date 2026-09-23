@@ -51,7 +51,7 @@ Türkiye (`tr_`) is the largest backend: Yargıtay/Danıştay/BAM case law, AYM,
 Uyuşmazlık, all legislation types, Resmî Gazete, and eight regulators (EPDK,
 Rekabet, SPK, BDDK, KVKK, BTK, GİB, Sigorta Tahkim) behind one
 `tr_kurum_karari_ara` interface, plus a locally indexed
-archive for `tr_semantik_ara`. Source: the `ArthurLegalTR/` folder.
+archive for `tr_semantik_ara`. Source: the `arthur-tr-hukuk-mcp/` folder (formerly `ArthurLegalTR/`).
 
 `tr_resmi_gazete_tara`, `tr_resmi_gazete_fihrist` and `tr_mevzuat_ara` also take a `konu` filter
 (`enerji`, `rekabet`, `vergi`, `icra`): a local, network-free topic triage over titles that finds

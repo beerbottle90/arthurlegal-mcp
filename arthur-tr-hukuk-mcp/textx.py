@@ -1,4 +1,4 @@
-"""Text utilities for ArthurLegalTR: HTML → text, PDF → text, Turkish folding.
+"""Text utilities for arthur-tr-hukuk-mcp: HTML → text, PDF → text, Turkish folding.
 
 The only optional dependency in the whole server lives here. ``pypdf`` is pure
 Python and extracts text from the PDFs that Rekabet Kurumu, EPDK, SPK, BTK and
