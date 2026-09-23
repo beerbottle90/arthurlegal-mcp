@@ -22,15 +22,18 @@ import hmac
 import json
 import mimetypes
 import os
+import re
 import secrets
 import socket
 import sys
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, List
 from urllib.parse import parse_qs, unquote, urlparse
 
+import tkgm_canli as canli
 import tkgm_hukuk as hukuk
 import tkgm_kaynak as kaynak
 import tkgm_parsel as parseller
@@ -74,6 +77,48 @@ def ozetler() -> List[Dict[str, Any]]:
                  "rejim": [r["uyari"] for r in hukuk.nitelik_rejimleri(p["oznitelik"].get("nitelik", ""))]}
         out.append(kayit)
     return out
+
+
+_KIMLIK = re.compile(r"\d{1,9}")
+
+
+def idari(sorgu: Dict[str, List[str]]) -> Any:
+    """Sorgu formunun seçim kutuları: il, `il=` ile ilçe, `ilce=` ile mahalle/köy listesi.
+
+    Listeler kullanıcı yazmaz; TKGM'nin kendi kayıtlarından gelir (hız sınırlı kapı, 30 gün
+    önbellek). Canlı istek olduğu için onay kartı `onay=1` gelene kadar döner."""
+    if canli.onay_gerekli() and (sorgu.get("onay") or [""])[0] != "1":
+        return 200, {"ok": True, "onay_gerekli": True, "kart": canli.onay_karti()}
+    il, ilce = (sorgu.get("il") or [""])[0], (sorgu.get("ilce") or [""])[0]
+    for deger in (il, ilce):
+        if deger and not _KIMLIK.fullmatch(deger):
+            return 400, {"ok": False, "hata": "kimlik sayı olmalı"}
+    son = time.monotonic() + canli.CAGRI_BUTCESI_SN
+    try:
+        if ilce:
+            tur, liste = "mahalle", canli.mahalle_listesi(int(ilce), son)
+        elif il:
+            tur, liste = "ilce", canli.ilce_listesi(int(il), son)
+        else:
+            tur, liste = "il", canli.il_listesi(son)
+    except canli.CanliHata as exc:
+        return 200, {"ok": False, "hata": str(exc)}
+    return 200, {"ok": True, "tur": tur, "liste": sorted(liste, key=lambda k: canli.katla_tam(k["ad"]))}
+
+
+def idari_coz(sorgu: Dict[str, List[str]]) -> Any:
+    """Sor sekmesindeki serbest metin → kutucuklara aktarılacak kimlikler. Sorgu YAPMAZ: kullanıcı
+    kutucukları görüp Sorgula'ya kendisi basar."""
+    if canli.onay_gerekli() and (sorgu.get("onay") or [""])[0] != "1":
+        return 200, {"ok": True, "onay_gerekli": True, "kart": canli.onay_karti()}
+    metin = (sorgu.get("metin") or [""])[0][:300]
+    try:
+        c = canli.metin_coz(metin, time.monotonic() + canli.CAGRI_BUTCESI_SN)
+    except canli.Belirsiz as exc:
+        return 200, {"ok": True, "belirsiz": exc.yanit()}
+    except canli.CanliHata as exc:
+        return 200, {"ok": False, "hata": str(exc)}
+    return 200, dict({"ok": True}, **c)
 
 
 def isleyici(tools: List[Tool]):
@@ -144,6 +189,9 @@ def isleyici(tools: List[Tool]):
                 self._json(200, {"ok": True, "klasor": kaynak.cikti_klasoru(), "dosyalar": galeri()})
             elif yol == "/api/cevaplar":
                 self._json(200, {"ok": True, "cevaplar": kaynak.cevaplar()})
+            elif yol in ("/api/idari", "/api/idari/coz"):
+                kod, veri = (idari if yol == "/api/idari" else idari_coz)(parse_qs(urlparse(self.path).query))
+                self._json(kod, veri)
             elif yol.startswith("/dosya/"):
                 ad = unquote(yol[len("/dosya/"):])
                 tam = os.path.join(kaynak.cikti_klasoru(), ad)

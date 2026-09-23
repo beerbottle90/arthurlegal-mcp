@@ -641,5 +641,95 @@ class UctanUca(Sahte):
         self.assertIn("dogrulanmamis_uclar", durum)
 
 
+class ArayuzFormu(Sahte):
+    """Yerel arayüzün yapılandırılmış sorgu formu: seçim kutularını dolduran uçlar ve sayfanın kendisi."""
+
+    def setUp(self):
+        super().setUp()
+        import tkgm_ui
+        self.tkgm_ui = tkgm_ui
+        self.ui = tkgm_ui.sunucu(server.TOOLS, 0)
+        threading.Thread(target=self.ui.serve_forever, daemon=True).start()
+        self.ui_kok = "http://127.0.0.1:%d" % self.ui.server_address[1]
+
+    def tearDown(self):
+        self.ui.shutdown()
+        self.ui.server_close()
+        super().tearDown()
+
+    def al(self, yol, belirtec=True, **p):
+        import urllib.error
+        import urllib.request
+        if belirtec:
+            p["t"] = self.tkgm_ui.BELIRTEC
+        adres = self.ui_kok + yol + ("?" + urllib.parse.urlencode(p) if p else "")
+        try:
+            with urllib.request.urlopen(adres, timeout=30) as y:
+                return y.status, y.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read().decode("utf-8")
+
+    def json_al(self, yol, **p):
+        kod, govde = self.al(yol, **p)
+        return kod, json.loads(govde)
+
+    def parsel_istekleri(self):
+        return [y for y, _ in self.srv.istekler if y.startswith("/api/parsel/")]
+
+    def test_belirtecsiz_ret(self):
+        self.assertEqual(self.al("/api/idari", belirtec=False)[0], 403)
+        self.assertEqual(self.istek_sayisi(), 0)
+
+    def test_onaydan_once_tkgmye_gitmez(self):
+        kod, j = self.json_al("/api/idari")
+        self.assertEqual(kod, 200)
+        self.assertTrue(j["onay_gerekli"])
+        self.assertIn("ticari olmayan", j["kart"])
+        self.assertEqual(self.istek_sayisi(), 0)
+
+    def test_listeler_kademeli_ve_sirali(self):
+        _, j = self.json_al("/api/idari", onay=1)
+        self.assertEqual(j["tur"], "il")
+        self.assertEqual([k["ad"] for k in j["liste"]], ["Ankara", "İstanbul", "İzmir"])   # Türkçe sıralama
+        _, j = self.json_al("/api/idari", onay=1, il=34)
+        self.assertEqual((j["tur"], {k["id"] for k in j["liste"]}), ("ilce", {1001, 1002, 1003}))
+        _, j = self.json_al("/api/idari", onay=1, ilce=1001)
+        self.assertEqual(j["tur"], "mahalle")
+        self.assertEqual([k["ad"] for k in j["liste"]][0], "Deneme")
+        self.assertEqual(self.parsel_istekleri(), [])
+
+    def test_gecersiz_kimlik_ret(self):
+        for kotu in ("abc", "../x", "1;2", "-5", "1.5"):
+            self.assertEqual(self.al("/api/idari", onay=1, il=kotu)[0], 400, kotu)
+        self.assertEqual(self.istek_sayisi(), 0)
+
+    def test_sor_metni_kutulara_cozulur_sorgu_atilmaz(self):
+        _, j = self.json_al("/api/idari/coz", onay=1, metin="İstanbul Kadıköy Deneme 101 ada 7 parsel")
+        self.assertTrue(j["ok"])
+        self.assertEqual((j["il"]["id"], j["ilce"]["id"], j["mahalle"]["id"], j["ada"], j["parsel"]), (34, 1001, 5001, 101, 7))
+        self.assertEqual(self.parsel_istekleri(), [])      # kutucukları doldurur, sorguyu kullanıcı başlatır
+
+    def test_belirsiz_mahallede_il_ilce_dolu_gelir(self):
+        self.json_al("/api/idari", onay=1)
+        self.json_al("/api/idari", onay=1, il=34)
+        _, j = self.json_al("/api/idari/coz", onay=1, metin="Kadıköy Yen 101 ada 8 parsel")
+        b = j["belirsiz"]
+        self.assertEqual((b["belirsiz"], b["il"]["id"], b["ilce"]["id"], b["ada"], b["parsel"]), ("mahalle", 34, 1001, 101, 8))
+        self.assertEqual({a["id"] for a in b["adaylar"]}, {5002, 5003})
+
+    def test_koordinat_metni_kutulara(self):
+        _, j = self.json_al("/api/idari/coz", onay=1, metin="40.9902, 29.0344")
+        self.assertEqual((j["enlem"], j["boylam"]), (40.9902, 29.0344))
+        self.assertEqual(self.parsel_istekleri(), [])
+
+    def test_sayfa_yapilandirilmis_formu_tasir(self):
+        kod, sayfa = self.al("/", belirtec=False)
+        self.assertEqual(kod, 200)
+        for parca in ('id="f-il"', 'id="f-ilce"', 'id="f-mahalle"', 'id="f-ada"', 'id="f-parsel"', 'id="f-sorgula"',
+                      'inputmode="numeric"', "otokontrol", "/api/idari/coz"):
+            self.assertTrue(parca in sayfa, parca)
+        self.assertFalse("canli-metin" in sayfa)            # eski serbest metin kutusu kalmadı
+
+
 if __name__ == "__main__":
     unittest.main()

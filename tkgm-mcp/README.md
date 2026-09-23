@@ -92,10 +92,19 @@ yabancı `Origin` ve `Sec-Fetch-Site: cross-site` ret; sayfa çerçevelenemez (`
 dosya bağlantıları Referer ile belirteç sızdırmaz. Windows'ta kapıya münhasır bağlanılır
 (`SO_EXCLUSIVEADDRUSE`). Dosya sunumu çıktı klasöründeki düz adlarla sınırlıdır.
 
-**Sor sekmesi.** Serbest metin kutusu. Belirlenimci girdiler yerel araçlarla hemen yanıtlanır:
-"İstanbul Kadıköy Caferağa 123 ada 45 parsel" ya da koordinat (yüklüyse seçer, değilse TKGM'den getirir; ilk
-sorguda onay kartı bir kez sorulur), "satış harcı 3.000.000 TL", "koridor 16 m",
-"önalım" gibi konu adları. Eşleşmeyen metin, Claude'a yapıştırılacak bir komuta dönüşür
+**TKGM'den getir formu.** Parsel Sorgu'daki sırayla alt alta zorunlu kutular. İl → İlçe → Mahalle/köy açılır
+listeleri TKGM'nin kendi idari listelerinden dolar (`GET /api/idari`); ad yazılmaz, seçilir, sorgu mahalle
+kimliğiyle gider. Ada ve Parsel yalnız rakam alır (köy parsellerinde ada 0; parsel 0 reddedilir). Otokontrol:
+bir alan eksik ya da geçersizken Sorgula kapalıdır ve altında eksikler yazar; tamamlanınca "Sorgulanacak: İl /
+İlçe / Mahalle · ada/parsel" özeti çıkar. Gelen kayıt istenen ada, parsel ve mahalleyle karşılaştırılır; fark,
+aktif olmayan durum ya da "gittiği parseller" varsa uyarı verilir. İlk tıklamada onay kartı sekme başına bir kez
+sorulur, onaydan önce TKGM'ye istek gitmez. "Koordinatla getir" Türkiye dışındaki noktayı kabul etmez.
+
+**Sor sekmesi.** Serbest metin kutusu. Belirlenimci girdiler yerel araçlarla hemen yanıtlanır.
+"İstanbul Kadıköy Caferağa 123 ada 45 parsel" ya da koordinat yüklüyse seçilir; değilse sorgu atılmaz, metin
+`GET /api/idari/coz` ile çözülüp soldaki kutulara aktarılır ve kullanıcı kontrol edip Sorgula'ya basar (mahalle
+adı birden çok mahalleye uyarsa il ve ilçe dolu gelir, mahalle listeden seçilir). "satış harcı 3.000.000 TL",
+"koridor 16 m", "önalım" gibi konu adları da burada yanıtlanır. Eşleşmeyen metin, Claude'a yapıştırılacak bir komuta dönüşür
 ("ArthurLegal'de sor: … (tkgm_ref: …)") ve Kopyala düğmesiyle alınır. Claude cevabı `arayuze_yaz` ile
 teslim eder, cevap Cevaplar listesine düşer. Bunun için Claude Desktop'ta yerel tkgm-mcp gerekir: paylaşılan
 uç kullanıcının diskine yazamaz. O durumda cevap elle yapıştırılıp kaydedilir. Arayüz modele doğrudan

@@ -50,7 +50,7 @@ from email.utils import parsedate_to_datetime
 from http.client import HTTPException
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-SURUM = "0.5.0"      # server.py __version__ ile aynı tutulur (test denetler)
+SURUM = "0.5.1"      # server.py __version__ ile aynı tutulur (test denetler)
 MANIFESTO = "https://github.com/beerbottle90/arthurlegal-mcp/blob/master/tkgm-mcp/docs/MANIFESTO.md"
 ILETISIM = "https://www.linkedin.com/in/ertug-demir-arthurlegal/"
 
@@ -1014,7 +1014,7 @@ def metin_coz(metin: Any, son: Optional[float] = None, ada: Any = None,
         try:
             mah_k = eslestir(" ".join(kalan), mahalleler, "mahalle")   # Belirsiz/Bulunamadi önerileriyle
         except Belirsiz as exc:
-            exc.ek = {"ada": ada, "parsel": parsel}
+            exc.ek = {"ada": ada, "parsel": parsel, "il": il_k, "ilce": ilce_k}   # arayüz kutucukları doldurur
             raise
     return {"il": il_k, "ilce": ilce_k, "mahalle": mah_k, "ada": ada, "parsel": parsel}
 

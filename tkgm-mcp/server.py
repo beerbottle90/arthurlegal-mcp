@@ -40,7 +40,7 @@ from tkgm_aktar import BICIMLER, aktar
 from tkgm_analiz import olc, tr_bicim
 from tkgm_kroki import ciz
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 canli.SURUM = __version__
 
 PARSEL_SORGU = "https://parselsorgu.tkgm.gov.tr/"

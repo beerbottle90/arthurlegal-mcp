@@ -26,6 +26,10 @@ section{display:flex;flex-direction:column;min-width:0;min-height:0}
 .adim a,.bag{color:var(--altin2)}
 .canli{margin-bottom:16px}.canli b{color:var(--altin2);display:block;font-size:15px;margin-bottom:6px}
 .canli .dugmeler{margin-top:6px}.veya{font-size:12px;color:var(--soluk);text-align:center;margin:0 0 10px}
+.canli label{margin:6px 0 2px}.zorunlu{color:var(--kirmizi)}.ikili{display:flex;gap:8px}.ikili>div{flex:1;min-width:0}
+select:disabled,input:disabled{opacity:.55}.gecersiz{border-color:var(--kirmizi)!important}
+.koordinat{margin-top:10px;font-size:12px;color:var(--soluk)}.koordinat summary{cursor:pointer}
+#f-uyari{margin-top:6px;min-height:18px}
 .liste{margin-top:16px;display:flex;flex-direction:column;gap:6px}
 .pk{background:var(--panel);border:1px solid transparent;border-radius:8px;padding:8px 10px;cursor:pointer}
 .pk.secili{border-color:var(--altin);background:var(--panel2)}
@@ -66,16 +70,33 @@ footer{padding:6px 20px;font-size:11px;color:var(--soluk);background:var(--laciv
 </header>
 <main>
 <aside>
-  <div class="canli"><b>TKGM'den getir</b>
-    <input id="canli-metin" placeholder="İstanbul Kadıköy Caferağa 123 ada 45 parsel">
-    <div class="dugmeler"><button class="d" id="canli-dugme">Getir</button></div>
+  <div class="canli" id="f"><b>TKGM'den getir</b>
+    <label for="f-il">İl <span class="zorunlu">*</span></label>
+    <select id="f-il"><option value="">İl listesi için tıklayın</option></select>
+    <label for="f-ilce">İlçe <span class="zorunlu">*</span></label>
+    <select id="f-ilce" disabled><option value="">Önce il seçin</option></select>
+    <label for="f-mahalle">Mahalle / köy <span class="zorunlu">*</span></label>
+    <select id="f-mahalle" disabled><option value="">Önce ilçe seçin</option></select>
+    <div class="ikili">
+      <div><label for="f-ada">Ada <span class="zorunlu">*</span></label><input id="f-ada" inputmode="numeric" maxlength="6" placeholder="köyde 0" autocomplete="off"></div>
+      <div><label for="f-parsel">Parsel <span class="zorunlu">*</span></label><input id="f-parsel" inputmode="numeric" maxlength="6" autocomplete="off"></div>
+    </div>
+    <div class="kucuk" id="f-uyari" aria-live="polite"></div>
+    <div class="dugmeler"><button class="d" id="f-sorgula" type="button" disabled>Sorgula</button><button class="d ikincil" id="f-temizle" type="button">Temizle</button></div>
     <div id="canli-sonuc"></div>
+    <details class="koordinat"><summary>Koordinatla getir</summary>
+      <div class="ikili">
+        <div><label for="f-enlem">Enlem</label><input id="f-enlem" inputmode="decimal" maxlength="12" placeholder="39.9115" autocomplete="off"></div>
+        <div><label for="f-boylam">Boylam</label><input id="f-boylam" inputmode="decimal" maxlength="12" placeholder="32.8506" autocomplete="off"></div>
+      </div>
+      <div class="dugmeler"><button class="d ikincil" id="f-konum" type="button" disabled>Noktadaki parseli getir</button></div>
+    </details>
   </div>
   <div class="veya">ya da dosyayla</div>
   <div class="birak" id="birak"><b>Parsel dosyasını bırakın</b>GeoJSON / KML — ya da tıklayıp seçin<input type="file" id="dosya" accept=".json,.geojson,.kml" multiple hidden></div>
   <ol class="adim">
-    <li>İl, ilçe, mahalle ile ada ve parsel yazın ya da bir koordinat girin (40.98765, 29.02345).</li>
-    <li>İlk sorguda bir onay kartı çıkar; parsel bilgisi TKGM Parsel Sorgu'nun herkese açık verisinden gelir.</li>
+    <li>İl, ilçe ve mahalleyi TKGM'nin kendi listesinden seçin; ada ve parseli yalnız rakamla yazın (köy parsellerinde ada 0). Sorgula, bütün alanlar geçerli olunca açılır.</li>
+    <li>İlk canlı istekte bir onay kartı çıkar; parsel bilgisi TKGM Parsel Sorgu'nun herkese açık verisinden gelir. Gelen kayıt istenenle karşılaştırılır, fark varsa uyarı çıkar.</li>
     <li>Elinizde <a href="https://parselsorgu.tkgm.gov.tr/" target="_blank" rel="noopener">Parsel Sorgu</a>'dan indirilmiş GeoJSON/KML varsa yukarıya bırakın.</li>
   </ol>
   <div class="liste" id="liste"></div>
@@ -145,35 +166,137 @@ async function yukle(dosyalar) {
   }
   listeCiz(); ciz(aktif());
 }
-/* ---------- TKGM'den canlı getirme (sohbetteki parsel_sorgula ile aynı araç) ---------- */
-async function canliGetir(metin, ek = {}) {
-  const args = Object.assign({ metin, onay: durum.canliOnay || undefined }, ek);
-  let s = await cagir("parsel_sorgula", args);
-  if (s.onay_gerekli) {
-    if (!confirm(s.kart)) return { mesaj: "Canlı sorgu yapılmadı. Parsel dosyasını soldaki alana bırakabilirsiniz." };
-    durum.canliOnay = true;
-    s = await cagir("parsel_sorgula", Object.assign(args, { onay: true }));
-  }
-  if (s.belirsiz) return { belirsiz: s };
+/* ---------- TKGM'den getir: yapılandırılmış form ----------
+   İl, ilçe ve mahalle adı yazılmaz, TKGM'nin kendi listesinden seçilir; ada ve parsel yalnız rakamdır.
+   Sorgu mahalle kimliğiyle gider (ad eşleştirmesi yok) ve gelen kayıt istenenle karşılaştırılır. */
+const F = id => $("#f-" + id);
+const alS = async (yol, p = {}) => (await fetch(yol + "?" + new URLSearchParams(Object.assign({ t: T }, p)))).json();
+const katla = s => String(s || "").toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ı/g, "i")
+  .replace(/\s+(mahallesi|mah\.?|koyu)$/, "").trim();
+const sonucKutusu = (...d) => $("#canli-sonuc").replaceChildren(...d);
+async function canliIzin() {            // sohbet başına tek onay kartının arayüzdeki karşılığı: sekme başına bir kez
+  if (durum.canliOnay) return true;
+  const j = await alS("/api/idari");
+  if (!j.ok) throw new Error(j.hata);
+  if (j.onay_gerekli && !confirm(j.kart)) return false;
+  if (j.liste) durum.iller = j.liste;
+  durum.canliOnay = true; return true;
+}
+async function idariListe(p) { const j = await alS("/api/idari", Object.assign({ onay: 1 }, p)); if (!j.ok) throw new Error(j.hata); return j.liste; }
+function secenekler(sec, liste, bos) {
+  sec.replaceChildren(el("option", { value: "" }, bos), ...liste.map(k => el("option", { value: String(k.id) }, k.ad)));
+  sec.disabled = !liste.length;
+}
+async function illeriYukle() {
+  if (F("il").options.length > 1) return true;
+  if (!(await canliIzin())) return false;
+  sonucKutusu(el("div", { class: "kucuk" }, "İl listesi TKGM'den alınıyor…"));
+  durum.iller = durum.iller || await idariListe({});
+  secenekler(F("il"), durum.iller, "İl seçin"); sonucKutusu(); return true;
+}
+async function ilceleriYukle(ilId) {
+  secenekler(F("ilce"), [], "Önce il seçin"); secenekler(F("mahalle"), [], "Önce ilçe seçin");
+  if (ilId) secenekler(F("ilce"), await idariListe({ il: ilId }), "İlçe seçin");
+}
+async function mahalleleriYukle(ilceId) {
+  secenekler(F("mahalle"), [], "Önce ilçe seçin");
+  if (ilceId) secenekler(F("mahalle"), await idariListe({ ilce: ilceId }), "Mahalle / köy seçin");
+}
+const rakam = inp => { const v = inp.value.replace(/\D/g, "").slice(0, 6); if (v !== inp.value) inp.value = v; return v; };
+const secilen = sec => sec.value ? sec.selectedOptions[0].textContent : "";
+function denetle() {                    // otokontrol: eksik ya da geçersiz alan varken Sorgula kapalı
+  const ada = rakam(F("ada")), parsel = rakam(F("parsel")), eksik = [];
+  if (!F("il").value) eksik.push("il");
+  if (!F("ilce").value) eksik.push("ilçe");
+  if (!F("mahalle").value) eksik.push("mahalle/köy");
+  if (ada === "") eksik.push("ada (köyde 0)");
+  if (parsel === "") eksik.push("parsel");
+  else if (Number(parsel) < 1) eksik.push("parsel 0 olamaz");
+  F("parsel").classList.toggle("gecersiz", parsel !== "" && Number(parsel) < 1);
+  F("sorgula").disabled = eksik.length > 0;
+  F("uyari").textContent = eksik.length ? "Eksik: " + eksik.join(", ")
+    : "Sorgulanacak: " + [secilen(F("il")), secilen(F("ilce")), secilen(F("mahalle"))].join(" / ") + " · " + Number(ada) + " ada " + Number(parsel) + " parsel";
+  return !eksik.length;
+}
+function koordinatDenetle() {
+  const sayi = x => Number(String(x).replace(",", ".").trim());
+  const e = sayi(F("enlem").value), b = sayi(F("boylam").value);
+  const dolu = F("enlem").value.trim() !== "" && F("boylam").value.trim() !== "";
+  const gecerli = dolu && e >= 35 && e <= 43 && b >= 25 && b <= 45.5;
+  F("konum").disabled = !gecerli;
+  [F("enlem"), F("boylam")].forEach(i => i.classList.toggle("gecersiz", dolu && !gecerli));
+  return gecerli ? { enlem: e, boylam: b } : null;
+}
+function sonucuIsle(s, beklenen) {
   const kayit = Object.assign({}, s, { alan_m2: s.hesap_alani_m2, dosyadaki_alan_m2: s.tapu_alani_m2 });
   if (!durum.parseller.some(x => x.ref === kayit.ref)) durum.parseller.push(kayit);
   durum.secili = kayit.ref; listeCiz();
-  return { kayit, s };
+  const uyarilar = [];
+  if (beklenen) {                        // otokontrol: TKGM'nin döndürdüğü kayıt istenen kayıt mı
+    if (String(s.ada) !== String(beklenen.ada) || String(s.parsel_no) !== String(beklenen.parsel))
+      uyarilar.push("TKGM başka bir ada/parsel döndürdü: " + s.ada + "/" + s.parsel_no + " (istenen " + beklenen.ada + "/" + beklenen.parsel + ").");
+    if (s.mahalle && katla(s.mahalle) !== katla(beklenen.mahalle))
+      uyarilar.push("Mahalle farklı: seçilen " + beklenen.mahalle + ", kayıtta " + s.mahalle + ".");
+  }
+  if (s.durum && !/aktif/i.test(s.durum)) uyarilar.push("Parsel durumu: " + s.durum + ".");
+  if (s.gittigi_parseller) uyarilar.push("Gittiği parseller: " + s.gittigi_parseller + (s.gittigi_sebep ? " (" + s.gittigi_sebep + ")" : "") + ".");
+  sonucKutusu(el("div", { class: "kucuk" }, s.parsel + " · " + s.kaynak), ...uyarilar.map(u => el("div", { class: "uyari hata" }, u)));
+  sekmeAc("ozet");
 }
-const adayKutusu = (b, sec) => el("div", { class: "uyari" }, "'" + b.aranan + "' için birden çok " + b.belirsiz + " var" + (b.belirsiz === "mahalle" ? "; seçin: " : ". İl ve ilçeyi tam yazın: "),
-  ...(b.belirsiz === "mahalle" ? b.adaylar.map(a => el("button", { class: "d ikincil", style: "margin:4px 4px 0 0", onclick: () => sec(a) }, a.ad)) : [b.adaylar.map(a => a.ad).join(", ")]));
-async function canliFormu(ek = {}) {
-  const metin = $("#canli-metin").value.trim(), kutu = $("#canli-sonuc");
-  if (!metin && !ek.mahalle_id) return;
-  kutu.replaceChildren(el("div", { class: "kucuk" }, "TKGM'ye soruluyor…"));
-  try { const y = await canliGetir(metin, ek);
-    if (y.belirsiz) return kutu.replaceChildren(adayKutusu(y.belirsiz, a => canliFormu({ mahalle_id: a.id, ada: y.belirsiz.ada, parsel: y.belirsiz.parsel })));
-    if (y.mesaj) return kutu.replaceChildren(el("div", { class: "kucuk" }, y.mesaj));
-    kutu.replaceChildren(el("div", { class: "kucuk" }, y.s.kaynak)); sekmeAc("ozet");
-  } catch (e) { kutu.replaceChildren(hataKutusu(e)); }
+const hataGoster = e => sonucKutusu(hataKutusu(e));
+F("il").addEventListener("mousedown", e => { if (F("il").options.length > 1) return; e.preventDefault();
+  illeriYukle().then(tamam => { if (tamam) { F("il").focus(); try { F("il").showPicker(); } catch (x) { } } }).catch(hataGoster); });
+F("il").addEventListener("keydown", e => { if (F("il").options.length <= 1) illeriYukle().catch(hataGoster); });
+F("il").addEventListener("change", () => ilceleriYukle(F("il").value).catch(hataGoster).finally(denetle));
+F("ilce").addEventListener("change", () => mahalleleriYukle(F("ilce").value).catch(hataGoster).finally(denetle));
+F("mahalle").addEventListener("change", denetle);
+["ada", "parsel"].forEach(k => {
+  F(k).addEventListener("input", denetle);
+  F(k).addEventListener("keydown", e => { if (e.key === "Enter" && !F("sorgula").disabled) F("sorgula").click(); });
+});
+F("sorgula").addEventListener("click", e => mesgul(e.target, async () => {
+  if (!denetle()) return;
+  const beklenen = { ada: Number(rakam(F("ada"))), parsel: Number(rakam(F("parsel"))), mahalle: secilen(F("mahalle")) };
+  try {
+    if (!(await canliIzin())) return;
+    sonucKutusu(el("div", { class: "kucuk" }, "TKGM'ye soruluyor…"));
+    const s = await cagir("parsel_sorgula", { mahalle_id: Number(F("mahalle").value), ada: beklenen.ada, parsel: beklenen.parsel, onay: true });
+    sonucuIsle(s, beklenen);
+  } catch (x) { hataGoster(x); }
+}));
+F("temizle").addEventListener("click", () => {
+  F("il").value = ""; secenekler(F("ilce"), [], "Önce il seçin"); secenekler(F("mahalle"), [], "Önce ilçe seçin");
+  F("ada").value = F("parsel").value = ""; sonucKutusu(); denetle(); });
+["enlem", "boylam"].forEach(k => F(k).addEventListener("input", koordinatDenetle));
+F("konum").addEventListener("click", e => mesgul(e.target, async () => {
+  const k = koordinatDenetle(); if (!k) return;
+  try {
+    if (!(await canliIzin())) return;
+    sonucuIsle(await cagir("konumdan_parsel", Object.assign(k, { onay: true })), null);
+  } catch (x) { hataGoster(x); }
+}));
+async function formaAktar(metin) {      // Sor sekmesi: serbest metin sorgu atmaz, kutucukları doldurur
+  if (!(await canliIzin())) return { mesaj: "Canlı sorgu için onay verilmedi." };
+  const c = await alS("/api/idari/coz", { metin, onay: 1 });
+  if (!c.ok) throw new Error(c.hata);
+  if (c.enlem != null) {
+    F("enlem").value = c.enlem; F("boylam").value = c.boylam; $(".koordinat").open = true; koordinatDenetle(); F("konum").focus();
+    return { mesaj: "Koordinat soldaki kutucuklara aktarıldı; kontrol edip 'Noktadaki parseli getir'e basın." };
+  }
+  const k = c.belirsiz || c;
+  await illeriYukle();
+  if (k.il) { F("il").value = String(k.il.id); await ilceleriYukle(k.il.id); }
+  if (k.ilce) { F("ilce").value = String(k.ilce.id); await mahalleleriYukle(k.ilce.id); }
+  if (k.mahalle) F("mahalle").value = String(k.mahalle.id);
+  if (k.ada != null) F("ada").value = k.ada;
+  if (k.parsel != null) F("parsel").value = k.parsel;
+  denetle();
+  if (c.belirsiz) { F("mahalle").focus();
+    return { mesaj: "'" + c.belirsiz.aranan + "' birden çok " + c.belirsiz.belirsiz + " ile eşleşti (" + c.belirsiz.adaylar.map(a => a.ad).join(", ") + "). Soldaki listeden seçip Sorgula'ya basın." }; }
+  F("sorgula").focus();
+  return { mesaj: "Soldaki kutucuklara aktarıldı: " + F("uyari").textContent.replace(/^Sorgulanacak: /, "") + ". Kontrol edip Sorgula'ya basın." };
 }
-$("#canli-dugme").addEventListener("click", e => mesgul(e.target, () => canliFormu()));
-$("#canli-metin").addEventListener("keydown", e => { if (e.key === "Enter") canliFormu(); });
+denetle(); koordinatDenetle();
 function listeCiz() {
   const l = $("#liste"); l.replaceChildren();
   for (const p of durum.parseller) l.append(el("div", { class: "pk" + (p.ref === durum.secili ? " secili" : ""), onclick: () => { durum.secili = p.ref; listeCiz(); ciz(aktif()); } },
@@ -298,10 +421,7 @@ async function yonlendir(metin) {
   const koordinat = /(\d{2}[.,]\d{3,})\s*[,;/ ]\s*(\d{2}[.,]\d{3,})/.test(k);
   if (ap || koordinat) { const et = ap ? ap[1] + "/" + ap[2] : "", p = ap && durum.parseller.find(x => x.parsel === et || x.parsel.endsWith(" " + et));
     if (p) { durum.secili = p.ref; listeCiz(); return { mesaj: et + " seçildi; Özet sekmesi açılıyor.", sekme: "ozet" }; }
-    try { const y = await canliGetir(metin);
-      if (y.belirsiz) return { dugum: adayKutusu(y.belirsiz, async a => { try { const z = await canliGetir(metin, { mahalle_id: a.id, ada: y.belirsiz.ada, parsel: y.belirsiz.parsel }); if (z.kayit) sekmeAc("ozet"); } catch (e) { alert(e.message); } }) };
-      if (y.mesaj) return { mesaj: y.mesaj };
-      return { mesaj: y.s.parsel + " getirildi (" + y.s.kaynak + "); Özet sekmesi açılıyor.", sekme: "ozet" };
+    try { return await formaAktar(metin);
     } catch (e) {
       // Yer adı yoksa canlı sorgu olmaz; metin harç/koridor/konu yönlendirmesine devam eder.
       if (!/İl adı bulunamadı|ada\/parsel bulunamadı/.test(e.message)) throw e;
@@ -328,7 +448,7 @@ function komut(metin) {
   return c + "\nCevabını sohbette ver ve arayuze_yaz aracıyla (birleşik uçta tkgm_arayuze_yaz) arayüze de gönder.";
 }
 cizici.sor = async kap => {
-  const giris = el("textarea", { placeholder: "Sorunuzu yazın: \"İstanbul Kadıköy Caferağa 123 ada 45 parsel\" (TKGM'den getirir), \"satış harcı 3.000.000 TL\", \"koridor 16 m\", \"önalım\" gibi girdiler burada yanıtlanır; gerisi Claude'a yapıştıracağınız bir komut olur.", style: "min-height:90px" });
+  const giris = el("textarea", { placeholder: "Sorunuzu yazın: \"İstanbul Kadıköy Caferağa 123 ada 45 parsel\" (soldaki kutucuklara aktarır, siz onaylarsınız), \"satış harcı 3.000.000 TL\", \"koridor 16 m\", \"önalım\" gibi girdiler burada yanıtlanır; gerisi Claude'a yapıştıracağınız bir komut olur.", style: "min-height:90px" });
   const sonuc = el("div"), liste = el("div"), el_cevap = el("textarea", { placeholder: "Claude'un cevabını buraya yapıştırıp kaydedebilirsiniz (yerel tkgm-mcp yoksa).", style: "min-height:60px" });
   const gonder = async () => { const metin = giris.value.trim(); if (!metin) return;
     try { const y = await yonlendir(metin);
