@@ -89,6 +89,15 @@ def test_talimat_madde_atfi_kurali_basta():
     assert "madde_no" in server.INSTRUCTIONS[:600]
 
 
+def test_cekilemeyen_madde_acik_uyari_ve_baglanti():
+    """Çekilemeyen madde köşeli etiketle değil, açık uyarı satırıyla ve resmî bağlantıyla işaretlenir."""
+    import server
+    uyari = "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/"
+    assert uyari in server.INSTRUCTIONS[:700]     # istemci talimatı kısaltsa da ilk paragrafta görünür
+    assert "\"doğrulanmadı\" diye işaretleyin" not in server.INSTRUCTIONS
+    assert uyari in mv.DOGRULANMADI               # araç hata mesajı da aynı satırı söyler
+
+
 if __name__ == "__main__":
     ok = 0
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

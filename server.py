@@ -46,7 +46,7 @@ from typing import Any, Callable, Dict, List, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcpcore import McpError, Tool, run  # noqa: E402
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Deployed bundle: every backend sits next to this file.
@@ -334,7 +334,9 @@ def build() -> None:
     ))
 
 
-INSTRUCTIONS_HEADER = """MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın, "doğrulanmadı" diye işaretleyin.
+INSTRUCTIONS_HEADER = """MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın; açıkça "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/" yazın.
+
+CANLI VERİ: Araç veri getiremezse (hata, `unavailable`, `upstream_blocked`, onay yok) hafızadan doldurmayın; aynı UYARI satırını aracın `source_url`'si ya da kaynağın resmî giriş sayfasıyla yazın; bağlantı uydurulmaz, "[doğrulayın]" etiketi kullanılmaz.
 
 ArthurLegal — 15 yargı çevresi tek uçta.
 
@@ -351,14 +353,12 @@ koordinat ya da yer adı; dosya İSTEMEYİN), rapor, ölçü, kroki; ilk canlı 
 TÜRKİYE İÇİN GİRİŞ NOKTASI: karmaşık Türk hukuku sorusunda önce `tr_hukuk_arastirma_rehberi`
 (hangi soru için hangi araç), sonra `tr_kurum_listesi` (8 kurumun filtreleri).
 
-Bu kozmetik değil: alttaki sunucularda `get_act` beş ayrı şey, `search_legislation`
-üç ayrı şey demek. Önek, İspanyol hukuku sorusunun Fin mevzuatıyla
-cevaplanmasını engelleyen şeydir.
+Bu kozmetik değil: `get_act` alttaki sunucularda beş ayrı şeydir; önek, İspanyol
+sorusunun Fin mevzuatıyla cevaplanmasını engeller.
 
-DURUM. `status` aracı hepsinin sağlığını tek seferde verir — hangi yargı çevresi
-yüklendi, kaç belge indeksli, hangi aralık tarandı, semantik arama açık mı.
-Sonuçlar ince göründüğünde **önce onu çağır**: yüklenememiş bir yargı çevresi ile
-gerçekten boş bir sonuç kümesi farklı şeylerdir.
+DURUM. Sonuçlar ince görünürse **önce `status`** (yüklenen yargı çevreleri, indeks, taranan
+aralık, semantik arama): yüklenememiş bir yargı çevresi ile gerçekten boş bir sonuç kümesi
+farklı şeylerdir.
 
 Aşağıda her yargı çevresinin kendi kuralları var. Bunlar tavsiye değil, o
 hukukun doğru alıntılanması için gereken disiplinlerdir.

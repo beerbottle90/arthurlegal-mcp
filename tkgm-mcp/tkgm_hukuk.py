@@ -326,7 +326,7 @@ TEYIT: Dict[str, str] = {
     "yabanci_edinim": "%s: %s — 2644 m. 35, 36; 2565 m. 9/b, 28, 29" % (TEYIT_TARIHI, _TEYIT_ORTAK),
     "tapu_sicili_inceleme": "%s: %s — TMK 1020; 6698 m. 5, 8" % (TEYIT_TARIHI, _TEYIT_ORTAK),
 }
-TEYIT_YOK = "YOK — adresler ezberden; alıntıdan önce doğrulayın"
+TEYIT_YOK = "YOK — adresler ezberden. UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/"
 
 
 # Teyit günü her maddenin resmî metninde görülen değişiklik izleri: satır içi notlar

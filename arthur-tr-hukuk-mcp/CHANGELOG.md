@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — 2026-09-27
+
+- Talimat: çekilemeyen madde ve erişilemeyen kaynak için "doğrulanmadı" işareti yerine açıkça `UYARI: veri çekilemedi, teyidiniz gerekli: <bağlantı>` (madde için https://www.mevzuat.gov.tr/). ArthurLegal paketlerindeki (1.10.1) canlı veri uyarısıyla aynı biçim; bağlantı aracın `source_url`'si ya da resmî giriş sayfasıdır, uydurulmaz.
+- Talimata TEYİT BAĞLANTISI listesi: mevzuat, Resmî Gazete, Yargıtay, Danıştay, BAM ve yerel mahkeme, AYM, Uyuşmazlık Mahkemesi ve sekiz kurumun resmî giriş sayfaları.
+- Madde getirilemediğinde araç mesajı (`DOGRULANMADI`) ve `ok=false` notu aynı uyarı satırını söyler.
+
 ## Ad — 2026-09-23
 
 - Depo ve klasör adı `ArthurLegalTR` → `arthur-tr-hukuk-mcp`: ArthurLegal paket deposuyla karışıyordu.

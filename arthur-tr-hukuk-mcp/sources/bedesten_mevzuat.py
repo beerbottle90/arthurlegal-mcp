@@ -129,7 +129,8 @@ SURE_S = float(os.environ.get("MEVZUAT_MADDE_DEADLINE_S", "75"))   # istemci ~10
 _ASGARI_KALAN_S = 8.0            # bundan az süre kaldıysa yeni istek açılmaz
 TTL_METIN = float(os.environ.get("MEVZUAT_TEXT_TTL_S", str(6 * 3600)))
 TTL_KUNYE = float(os.environ.get("MEVZUAT_META_TTL_S", str(24 * 3600)))
-DOGRULANMADI = "Madde doğrulanamadı — metni görmeden atıf yapmayın."
+DOGRULANMADI = ("Madde doğrulanamadı — metni görmeden atıf yapmayın; atıf gerekiyorsa yanına açıkça "
+                "\"UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/\" yazın.")
 KOMSU_UYARI = "EN YAKIN MADDEYİ ATIF OLARAK KULLANMAYIN."
 
 
@@ -1803,7 +1804,8 @@ def article(args: Dict[str, Any]) -> Dict[str, Any]:
                "requests": butce.istek, "items": items,
                "note": ("Her maddenin citation alanını BİREBİR kullanın ve maddeye yüklediğiniz içeriğin "
                         "(hakkın sahibi, şart, süre, sonuç) heading ve text ile örtüştüğünü kontrol edin. "
-                        "ok=false olan madde DOĞRULANMADI: ezberden yazmayın.")}
+                        "ok=false olan madde DOĞRULANMADI: ezberden yazmayın; yanına açıkça "
+                        "\"UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/\" yazın.")}
         if not tamam:
             out["incomplete_note"] = ("Bazı maddeler getirilemedi (items[].error_code). retry=true olanları "
                                       "birkaç saniye sonra yalnız onlarla yineleyin.")

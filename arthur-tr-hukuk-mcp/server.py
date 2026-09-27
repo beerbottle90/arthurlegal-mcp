@@ -48,7 +48,7 @@ import sources  # noqa: E402
 from sources import bedesten_ictihat, bedesten_mevzuat, anayasa, uyusmazlik, resmi_gazete, spk  # noqa: E402
 from textx import HAS_PYPDF  # noqa: E402
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 INDEX_PATH = os.environ.get("INDEX_PATH") or os.path.join(HERE, "data", "index.db")
 
 _index: Optional[retrieval.Index] = None
@@ -282,7 +282,8 @@ ALINTI DİSİPLİNİ
    source_url olmayan belgeler (madde metni) için URL uydurmayın; belge adı + madde numarası ile atıf yapın.
    Özelge bağlayıcı değildir. Rekabet/EPDK/BDDK kararlarının RG'de yayımlandığını fihristle teyit edin.
    Madde atfı: yazılan her kanun maddesi (sözleşme ve dilekçe gövdesi dâhil) tr_mevzuat_madde_getir ile çekilir;
-   başlık ve metin, maddeye yüklenen içerikle karşılaştırılır. Çekilemeyen madde ezberden yazılmaz.
+   başlık ve metin, maddeye yüklenen içerikle karşılaştırılır. Çekilemeyen madde ezberden yazılmaz; yerine
+   "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/" yazılır.
    Bedesten hız sınırı: 10 istek / 30 sn; aynı turda 5'ten fazla çağrı göndermeyin, bu bir tempo kuralıdır, doğrulanacak madde sayısına sınır değildir; 429 alınca birkaç saniye bekleyin.
 """
 
@@ -400,7 +401,7 @@ def build_tools() -> List[Tool]:
     return tools
 
 
-INSTRUCTIONS = """MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın, "doğrulanmadı" diye işaretleyin.
+INSTRUCTIONS = """MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın; yerine açıkça "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/" yazın.
 
 arthur-tr-hukuk-mcp — Türk hukuku araştırma sunucusu (içtihat + mevzuat + 8 düzenleyici kurum + semantik arama).
 
@@ -412,7 +413,16 @@ reCAPTCHA, DNS). Bu kurumlar sorulursa bunu söyleyin; sonuç uydurmayın.
 
 İLK ÇAĞRI. Karmaşık soruda önce `hukuk_arastirma_rehberi`; sonuçlar ince göründüğünde `status`. Yüklenememiş
 kaynak ERİŞİLEMEZ demektir, "karar yok" demek değildir. `unavailable: true` veya `upstream_blocked: true`
-taşıyan yanıtı boş sonuç gibi yorumlamayın.
+taşıyan yanıtı boş sonuç gibi yorumlamayın; bilginin ardından "UYARI: veri çekilemedi, teyidiniz gerekli: <bağlantı>" yazın.
+
+TEYİT BAĞLANTISI. Araç o belge için `source_url` döndürdüyse o adres; döndürmediyse kaynağın resmî giriş sayfası:
+mevzuat https://www.mevzuat.gov.tr/ · Resmî Gazete https://www.resmigazete.gov.tr/ · Yargıtay
+https://karararama.yargitay.gov.tr/ · Danıştay https://karararama.danistay.gov.tr/ · BAM ve yerel mahkeme
+https://emsal.uyap.gov.tr/ · AYM https://kararlarbilgibankasi.anayasa.gov.tr/ (norm denetimi
+https://normkararlarbilgibankasi.anayasa.gov.tr/) · Uyuşmazlık https://www.uyusmazlik.gov.tr/ · Rekabet
+https://www.rekabet.gov.tr/ · EPDK https://www.epdk.gov.tr/ · SPK https://www.spk.gov.tr/ · BDDK
+https://www.bddk.org.tr/ · KVKK https://www.kvkk.gov.tr/ · BTK https://www.btk.gov.tr/ · GİB https://www.gib.gov.tr/ ·
+Sigorta Tahkim https://www.sigortatahkim.org.tr/. Derin bağlantı tahminle kurulmaz; "[doğrulayın]" türü etiket kullanılmaz.
 
 ALINTI. Her sonuçtaki `citation` alanı birebir kullanılır; esas/karar numarası, tarih ve RG künyesi ezberden
 yazılmaz. `source_url` olmayan belgeler için URL uydurulmaz. Özelge bağlayıcı değildir. Karar listeleri metin

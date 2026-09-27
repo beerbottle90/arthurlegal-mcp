@@ -50,7 +50,7 @@ from email.utils import parsedate_to_datetime
 from http.client import HTTPException
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-SURUM = "0.5.1"      # server.py __version__ ile aynı tutulur (test denetler)
+SURUM = "0.5.2"      # server.py __version__ ile aynı tutulur (test denetler)
 MANIFESTO = "https://github.com/beerbottle90/arthurlegal-mcp/blob/master/tkgm-mcp/docs/MANIFESTO.md"
 ILETISIM = "https://www.linkedin.com/in/ertug-demir-arthurlegal/"
 

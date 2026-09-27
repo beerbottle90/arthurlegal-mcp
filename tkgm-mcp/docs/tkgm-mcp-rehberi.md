@@ -121,7 +121,8 @@ döndürdüğü `dayanak`, `alinti` ve `matrah_kurali` alanlarını da aktar; ta
 - **3D arazi 30 m'lik yüzey modelidir (DSM):** bina ve ağaç yüksekliklerini içerir; küçük kent
   parsellerinde eğim kabadır. Keşif ve harita mühendisi ölçüsünün yerini tutmaz.
 - **`dayanak_koprusu` adres verir, metin vermez.** Madde metnini `tr_mevzuat_*` ile çekmeden
-  alıntılama; yanıttaki `teyit` alanı "YOK" diyorsa adres ezberdendir, önce doğrula. Bu kural
+  alıntılama; yanıttaki `teyit` alanı "YOK" diyorsa adres ezberdendir: önce doğrula, doğrulanamadıysa yanına
+  açıkça "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/" yaz. Bu kural
   süs değildir: modülün ilk taslağı 5403 m. 8/İ'deki sınırdaş önalım fıkrasını yürürlükte
   sanıyordu (7255 s. K. ile 2020'de kaldırıldı); TMK 733 de 24.12.2025'te değişti (7571 s. K.
   m. 35: mutlak süre iki yıldan BİR yıla indi; 733/1'e 2886 s. K. satışları eklendi — cebrî artırma
