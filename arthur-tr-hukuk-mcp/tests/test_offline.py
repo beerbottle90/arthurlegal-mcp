@@ -60,6 +60,20 @@ def test_rekabet_list_parser():
     assert "27.11.2025" in r["citation"]
 
 
+def test_rekabet_unquoted_multiword_query_is_flagged():
+    # The Kurum's PdfText search matches words, not phrases: an unquoted multi-word query inflates `total`.
+    html = '<div class="yazi01">Toplam : 2737</div><div id="kararList"></div>'
+    original = rekabet._http.get_text
+    rekabet._http.get_text = lambda *a, **k: html
+    try:
+        assert "DİKKAT" in rekabet.search({"query": "karşı oy"})["note"]
+        assert "DİKKAT" not in rekabet.search({"query": '"karşı oy gerekçesi"'})["note"]
+        assert "DİKKAT" not in rekabet.search({"query": "oyçokluğu"})["note"]
+    finally:
+        rekabet._http.get_text = original
+    assert "kelime bazlıdır" in rekabet.SOURCE.notes
+
+
 def test_sigorta_split():
     txt = ("İÇİNDEKİLER\n15.06.2026 Tarih ve K-2026/1 Sayılı Hakem Kararı ....... 3\n" +
            "15.06.2026 Tarih ve K-2026/1 Sayılı Hakem Kararı\n" + "gövde " * 300 +

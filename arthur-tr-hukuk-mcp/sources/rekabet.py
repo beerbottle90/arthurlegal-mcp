@@ -87,8 +87,11 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
     except HttpError as exc:
         return {"error": str(exc)}
     out = _parse_list(html)
-    out.update({"query": q, "page": page, "page_size": 10,
-                "note": "Tam metin: kurum_karari_getir(kurum='rekabet', id=karar_id). PDF'ler uzun; sayfalanır."})
+    note = "Tam metin: kurum_karari_getir(kurum='rekabet', id=karar_id). PDF'ler uzun; sayfalanır."
+    if q and " " in q.strip('"') and not (q.startswith('"') and q.endswith('"')):
+        note += (" DİKKAT: tırnaksız çok kelimeli sorgu ifade araması değildir; Kurum kelimeleri ayrı ayrı eşler ve "
+                 "'total' ifadeyi içeren karar sayısı değildir. İfade için sorguyu tırnak içinde yazın.")
+    out.update({"query": q, "page": page, "page_size": 10, "note": note})
     return out
 
 
@@ -160,7 +163,9 @@ def _iso(d: str) -> str:
 SEARCH_SCHEMA = {
     "type": "object",
     "properties": {
-        "query": {"type": "string", "description": "Karar PDF metninde aranacak ifade"},
+        "query": {"type": "string", "description": ("Karar PDF metninde aranacak ifade. Çok kelimeli ifadeyi "
+                                                    "tırnak içinde yazın (\"karşı oy gerekçesi\"); tırnaksız sorgu "
+                                                    "kelimeleri ayrı ayrı eşler.")},
         "decision_type": {"type": "string", "enum": list(TYPES), "description": "Karar türü filtresi"},
         "decision_number": {"type": "string", "description": "Örn. 22-21/345-150"},
         "decision_date": {"type": "string", "description": "DD.MM.YYYY"},
@@ -175,7 +180,10 @@ GET_SCHEMA = {"type": "object", "properties": {"id": {"type": "string", "descrip
 
 SOURCE = Source(
     key="rekabet", label="Rekabet Kurumu — Kurul kararları", kind="kurum",
-    notes=("Liste sayfası 10 karar/sayfa; PdfText araması karar metninde yapılır. Karar PDF'leri "
+    notes=("Liste sayfası 10 karar/sayfa; PdfText araması karar metninde yapılır. Kurum araması kelime "
+           "bazlıdır: tırnaksız çok kelimeli sorgu ifade aramaz (29.09.2026 ölçümü: 'karşı oy' 2.737, "
+           "'farklı gerekçe' 5.222 karar; tırnaklı \"karşı oy gerekçesi\" 61). İfade için tırnak kullanın; "
+           "'total' bir ifadeyi içeren karar sayısı değildir, istatistik için kullanmayın. Karar PDF'leri "
            "büyük olabilir (birleşme kararları 100+ sayfa). Kılavuz ve tebliğler için mevzuat_ara. "
            "Yerel indeks Rekabet kararlarının YALNIZ BAŞLIĞINI taşır: semantik_ara(kurum='rekabet') gerekçede değil başlıkta "
            "arar; gerekçe için bu canlı aramayı kullanın."),
