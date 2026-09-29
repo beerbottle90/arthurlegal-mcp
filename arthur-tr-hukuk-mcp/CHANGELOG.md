@@ -1,5 +1,12 @@
 # Changelog
 
+## Yayımlanmamış
+
+- Rekabet: Kurum'un PdfText araması kelime bazlıdır; tırnaksız çok kelimeli sorgu ifade aramaz ve `total` şişer
+  (29.09.2026 ölçümü: 'karşı oy' 2.737, 'farklı gerekçe' 5.222 karar; tırnaklı "karşı oy gerekçesi" 61). Kaynak notu
+  ve `query` açıklaması bunu söyler; tırnaksız çok kelimeli sorgunun yanıt notuna DİKKAT satırı eklenir ("UYARI"
+  önekini kullanmaz: o, çekilemeyen veriye ayrılmıştır).
+
 ## 0.5.1 — 2026-09-27
 
 - Talimat: çekilemeyen madde ve erişilemeyen kaynak için "doğrulanmadı" işareti yerine açıkça `UYARI: veri çekilemedi, teyidiniz gerekli: <bağlantı>` (madde için https://www.mevzuat.gov.tr/). ArthurLegal paketlerindeki (1.10.1) canlı veri uyarısıyla aynı biçim; bağlantı aracın `source_url`'si ya da resmî giriş sayfasıdır, uydurulmaz.
