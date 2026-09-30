@@ -111,6 +111,24 @@ def test_index_roundtrip_and_search(tmp_path=None):
     assert idx.get("a")["citation"] == "EPDK, 1"
 
 
+def test_tirnakli_ifade_buyuk_harfli_basligi_da_bulur():
+    """Büyük harfli başlık "KARŞI OY GEREKÇESİ" unicode61'de "karsi", akan metin "karsı" olur."""
+    d = tempfile.mkdtemp()
+    idx = retrieval.Index(os.path.join(d, "t.db"))
+    idx.upsert({"ref": "r:1", "title": "A", "body": "KARŞI OY GEREKÇESİ\nKurul çoğunluğunun görüşüne katılmıyorum.",
+                "subject": "rekabet"})
+    idx.upsert({"ref": "r:2", "title": "B", "body": "Üyenin karşı oy gerekçesi ekte yer almaktadır.", "subject": "rekabet"})
+    idx.upsert({"ref": "r:3", "title": "C", "body": "Karşı taraf oy birliğiyle gerekçesini sundu.", "subject": "rekabet"})
+    idx.reindex_fts()
+    for q in ('"karşı oy gerekçesi"', '"KARŞI OY GEREKÇESİ"', '"Karşı Oy Gerekçesi"', '"karsi oy gerekcesi"'):
+        refs = {r["ref"] for r in idx.search(q, mode="lexical")["results"]}
+        assert refs == {"r:1", "r:2"}, (q, refs)
+    assert retrieval._fts_query('"rekabet kurulu"') == '"rekabet kurulu"'  # ı/i yoksa tek ifade
+    assert len(retrieval._phrase_variants("karşı oy gerekçesi")) == 4
+    uzun = retrieval._phrase_variants("idari para cezası verilmesine gerek olmadığına karar verildi")
+    assert len(uzun) <= 3, "beşten çok ı/i'li kelimede bileşim patlamasın"
+
+
 def test_server_stdio_lists_tools():
     msgs = [{"jsonrpc": "2.0", "id": 1, "method": "initialize",
              "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}},
@@ -334,6 +352,45 @@ def test_backfill_yalniz_basliktan_ibaret_govdeyi_doldurur():
     vek = {r[0] for r in idx.db.execute("SELECT doc_id FROM vecs")}
     assert ids["bddk:11"] not in vek, "metni değişen belgenin eski vektörü kalmamalı"
     assert ids["bddk:12"] in vek and ids["bddk:13"] in vek
+
+
+def test_pack_govdeyi_sona_alir_icerik_vektor_ve_arama_ayni_kalir():
+    """Dağıtım paketi: süzgeç sütunları uzun gövdeden önce; satırlar, id'ler, vektörler ve sonuçlar aynı."""
+    import sqlite3
+
+    import crawl
+    d = tempfile.mkdtemp()
+    idx = retrieval.Index(os.path.join(d, "t.db"))
+    idx.upsert({"ref": "rekabet:1", "title": "X A.Ş.'nin devralınması", "body": "Karşı oy gerekçesi. " * 3000,
+                "subject": "rekabet", "date": "2024-01-01", "citation": "Rekabet Kurulu, 1", "meta": {"k": "v"}})
+    idx.upsert({"ref": "epdk:1", "title": "Lisans iptali", "body": "EPDK lisans iptal kararı", "subject": "epdk",
+                "date": "2023-01-01", "citation": "EPDK, 1"})
+    for r in idx.db.execute("SELECT id FROM docs").fetchall():
+        idx.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?, ?, ?, ?)", (r["id"], 2, b"\x01" * 8, "m"))
+    idx.db.commit()
+    idx.reindex_fts()
+    once = [dict(r) for r in idx.db.execute("SELECT * FROM docs ORDER BY id")]
+    vek_once = idx.db.execute("SELECT * FROM vecs ORDER BY doc_id").fetchall()
+    arama_once = idx.search("karşı oy gerekçesi", mode="lexical", filters={"subject": "rekabet"})["results"]
+
+    ozet = crawl._pack(idx, lambda m: None)
+    cols = [r[1] for r in idx.db.execute("PRAGMA table_info(docs)")]
+    assert ozet["yeniden_kuruldu"] and cols[:3] == ["id", "subject", "date"] and cols[-1] == "body"
+    assert [dict(r) for r in idx.db.execute("SELECT * FROM docs ORDER BY id")] == once
+    assert idx.db.execute("SELECT * FROM vecs ORDER BY doc_id").fetchall() == vek_once
+    arama = idx.search("karşı oy gerekçesi", mode="lexical", filters={"subject": "rekabet"})["results"]
+    assert [r["ref"] for r in arama] == [r["ref"] for r in arama_once] == ["rekabet:1"]
+    try:
+        idx.db.execute("INSERT INTO docs(ref, title) VALUES('epdk:1', 'kopya')")
+        raise AssertionError("ref'in UNIQUE kısıtı paketlemede kayboldu")
+    except sqlite3.IntegrityError:
+        idx.db.rollback()
+    assert {r[0] for r in idx.db.execute("SELECT name FROM sqlite_master WHERE tbl_name='docs' AND type='index'")} \
+        >= {"docs_date", "docs_court"}
+    assert crawl._pack(idx, lambda m: None)["yeniden_kuruldu"] is False, "ikinci paketleme sırayı yeniden kurmaz"
+    idx.upsert({"ref": "epdk:2", "title": "Yeni karar", "body": "tarife onayı", "subject": "epdk"})
+    idx.reindex_fts()
+    assert idx.search("tarife", mode="lexical", filters={"subject": "epdk"})["results"][0]["ref"] == "epdk:2"
 
 
 # ---------------------------------------------------------------- mevzuat_ara(konu=…)

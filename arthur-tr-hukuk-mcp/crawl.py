@@ -8,6 +8,7 @@
     python crawl.py --embed-only            # vectorise whatever lacks a vector
     python crawl.py --only-new --source rekabet --pages 40   # tazeleme: yalnız yeni ref'ler
     python crawl.py --backfill-text --source bddk,btk        # gövdesi başlıktan ibaret belgelere tam metin
+    python crawl.py --pack                  # dağıtım öncesi: gövde sonda, FTS yeniden + optimize, VACUUM
 
 ``--only-new`` is the refresh mode. ``upsert`` REPLACES a document's body and
 DROPS its vector, so re-crawling a source that was first crawled with
@@ -30,6 +31,7 @@ can filter by regulator; the topic label each adapter chose goes into meta.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import sys
 import time
@@ -142,6 +144,83 @@ def _backfill(idx: "retrieval.Index", keys: List[str], limit: int, log) -> Dict[
     return ozet
 
 
+# Paketlenmiş dizinde süzgeç sütunları satırın başında, uzun gövde en sonda durur.
+_PACK_ONCE = ("id", "subject", "date", "court", "lang", "status")
+
+
+def _parmak_izi(db, cols: List[str]) -> tuple:
+    h = hashlib.sha256()
+    n = 0
+    for r in db.execute("SELECT %s FROM docs ORDER BY id" % ", ".join(sorted(cols))):
+        h.update(repr(tuple(r)).encode("utf-8"))
+        n += 1
+    return n, h.hexdigest()
+
+
+def _pack(idx: "retrieval.Index", log) -> Dict[str, Any]:
+    """Dağıtım öncesi paketleme: ``docs`` gövde sonda yeniden kurulur, FTS baştan kurulup birleştirilir, VACUUM.
+
+    Neden var: SQLite satırı sütun sırasıyla saklar. Şemada ``body`` ortada; ondan sonra gelen ``date``,
+    ``subject`` ve ``court``'a ulaşmak için taşma sayfası zinciri baştan sona okunur, yani kurum süzgeçli
+    her aramada her aday belgenin bütün metni diskten geçer. Rekabet tam metni gelince (30.09.2026, ~270 MB
+    metin) kurum süzgeçli aramada okunan veri ve ``status`` süresi katlandı; gövde sonda iken eski düzeyin
+    altına indi. Kod sütunları hep ADIYLA kullanır, FTS5 dış içerik tablosu da; sıra hiçbir sonucu
+    değiştirmez. Satırlar, id'ler ve vektörler aynen kalır; önce/sonra parmak iziyle denetlenir.
+    """
+    db = idx.db
+    db.commit()
+    if db.execute("PRAGMA foreign_keys").fetchone()[0]:
+        raise RuntimeError("foreign_keys açık: DROP TABLE docs vektörleri CASCADE ile silerdi")
+    info = {r[1]: r for r in db.execute("PRAGMA table_info(docs)")}
+    cols = list(info)
+    sira = [c for c in _PACK_ONCE if c in info] + [c for c in cols if c not in _PACK_ONCE and c != "body"] + ["body"]
+    yeniden = cols != sira
+    if yeniden:
+        tekil = set()
+        for ix in db.execute("PRAGMA index_list(docs)").fetchall():
+            if ix[2] and ix[3] == "u":
+                tekil.update(r[2] for r in db.execute("PRAGMA index_info(%s)" % ix[1]))
+        dizinler = [r[0] for r in db.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'docs' AND sql IS NOT NULL")]
+
+        def tanim(c: str) -> str:
+            _, ad, tur, notnull, varsayilan, pk = info[c]
+            s = "%s %s" % (ad, tur)
+            if pk:
+                return s + " PRIMARY KEY"
+            s += " UNIQUE" if ad in tekil else ""
+            s += " NOT NULL" if notnull else ""
+            return s + (" DEFAULT %s" % varsayilan if varsayilan is not None else "")
+
+        once = _parmak_izi(db, cols)
+        adlar = ", ".join(sira)
+        db.execute("BEGIN")
+        db.execute("CREATE TABLE docs__pack (%s)" % ", ".join(tanim(c) for c in sira))
+        db.execute("INSERT INTO docs__pack(%s) SELECT %s FROM docs ORDER BY id" % (adlar, adlar))
+        db.execute("DROP TABLE docs")
+        db.execute("ALTER TABLE docs__pack RENAME TO docs")
+        for sql in dizinler:
+            db.execute(sql)
+        db.execute("COMMIT")
+        if _parmak_izi(db, cols) != once:
+            raise RuntimeError("paketleme içeriği değiştirdi")
+        log("pack: docs gövde sonda yeniden kuruldu (%d belge, içerik aynı)" % once[0])
+    t0 = time.time()
+    idx.reindex_fts()
+    for t in ("docs_fts", "docs_tri"):
+        db.execute("INSERT INTO %s(%s) VALUES('optimize')" % (t, t))
+    db.commit()
+    db.execute("VACUUM")
+    butunluk = db.execute("PRAGMA integrity_check").fetchone()[0]
+    db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    if butunluk != "ok":
+        raise RuntimeError("integrity_check: %s" % butunluk)
+    ozet = {"yeniden_kuruldu": yeniden, "belge": idx.count(), "vektor": db.execute(
+        "SELECT COUNT(*) FROM vecs").fetchone()[0], "boyut_mb": round(os.path.getsize(idx.path) / 1e6)}
+    log("pack: FTS yeniden kuruldu + optimize, VACUUM, integrity ok (%.0fs) %s" % (time.time() - t0, ozet))
+    return ozet
+
+
 def _parse_range(spec: str) -> List[int]:
     out: List[int] = []
     for part in (spec or "").split(","):
@@ -167,6 +246,9 @@ def main(argv=None) -> int:
     ap.add_argument("--backfill-text", action="store_true",
                     help="no crawl: fetch full text for documents indexed from a listing only "
                          "(bddk, btk, rekabet); resumable; --limit caps documents per source")
+    ap.add_argument("--pack", action="store_true",
+                    help="no crawl: pack the index for shipping (body column last, FTS rebuilt + optimized, "
+                         "VACUUM); content, ids and vectors unchanged")
     ap.add_argument("--limit", type=int, default=0, help="max documents per source (0 = no limit)")
     ap.add_argument("--pages", type=int, default=0, help="max listing pages per source where paged")
     ap.add_argument("--years", default="", help="spk: bülten years, e.g. 2024,2025,2026")
@@ -179,6 +261,9 @@ def main(argv=None) -> int:
     idx = retrieval.Index(args.index)
     log = lambda m: sys.stderr.write(m + "\n")  # noqa: E731
 
+    if args.pack:
+        _pack(idx, log)
+        return 0
     if args.backfill_text:
         keys = [k.strip() for k in args.source.split(",") if k.strip()] or ["bddk", "btk"]
         _backfill(idx, keys, args.limit, log)
