@@ -26,9 +26,37 @@ indexed from their listings, so their body was the title and `semantik_ara` sear
 `crawl.py --backfill-text` added full text for BDDK (964/964) and BTK (1,897/1,904; seven are scanned PDFs).
 "idari para cezası" occurs in the text of 419 BTK decisions and in the title of only 9 — for the other 411 the question
 could not be asked before, because BTK's live search is title-only too. (Counted with Turkish-aware case folding:
-SQLite's `lower()` leaves "İ" alone and reports no title at all.) Rekabet stays title-only on purpose: its live search
-already matches inside the PDFs, and ten thousand long PDFs would bloat the baked image. EPDK has text for about half
-of its decisions (the rest have no extractable document); KVKK, SPK and Sigorta Tahkim always had full text.
+SQLite's `lower()` leaves "İ" alone and reports no title at all.) EPDK has text for about half of its decisions (the
+rest have no extractable document); KVKK, SPK and Sigorta Tahkim always had full text.
+
+**Rekabet has full text since 2026-09-30.** It was left title-only at first (its live search already matches inside the
+PDFs, and ten thousand long PDFs bloat the baked image). But the live search is word-based (an unquoted multi-word query
+is not a phrase search, see `sources/rekabet.py`), and questions about the reasoning need ranked retrieval. The index now
+carries the text of 10,433 of 10,445 decisions (twelve PDFs yield no text and keep their title;
+`--backfill-text --source rekabet`, 7.1 h at one request per second). The baked index grew from 284 MB to 1,353 MB.
+Measured on a stratified sample of 101 decisions (period × decision type):
+
+| query | top 10, title-only | top 10, full text |
+|---|---:|---:|
+| six-word phrase from the reasoning | 2 | 95 (first: 79) |
+| three rare words from the reasoning | 0 | 91 |
+| decision number | 101 (first: 94) | 101 (first: 96) |
+| first six words of the title | 96 (first: 79) | 92 (first: 62) |
+
+The last row is the price: other decisions now name the same undertakings. Six of the nine misses are generic openings
+("Rekabet Kurulunun … tarihli … sayılı kararı uyarınca") that mostly missed before too. Rekabet vectors are still title
+vectors, restored after the backfill (the workstation has no Voyage key).
+
+Quoted phrases are searched in both ı/i spellings of each word. The dissent heading "KARŞI OY GEREKÇESİ" folds to
+"karsi" under unicode61, running text to "karsı": "karşı oy gerekçesi" matched 52 decisions as typed and 733 with the
+heading. Spanish and Dutch indexes return the same counts as before.
+
+**The shipped index is packed** (`crawl.py --pack`). SQLite stores a row's columns in order and `body` sits in the middle
+of the schema, so reading `subject` or `date` walks the row's whole overflow chain. With Rekabet's text in place a
+kurum-filtered search read twice the data (median 170 MB instead of 82) and `status` six times as much (378 MB, 302 ms).
+Packing rebuilds `docs` with `body` last (same columns, rows, ids and vectors, checked by fingerprint) and brings both
+back to the title-only level or below (82 MB; 44 ms). The code addresses columns by name, and so does FTS5's
+external-content read: only the byte layout changes.
 
 **Bedesten** (ictihat + mevzuat). One IP gets ~10 requests per 30 s; the shared
 token bucket spaces requests 3.5 s apart and honours `Retry-After`. Result

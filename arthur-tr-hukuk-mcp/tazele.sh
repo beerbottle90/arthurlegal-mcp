@@ -34,4 +34,10 @@ python crawl.py --only-new --source spk            --years "$(date +%Y)" --index
 python crawl.py --only-new --source sigorta_tahkim --issues 60-66       --index "$I" $EK
 python crawl.py --only-new --source rekabet        --pages 40           --index "$I" $EK
 python crawl.py --only-new --source epdk           --fetch-text         --index "$I" $EK
+# Rekabet listesi metinsiz gelir; indeks 30.09.2026'dan beri tam metinli. Yalniz
+# govdesi hala basliktan ibaret satirlar indirilir (yeni kararlar + metni cikmayanlar).
+python crawl.py --backfill-text --source rekabet                        --index "$I" $EK
+# Dagitim paketi: govde sutunu sonda, FTS birlesik (kurum suzgecli arama tam metni
+# okumaz; bkz. crawl.py _pack). baked/'a kopyalamadan once.
+python crawl.py --pack                                                  --index "$I"
 echo "TAZELEME BITTI: $I"

@@ -185,8 +185,10 @@ SOURCE = Source(
            "'farklı gerekçe' 5.222 karar; tırnaklı \"karşı oy gerekçesi\" 61). İfade için tırnak kullanın; "
            "'total' bir ifadeyi içeren karar sayısı değildir, istatistik için kullanmayın. Karar PDF'leri "
            "büyük olabilir (birleşme kararları 100+ sayfa). Kılavuz ve tebliğler için mevzuat_ara. "
-           "Yerel indeks Rekabet kararlarının YALNIZ BAŞLIĞINI taşır: semantik_ara(kurum='rekabet') gerekçede değil başlıkta "
-           "arar; gerekçe için bu canlı aramayı kullanın."),
+           "Yerel indeks (semantik_ara, kurum='rekabet') kararların TAM METNİNİ de taşır (30.09.2026: 10.445 kararın "
+           "10.433'ü; metni çıkmayan 12 karar yalnız başlıkla): kelime ve tırnaklı ifade gerekçede de aranır, sonuç "
+           "ilgiye göre sıralanır; anlam kanalı Rekabet'te karar konusu (başlık) vektörüyle çalışır. İndeks son "
+           "dağıtımdaki arşivdir; en yeni kararlar için bu canlı arama."),
     search=search, get=get, crawl=crawl, search_schema=SEARCH_SCHEMA, get_schema=GET_SCHEMA,
     homepage=BASE + "/tr/Kararlar",
 )

@@ -6,6 +6,20 @@
   (29.09.2026 ölçümü: 'karşı oy' 2.737, 'farklı gerekçe' 5.222 karar; tırnaklı "karşı oy gerekçesi" 61). Kaynak notu
   ve `query` açıklaması bunu söyler; tırnaksız çok kelimeli sorgunun yanıt notuna DİKKAT satırı eklenir ("UYARI"
   önekini kullanmaz: o, çekilemeyen veriye ayrılmıştır).
+- Rekabet: yerel indeks tam metinli (30.09.2026): 10.445 kararın 10.433'ü (`crawl.py --backfill-text --source rekabet`,
+  saniyede bir istek, 7,1 saat; metni çıkmayan 12 PDF başlıkla kalır). Tabakalı 101 kararlık örnekte gerekçeden altı
+  kelimelik ifade kararını ilk 10'da 95/101 buluyor (önce 2), üç nadir kelime 91/101 (önce 0), karar sayısı 101/101
+  (değişmedi). Bedeli: başlığın ilk altı kelimesi 96 yerine 92/101 (birinci sırada 79 yerine 62), çünkü aynı
+  teşebbüsleri anan başka kararlar öne geçiyor; dokuz ıskanın altısı "Rekabet Kurulunun … sayılı kararı uyarınca" gibi
+  genel açılışlar. Rekabet vektörleri başlık vektörü olarak kaldı. Kaynak notu artık indeksin tam metinli olduğunu
+  söyler; `tazele.sh` yeni kararlara metin ekler ve dizini paketler.
+- `crawl.py --pack`: dağıtım paketi. `docs` gövde sonda yeniden kurulur (sütunlar, satırlar, id'ler ve vektörler aynı;
+  parmak iziyle denetlenir), FTS baştan kurulup birleştirilir, VACUUM. Gövde ortadayken kurum süzgeçli arama her adayın
+  bütün metnini okuyordu: Rekabet metniyle okunan veri 82 → 170 MB (medyan), `status` 52 → 302 ms; paketli dizinde
+  82 MB ve 44 ms.
+- Tırnaklı ifade her kelimenin ı/i yazımıyla aranır (en çok 16 bileşim; fazlasında bütün ifadenin üç yazımı). Büyük
+  harfli başlık "KARŞI OY GEREKÇESİ" unicode61'de "karsi", akan metin "karsı" olur: "karşı oy gerekçesi" yazıldığı gibi
+  52 kararda, başlıkla birlikte 733 kararda geçiyor. İspanyolca ve Felemenkçe dizinlerde sonuç sayıları değişmedi.
 
 ## 0.5.1 — 2026-09-27
 
