@@ -11,6 +11,8 @@ import json
 import os
 import sys
 import unittest
+import urllib.error
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -106,9 +108,11 @@ class McpProtocolTests(unittest.TestCase):
     def test_tools_list_exposes_the_documented_six(self):
         resp, _ = _handle_payload({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         names = {t["name"] for t in resp["result"]["tools"]}
+        # server_status is listed when this server runs on its own; the
+        # arthurlegal-mcp aggregator drops it in favour of its single `status`.
         self.assertEqual(names, {
             "search_acts", "count_acts", "get_act",
-            "get_act_fulltext", "list_types", "list_sections",
+            "get_act_fulltext", "list_types", "list_sections", "server_status",
         })
 
     def test_search_acts_advertises_the_types_filter(self):
@@ -126,6 +130,76 @@ class McpProtocolTests(unittest.TestCase):
     def test_tool_payloads_are_json_serialisable(self):
         resp, _ = _handle_payload({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         json.dumps(resp, ensure_ascii=False)
+
+
+class UpstreamFailureTests(unittest.TestCase):
+    """A dead upstream is reported fast and with its reason (hosted endpoint, 2026-10-09:
+    four calls in four timed out, each after the MCP client had already given up)."""
+
+    def _patched_urlopen(self, fake):
+        saved = urllib.request.urlopen
+        urllib.request.urlopen = fake
+        self.addCleanup(setattr, urllib.request, "urlopen", saved)
+
+    def test_defaults_answer_before_an_mcp_client_gives_up(self):
+        c = EqanunClient()
+        self.assertEqual((c.timeout, c.retries), (12.0, 1))
+
+    def test_a_timeout_is_not_waited_out_again(self):
+        calls = []
+
+        def urlopen(req, timeout=None):
+            calls.append(timeout)
+            raise TimeoutError("timed out")
+
+        self._patched_urlopen(urlopen)
+        with self.assertRaises(EqanunError) as ctx:
+            EqanunClient(timeout=5, retries=2, retry_backoff=0).search("qanun", length=1)
+        self.assertEqual(calls, [5])
+        self.assertIn("did not answer within 5 s", str(ctx.exception))
+
+    def test_a_5xx_is_still_retried(self):
+        calls = []
+
+        def urlopen(req, timeout=None):
+            calls.append(timeout)
+            raise urllib.error.HTTPError(req.full_url, 503, "busy", {}, None)
+
+        self._patched_urlopen(urlopen)
+        with self.assertRaises(EqanunError):
+            EqanunClient(timeout=5, retries=2, retry_backoff=0).search("qanun", length=1)
+        self.assertEqual(len(calls), 3)
+
+    def test_tools_answer_an_unreachable_upstream_with_the_warning_line(self):
+        from eqanun import mcp_server
+
+        class Down:
+            def __getattr__(self, name):
+                def fail(*args, **kwargs):
+                    raise EqanunError("e-qanun.az did not answer within 12 s (x)")
+                return fail
+
+        saved = mcp_server._client
+        mcp_server._client = Down()
+        self.addCleanup(setattr, mcp_server, "_client", saved)
+        handler = next(t["handler"] for t in TOOLS if t["name"] == "get_act")
+        out = handler({"act_id": 1})
+        self.assertIn("did not answer", out["error"])
+        self.assertIn("UYARI: veri çekilemedi", out["warning"])
+
+    def test_status_reports_an_unreachable_upstream(self):
+        from eqanun import mcp_server
+
+        class Down:
+            def search(self, *args, **kwargs):
+                raise EqanunError("e-qanun.az did not answer within 8 s (x)")
+
+        saved = mcp_server._probe_client
+        mcp_server._probe_client = Down()
+        self.addCleanup(setattr, mcp_server, "_probe_client", saved)
+        out = mcp_server._t_server_status({})
+        self.assertFalse(out["upstream_reachable"])
+        self.assertIn("UYARI", out["warning"])
 
 
 if __name__ == "__main__":

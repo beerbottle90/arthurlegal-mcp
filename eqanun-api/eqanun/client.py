@@ -53,6 +53,12 @@ class EqanunError(RuntimeError):
     """Raised for transport errors or non-2xx API responses."""
 
 
+def _timed_out(exc: BaseException) -> bool:
+    reason = getattr(exc, "reason", exc)
+    return isinstance(exc, TimeoutError) or isinstance(reason, TimeoutError) \
+        or "timed out" in str(reason).lower()
+
+
 class EqanunClient:
     """Thin, polite client over the e-qanun.az public API."""
 
@@ -60,16 +66,20 @@ class EqanunClient:
         self,
         *,
         user_agent: Optional[str] = None,
-        timeout: float = 30.0,
-        retries: int = 2,
+        timeout: Optional[float] = None,
+        retries: Optional[int] = None,
         retry_backoff: float = 1.5,
     ) -> None:
         # Precedence: explicit argument > EQANUN_USER_AGENT > library default.
         # Reading the env var here means the CLI and the MCP server inherit it
         # without either of them needing a flag of its own.
         self.user_agent = user_agent or os.environ.get("EQANUN_USER_AGENT") or _DEFAULT_UA
-        self.timeout = timeout
-        self.retries = retries
+        # 30 s and two retries meant about 95 s before a dead upstream was reported:
+        # longer than an MCP client waits, so the caller saw a bare "operation timed
+        # out" and never the reason (hosted endpoint, 2026-10-09). Same precedence
+        # as the User-Agent: argument > EQANUN_TIMEOUT / EQANUN_RETRIES > default.
+        self.timeout = timeout if timeout is not None else float(os.environ.get("EQANUN_TIMEOUT", "12"))
+        self.retries = retries if retries is not None else int(os.environ.get("EQANUN_RETRIES", "1"))
         self.retry_backoff = retry_backoff
 
     # ---------------------------------------------------------------- transport
@@ -94,6 +104,12 @@ class EqanunClient:
                 last_exc = exc
             except (urllib.error.URLError, TimeoutError) as exc:
                 last_exc = exc
+                if _timed_out(exc):
+                    # A host that silently drops the connection does not answer a
+                    # second ask either; waiting it out again only hides the reason.
+                    raise EqanunError(
+                        f"e-qanun.az did not answer within {self.timeout:g} s ({url})"
+                    ) from exc
             if attempt < self.retries:
                 time.sleep(self.retry_backoff * (attempt + 1))
         raise EqanunError(f"request failed for {url}: {last_exc}") from last_exc
