@@ -11,16 +11,28 @@ Search needs an index; browsing and direct fetches do not:
 
 from __future__ import annotations
 
-from typing import Any, Dict
+import math
+import os
+import struct
+from typing import Any, Dict, Optional
 
+import retrieval
 from finlex import ACT_TYPES, FinlexClient, FinlexError
 from mcpcore import McpError, Tool, run
 from retrieval import Index, embeddings_status
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 _client = FinlexClient()
 _index = Index()
+
+# A result found by meaning alone is kept only when its similarity to the query
+# stands this many standard deviations above the query's similarity to the
+# whole index. The top of a few hundred unrelated documents sits at ~2.3-3.2 sd;
+# related acts reached across languages sat at 3.45-4.3 sd (bge-m3, the 250-act
+# index, 2026-10-09). The scale is relative, so it carries across models better
+# than a raw cosine does; re-check it after changing model or corpus size.
+SEMANTIC_MIN_Z = float(os.environ.get("FI_SEMANTIC_MIN_Z", "3.4"))
 
 INSTRUCTIONS = """Finnish legislation from Finlex, the Ministry of Justice's
 open-data service. Akoma Ntoso XML, no auth.
@@ -42,7 +54,12 @@ stamp it got in `lang_version`. A specific stamp comes from `browse_year` or
 
 SEARCH IS LOCAL. Finlex has no full-text search endpoint, so `search_acts` runs
 against a local index. Read `index_coverage` before concluding an act does not
-exist — the index holds only the years that were crawled."""
+exist — the index holds only the years that were crawled.
+
+MEANING-ONLY MATCHES. When no word of the query occurs in the index, results
+carry `match: "semantic only"` and the response a `warning`: they are leads,
+not answers, and the act asked about may be outside the index. Results no more
+similar than unrelated text are dropped (`semantic_filter`)."""
 
 
 def _t_search(args: Dict[str, Any]) -> Any:
@@ -64,10 +81,92 @@ def _t_search(args: Dict[str, Any]) -> Any:
             filters[key] = args[key]
     out = _index.search(query, mode=args.get("mode", "hybrid"),
                         limit=int(args.get("limit", 20)), filters=filters)
-    out["index_coverage"] = _index.get_state("coverage") or "unknown — call server_status"
+    coverage = _index.get_state("coverage") or "unknown — call server_status"
+    out["index_coverage"] = coverage
     out["language_note"] = ("Finnish and Swedish expressions are both indexed and "
                             "both authoritative; see each result's `lang`.")
+    channels = out.get("retrieval", {}).get("channels_used", {})
+    if out["results"] and not channels.get("lexical") and not channels.get("fuzzy"):
+        _semantic_only(query, out, coverage)
     return out
+
+
+def _semantic_only(query: str, out: Dict[str, Any], coverage: str) -> None:
+    """Flag a result set that no word of the query reached, and drop its noise.
+
+    The semantic channel always returns its nearest neighbours, related or
+    not. With no keyword or substring match behind them, each result is marked
+    as a meaning-only match with its similarity, and results that stand no
+    higher above the index than chance would put them are removed.
+    """
+    out["warning"] = (
+        "No word of %r occurs in the index (coverage: %s, %d documents). These "
+        "results match by meaning only and may be unrelated — the act you want may "
+        "simply be outside the index. For a known act use get_act with its year "
+        "and number; browse_year lists a year." % (query, coverage, _index.count()))
+    scores = _similarity(query)
+    for result in out["results"]:
+        result["match"] = "semantic only"
+    if scores is None:
+        out["semantic_filter"] = {"applied": False,
+                                  "note": "Similarity could not be computed; nothing was dropped."}
+        return
+    sims, mean, sd = scores
+    kept, dropped = [], 0
+    for result in out["results"]:
+        sim = sims.get(result["ref"])
+        if sim is None:
+            kept.append(result)
+            continue
+        z = (sim - mean) / sd if sd else 0.0
+        result["similarity"] = round(sim, 4)
+        result["similarity_z"] = round(z, 2)
+        if z >= SEMANTIC_MIN_Z:
+            kept.append(result)
+        else:
+            dropped += 1
+    out["results"] = kept
+    out["total"] = len(kept)
+    out["semantic_filter"] = {
+        "applied": True,
+        "min_z": SEMANTIC_MIN_Z,
+        "dropped": dropped,
+        "note": "similarity_z = standard deviations above the query's mean similarity "
+                "to all %d indexed documents; results below min_z were dropped as "
+                "indistinguishable from unrelated text." % len(sims),
+    }
+
+
+def _similarity(query: str) -> Optional[tuple]:
+    """``({ref: cosine}, mean, sd)`` of the query against every indexed vector.
+
+    The same vectors the semantic channel ranked by; the index does not expose
+    its scores, so they are recomputed here. None when the backend is down or
+    nothing is vectorised for the configured model.
+    """
+    if not retrieval.embeddings_available():
+        return None
+    try:
+        q = retrieval._embed([query], input_type="query")[0]
+    except Exception:  # noqa: BLE001 - an unreachable backend is a reportable state
+        return None
+    norm = math.sqrt(sum(x * x for x in q)) or 1.0
+    q = [x / norm for x in q]
+    rows = _index.db.execute(
+        "SELECT d.ref, v.dim, v.vec FROM vecs v JOIN docs d ON d.id = v.doc_id "
+        "WHERE v.model = ?", (retrieval.embeddings_model(),)).fetchall()
+    sims: Dict[str, float] = {}
+    for ref, dim, blob in rows:
+        if dim != len(q):
+            continue
+        vec = struct.unpack("<%df" % dim, blob)
+        vnorm = math.sqrt(sum(x * x for x in vec)) or 1.0
+        sims[ref] = sum(a * b for a, b in zip(q, vec)) / vnorm
+    if len(sims) < 2:
+        return None
+    mean = sum(sims.values()) / len(sims)
+    sd = math.sqrt(sum((s - mean) ** 2 for s in sims.values()) / len(sims))
+    return sims, mean, sd
 
 
 def _t_browse(args: Dict[str, Any]) -> Any:
