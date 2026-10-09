@@ -1,0 +1,16 @@
+app = "arthurlegal-az-relay"
+# Frankfurt: e-qanun.az answers from here (0.5 s), not from Amsterdam (2026-10-09).
+primary_region = "fra"
+
+[build]
+
+[env]
+  RELAY_PORT = "8080"
+
+# No [http_service], no [[services]] and no public IP: the relay is reachable only on
+# Fly's private network, as arthurlegal-az-relay.internal:8080, by apps of the same
+# organization. Deploy with `fly deploy --ha=false`: one machine holds the one budget.
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

@@ -135,6 +135,7 @@ falls back to crawling when no baked index is present, and says which it used:
 | `EMBEDDINGS_URL` | env | `https://api.voyageai.com/v1/embeddings` |
 | `EMBEDDINGS_MODEL` | env | `voyage-4-lite` -- multilingual, 1024-dim |
 | `DE_ELI_URL` | env | German backend; `off` to disable |
+| `EQANUN_PROXY` | env | Azerbaijan: e-qanun.az is reached through `az-relay` (Frankfurt, private network only), because it does not answer from Amsterdam |
 
 A document holds exactly one vector (`vecs.doc_id` is the primary key), so
 changing `EMBEDDINGS_MODEL` does not add a second vector -- the next embedding
