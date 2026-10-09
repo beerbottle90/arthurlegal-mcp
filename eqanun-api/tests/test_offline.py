@@ -17,6 +17,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from eqanun import EqanunClient, EqanunError  # noqa: E402
+from eqanun._gate import Gate  # noqa: E402
 from eqanun._html import decode_html, html_to_text  # noqa: E402
 from eqanun.mcp_server import TOOLS, _handle_payload  # noqa: E402
 
@@ -154,20 +155,21 @@ class UpstreamFailureTests(unittest.TestCase):
 
         self._patched_urlopen(urlopen)
         with self.assertRaises(EqanunError) as ctx:
-            EqanunClient(timeout=5, retries=2, retry_backoff=0).search("qanun", length=1)
+            EqanunClient(timeout=5, retries=2, retry_backoff=0, gate=Gate(per_minute=6000), cache=False).search("qanun", length=1)
         self.assertEqual(calls, [5])
         self.assertIn("did not answer within 5 s", str(ctx.exception))
 
     def test_a_5xx_is_still_retried(self):
+        # 500 is retried; 429/503 pause the gate instead (tests/test_gate.py).
         calls = []
 
         def urlopen(req, timeout=None):
             calls.append(timeout)
-            raise urllib.error.HTTPError(req.full_url, 503, "busy", {}, None)
+            raise urllib.error.HTTPError(req.full_url, 500, "server error", {}, None)
 
         self._patched_urlopen(urlopen)
         with self.assertRaises(EqanunError):
-            EqanunClient(timeout=5, retries=2, retry_backoff=0).search("qanun", length=1)
+            EqanunClient(timeout=5, retries=2, retry_backoff=0, gate=Gate(per_minute=6000), cache=False).search("qanun", length=1)
         self.assertEqual(len(calls), 3)
 
     def test_tools_answer_an_unreachable_upstream_with_the_warning_line(self):
