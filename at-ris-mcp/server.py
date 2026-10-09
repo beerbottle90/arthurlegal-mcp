@@ -11,7 +11,7 @@ useless without local reranking.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from mcpcore import McpError, Tool, run
 from retrieval import embeddings_status, semantic_rerank
@@ -50,6 +50,12 @@ def _apps_doc(mapping: Dict[str, str]) -> str:
     return " · ".join("%s = %s" % (k, v) for k, v in mapping.items())
 
 
+def _limited(results: List[Dict[str, Any]], args: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The reranked page, cut to `limit` when one is given."""
+    limit = args.get("limit")
+    return results[:max(1, min(int(limit), 100))] if limit else results
+
+
 def _t_search_legislation(args: Dict[str, Any]) -> Any:
     query = (args.get("terms") or args.get("title") or "").strip()
     try:
@@ -64,15 +70,16 @@ def _t_search_legislation(args: Dict[str, Any]) -> Any:
     except RisError as exc:
         raise McpError(str(exc)) from exc
     ranked = semantic_rerank(query, raw["results"], fields=("title", "long_title"))
+    results = _limited(ranked["results"], args)
     return {
         "total_upstream": raw["total"],
-        "returned": len(ranked["results"]),
+        "returned": len(results),
         "ranking": {
             "method": ranked["method"],
             "note": ranked.get("note") or ranked.get("warning"),
             "why": "RIS returns hits alphabetically, not by relevance.",
         },
-        "results": ranked["results"],
+        "results": results,
     }
 
 
@@ -91,9 +98,10 @@ def _t_search_caselaw(args: Dict[str, Any]) -> Any:
         raise McpError(str(exc)) from exc
     ranked = semantic_rerank(terms, raw["results"],
                              fields=("docket", "norms", "legal_areas", "court"))
+    results = _limited(ranked["results"], args)
     return {
         "total_upstream": raw["total"],
-        "returned": len(ranked["results"]),
+        "returned": len(results),
         "ranking": {
             "method": ranked["method"],
             "note": ranked.get("note") or ranked.get("warning"),
@@ -101,7 +109,7 @@ def _t_search_caselaw(args: Dict[str, Any]) -> Any:
         },
         "note": "Results with doc_type 'Rechtssatz' are legal propositions, not "
                 "judgments; see their `decisions` list.",
-        "results": ranked["results"],
+        "results": results,
     }
 
 
@@ -127,14 +135,27 @@ def _t_status(args: Dict[str, Any]) -> Any:
             "the whole corpus (441,066 hits) instead of an error. This server "
             "never sends it; use `title` (Titel) instead.",
             "API v2.5 was retired and now 404s; this client uses v2.6.",
+            "Page sizes are 10, 20, 50 or 100 only; anything else fails RIS's "
+            "schema validation. `limit` cuts the reranked page instead.",
+            "RIS reports a rejected request inside an HTTP 200 "
+            "(OgdSearchResult.Error); this server raises it rather than "
+            "showing zero hits. LrKons lives under the Landesrecht endpoint.",
         ],
         **embeddings_status(),
     }
 
 
 _PAGE = {
-    "page_size": {"type": "integer", "enum": [10, 20, 50, 100], "default": 20},
+    "page_size": {
+        "type": "integer", "enum": [10, 20, 50, 100], "default": 20,
+        "description": "Results per RIS page. RIS accepts only 10, 20, 50 or 100 "
+                       "(verified 2026-10-09). For fewer, keep a page size and set `limit`.",
+    },
     "page": {"type": "integer", "default": 1, "description": "1-indexed page number."},
+    "limit": {
+        "type": "integer", "minimum": 1, "maximum": 100,
+        "description": "Return only the best N of the reranked page, e.g. 5.",
+    },
 }
 
 TOOLS = [

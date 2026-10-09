@@ -36,7 +36,9 @@ API = "https://data.bka.gv.at/ris/api/v2.6"
 OGD = "https://ogd.ris.bka.gv.at"
 UA = "arthurlegal-at-ris-mcp/%s (+https://github.com/beerbottle90/arthurlegal-mcp)" % __version__
 
-# RIS pages in fixed sizes; the API rejects arbitrary integers.
+# RIS pages in fixed sizes. Checked 2026-10-09: its PageSize enumeration is
+# exactly these four; "Five", "Fifteen", "TwentyFive" and numerals all fail
+# schema validation. Fewer results are a local cut (`limit` in server.py).
 PAGE_SIZES = {10: "Ten", 20: "Twenty", 50: "Fifty", 100: "OneHundred"}
 
 # Applikation -> what it actually covers. Used to validate input and to explain
@@ -226,13 +228,22 @@ class RisClient:
                 page_size: int, page: int) -> Dict[str, Any]:
         size = PAGE_SIZES.get(int(page_size))
         if size is None:
-            raise RisError("page_size must be one of %s" % sorted(PAGE_SIZES))
+            raise RisError(
+                "page_size must be one of %s — the only page sizes RIS accepts. "
+                "For fewer results, keep a page size and set `limit`." % sorted(PAGE_SIZES))
         query = {"Applikation": application, "DokumenteProSeite": size,
                  "Seitennummer": max(1, int(page))}
         query.update({k: v for k, v in params.items() if v})
         url = "%s/%s?%s" % (API, app_group, urllib.parse.urlencode(query))
         payload = _get(url)
-        results = (payload.get("OgdSearchResult") or {}).get("OgdDocumentResults") or {}
+        envelope = payload.get("OgdSearchResult") or {}
+        if envelope.get("Error"):
+            # RIS reports a rejected request inside an HTTP 200; read as a
+            # result it looked like zero hits.
+            error = envelope["Error"]
+            message = error.get("Message") if isinstance(error, dict) else error
+            raise RisError("RIS rejected the request: %s (%s)" % (message, url))
+        results = envelope.get("OgdDocumentResults") or {}
         hits = results.get("Hits") or {}
         try:
             total = int(hits.get("#text", 0))
@@ -253,7 +264,9 @@ class RisClient:
         if as_of:
             # Point-in-time: what the law looked like on this date.
             params["Fassung.FassungVom"] = as_of
-        raw = self._search("Bundesrecht", application, params, page_size, page)
+        # Provincial law has its own endpoint; Bundesrecht rejects LrKons.
+        group = "Landesrecht" if application == "LrKons" else "Bundesrecht"
+        raw = self._search(group, application, params, page_size, page)
         return {**raw, "results": [self._norm_law(r) for r in raw["refs"]]}
 
     def _norm_law(self, ref: Dict[str, Any]) -> Dict[str, Any]:

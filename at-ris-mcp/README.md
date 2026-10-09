@@ -70,6 +70,9 @@ this server cannot verify it.
 - No relevance ranking — results come back alphabetically.
 - `Kurztitel` is SILENTLY IGNORED: passing it returns all 441,066 documents.
 - API v2.5 was retired and now 404s; this client uses v2.6.
+- Page sizes are 10, 20, 50 or 100 only; `limit` returns fewer results.
+- A rejected request comes back as an error object inside HTTP 200 — raised
+  here, never shown as zero hits.
 - Much of the OGH corpus is Rechtssätze — legal propositions, not judgments.
 - A result's `url` (Dokument.wxe, eli/) is a web page that answers 503 to
   automated clients; `fetch_document` reads the same document from its
