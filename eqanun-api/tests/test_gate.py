@@ -185,6 +185,39 @@ class ClientThroughGateTests(unittest.TestCase):
         self.assertIn("paused", str(ctx.exception))
         self.assertEqual(len(self.calls), 1)
 
+    def test_requests_go_through_the_relay_when_one_is_configured(self):
+        seen, built = [], {}
+        outer = self
+
+        class Opener:
+            def open(self_, req, timeout=None):
+                seen.append(req.full_url)
+                return outer.fake_urlopen(req, timeout)
+
+        saved = urllib.request.build_opener
+
+        def build(*handlers):
+            built["handlers"] = handlers
+            return Opener()
+
+        urllib.request.build_opener = build
+        try:
+            g, _ = gate(per_minute=6000)
+            c = EqanunClient(timeout=5, retries=0, gate=g, cache=False,
+                             proxy="http://arthurlegal-az-relay.internal:8080")
+            c.list_sections()
+        finally:
+            urllib.request.build_opener = saved
+        proxies = [h.proxies for h in built["handlers"] if isinstance(h, urllib.request.ProxyHandler)][0]
+        self.assertEqual(proxies["https"], "http://arthurlegal-az-relay.internal:8080")
+        self.assertEqual(len(seen), 1)
+
+    def test_no_relay_means_a_direct_request(self):
+        g, _ = gate(per_minute=6000)
+        c = EqanunClient(timeout=5, retries=0, gate=g, cache=False, proxy="")
+        c.list_sections()
+        self.assertEqual(len(self.calls), 1)        # went through urllib.request.urlopen
+
     def test_timeouts_close_the_gate_after_three(self):
         g, _ = gate(per_minute=6000)
         c = self.client(g, cache=False)
