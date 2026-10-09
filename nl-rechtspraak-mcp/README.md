@@ -1,7 +1,8 @@
 # nl-rechtspraak-mcp
 
 **Netherlands 🇳🇱 legal research over the Model Context Protocol.**
-data.rechtspraak.nl (case law) + repository.overheid.nl SRU (legislation)
+data.rechtspraak.nl (case law) + KOOP SRU (legislation: BWB consolidated law,
+official publications on request)
 
 No authentication. No dependencies — pure Python standard library, so it runs on
 a stock Python 3.9+ with nothing to install.
@@ -70,7 +71,12 @@ this server cannot verify it.
 ## Upstream quirks this server handles
 
 - No free-text search on case law; unknown parameters are silently ignored.
-- Legislation (KOOP SRU) *does* have real CQL full-text search — passed through.
+- Legislation is searched upstream. The default is consolidated law (BWB, the
+  database behind wetten.overheid.nl), one result per regulation with its
+  permanent BWBR link; BWB lists every historical version separately, so the
+  server asks for the version valid on one day. The publications repository
+  (gazettes, full-text CQL) is `source="official_publications"`: searching it
+  for "Burgerlijk Wetboek Boek 6" returns Staatscourant notices, not the code.
 - Rechtspraak publishes metadata for more decisions than it publishes texts.
 
 ## Run it

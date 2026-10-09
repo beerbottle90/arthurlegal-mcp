@@ -19,11 +19,21 @@ they had searched. They had not. This client therefore accepts only parameters
 verified to filter, and search is served from the local index built by
 ``crawl.py``.
 
-``KoopClient`` — legislation (repository.overheid.nl SRU 2.0)
--------------------------------------------------------------
-The opposite situation: real CQL full-text search, verified to discriminate
-(``energiewet`` -> 1,961 records; ``mededinging`` -> 20,991). Passed straight
-through, no local index needed.
+``KoopClient`` — legislation (KOOP SRU: BWB + publications repository)
+-----------------------------------------------------------------------
+The opposite situation: real upstream search, no local index needed. KOOP runs
+two SRU services and they answer different questions:
+
+- **BWB** (zoekservice.overheid.nl, ``x-connection=BWB``) is the consolidated
+  law behind wetten.overheid.nl: one record per *version* of a regulation,
+  searched by title or abbreviation. This is the default. Without a validity
+  date it returns every historical version (Burgerlijk Wetboek Boek 6 has 66),
+  so the client always asks for the version valid on one day.
+- **The publications repository** (repository.overheid.nl, SRU 2.0) holds the
+  official gazettes and parliamentary papers, with real CQL full-text search
+  (``energiewet`` -> 1,961 records). It is the wrong default for "find the
+  law": ``Burgerlijk Wetboek Boek 6`` there returns 228 records led by three
+  Staatscourant notices on "Consignatie van gelden" (verified 2026-10-09).
 """
 
 from __future__ import annotations
@@ -41,6 +51,8 @@ __version__ = "1.0.0"
 
 RECHTSPRAAK = "https://data.rechtspraak.nl"
 KOOP_SRU = "https://repository.overheid.nl/sru"
+KOOP_BWB_SRU = "https://zoekservice.overheid.nl/sru/Search"
+WETTEN = "https://wetten.overheid.nl"
 UA = ("arthurlegal-nl-rechtspraak-mcp/%s "
       "(+https://github.com/beerbottle90/arthurlegal-mcp)" % __version__)
 
@@ -48,9 +60,18 @@ ATOM = "{http://www.w3.org/2005/Atom}"
 DCTERMS = "{http://purl.org/dc/terms/}"
 PSI = "{http://psi.rechtspraak.nl/}"
 SRU = "{http://docs.oasis-open.org/ns/search-ws/sruResponse}"
+SRW = "{http://www.loc.gov/zing/srw/}"        # SRU 1.2, which BWB still speaks
 GZD = "{http://standaarden.overheid.nl/sru}"
+OWMS = "{http://standaarden.overheid.nl/owms/terms/}"
+BWB = "{http://standaarden.overheid.nl/bwb/terms/}"
+SRU_DIAGNOSTICS = ("{http://docs.oasis-open.org/ns/search-ws/diagnostic}",
+                   "{http://www.loc.gov/zing/srw/diagnostic/}")
 
 ECLI_RE = re.compile(r"^ECLI:NL:[A-Z]+:\d{4}:[A-Z0-9.]+$", re.IGNORECASE)
+BWB_ID_RE = re.compile(r"^BWBR\d{7}$", re.IGNORECASE)
+# Atom titles read "ECLI:NL:HR:2026:919, Hoge Raad, 12-06-2026, 24/04627"; the
+# content record writes the same as "ECLI:NL:HR:2026:919 Hoge Raad , 12-06-2026 / ...".
+TITLE_COURT_RE = re.compile(r"^ECLI:\S+?[,\s]\s*(.+?)\s*,\s*\d{2}-\d{2}-\d{4}")
 
 # Parameters data.rechtspraak.nl actually honours. Anything else is dropped with
 # a warning rather than passed through to be silently ignored upstream.
@@ -76,6 +97,17 @@ def _fetch(url: str, timeout: int = 90) -> str:
 def _plain(xml_text: str) -> str:
     text = re.sub(r"<[^>]+>", " ", xml_text)
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
+
+
+def court_from_title(title: str) -> str:
+    """The court named in a Rechtspraak title, or "" when the title has another shape.
+
+    Search entries carry no separate court field, but every title names it. The
+    summary crawl used to store nothing, so this is also how rows indexed
+    before that fix get their court back without a re-crawl.
+    """
+    m = TITLE_COURT_RE.match((title or "").strip())
+    return m.group(1).strip() if m else ""
 
 
 class RechtspraakClient:
@@ -112,9 +144,11 @@ class RechtspraakClient:
         results = []
         for entry in root.findall(ATOM + "entry"):
             ecli = (entry.findtext(ATOM + "id") or "").strip()
+            title = (entry.findtext(ATOM + "title") or "").strip()
             results.append({
                 "ecli": ecli,
-                "title": (entry.findtext(ATOM + "title") or "").strip(),
+                "title": title,
+                "court": court_from_title(title),
                 "summary": (entry.findtext(ATOM + "summary") or "").strip(),
                 "updated": (entry.findtext(ATOM + "updated") or "").strip(),
                 "url": "https://uitspraken.rechtspraak.nl/details?id=%s" % ecli,
@@ -147,6 +181,11 @@ class RechtspraakClient:
             body_el = root.find(".//{*}conclusie")
             kind = "conclusie" if body_el is not None else "unknown"
         body = _plain(ET.tostring(body_el, encoding="unicode")) if body_el is not None else ""
+        # dcterms:abstract is only a pointer ("../../rs:inhoudsindicatie"); the
+        # official summary itself is the <inhoudsindicatie> element.
+        summary_el = root.find(".//{*}inhoudsindicatie")
+        summary = (_plain(ET.tostring(summary_el, encoding="unicode"))
+                   if summary_el is not None else "")
 
         docket = root.findtext(".//" + PSI + "zaaknummer") or ""
         out: Dict[str, Any] = {
@@ -160,7 +199,7 @@ class RechtspraakClient:
             "procedure": (root.findtext(".//" + PSI + "procedure") or "").strip(),
             "subject": dc("subject"),
             "language": dc("language") or "nl",
-            "abstract": dc("abstract"),
+            "abstract": summary or dc("abstract"),
             "document_kind": kind,
             "url": "https://uitspraken.rechtspraak.nl/details?id=%s" % ecli,
             "length_chars": len(body),
@@ -200,12 +239,101 @@ class RechtspraakClient:
             start += _dt.timedelta(days=1)
 
 
-class KoopClient:
-    """Dutch legislation via SRU 2.0 — real full-text search, passed through."""
+def _sru_root(url: str) -> ET.Element:
+    """Fetch an SRU response; a diagnostic is an error, never an empty result."""
+    raw = _fetch(url)
+    try:
+        root = ET.fromstring(raw.encode("utf-8"))
+    except ET.ParseError as exc:
+        raise NlError("KOOP returned unparseable SRU XML: %s" % exc) from exc
+    for ns in SRU_DIAGNOSTICS:
+        diag = root.find(".//" + ns + "message")
+        if diag is not None:
+            details = (root.findtext(".//" + ns + "details") or "").strip()
+            raise NlError("KOOP SRU diagnostic: %s%s" % (
+                "".join(diag.itertext()), " (%s)" % details if details else ""))
+    return root
 
-    def search(self, query: str, start: int = 1, limit: int = 20) -> Dict[str, Any]:
+
+def _text(node: ET.Element, path: str) -> str:
+    el = node.find(path)
+    return "".join(el.itertext()).strip() if el is not None else ""
+
+
+class KoopClient:
+    """Dutch legislation via KOOP SRU — see the module docstring for the two sources."""
+
+    SOURCES = ("consolidated", "official_publications")
+
+    def search(self, query: str, start: int = 1, limit: int = 20,
+               source: str = "consolidated", as_of: str = "") -> Dict[str, Any]:
         if not query.strip():
             raise NlError("query is required")
+        if source == "consolidated":
+            return self._search_bwb(query, start, limit, as_of)
+        if source == "official_publications":
+            return self._search_publications(query, start, limit)
+        raise NlError("source must be one of: %s" % ", ".join(self.SOURCES))
+
+    def _search_bwb(self, query: str, start: int, limit: int, as_of: str) -> Dict[str, Any]:
+        day = (as_of or _dt.date.today().isoformat()).strip()
+        try:
+            _dt.date.fromisoformat(day)
+        except ValueError:
+            raise NlError("as_of must be a date as YYYY-MM-DD, got %r" % as_of) from None
+        # Inside a quoted CQL term only the quote and the escape character matter.
+        terms = " ".join(re.sub(r'["\\]', " ", query).split())
+        if BWB_ID_RE.match(terms):
+            clause = 'dcterms.identifier = "%s"' % terms.upper()
+        else:
+            # All title words, or the official abbreviation ("Awb", "Sr").
+            clause = ('(overheidbwb.titel all "%s" or overheidbwb.afkorting = "%s")'
+                      % (terms, terms))
+        # One version per regulation: the one valid on `day`. Without this BWB
+        # returns every historical version as a separate record.
+        cql = '%s and overheidbwb.geldigheidsdatum = "%s"' % (clause, day)
+        params = {
+            "x-connection": "BWB", "operation": "searchRetrieve", "version": "1.2",
+            "query": cql, "startRecord": max(1, int(start)),
+            "maximumRecords": max(1, min(int(limit), 100)),
+        }
+        url = "%s?%s" % (KOOP_BWB_SRU, urllib.parse.urlencode(params))
+        root = _sru_root(url)
+        total = int(root.findtext(SRW + "numberOfRecords") or 0)
+        results: List[Dict[str, Any]] = []
+        seen = set()
+        for rec in root.iter(SRW + "record"):
+            ident = _text(rec, ".//" + DCTERMS + "identifier").upper()
+            if not ident or ident in seen:
+                continue
+            seen.add(ident)
+            title = _text(rec, ".//" + DCTERMS + "title")
+            valid_from = _text(rec, ".//" + BWB + "geldigheidsperiode_startdatum")
+            valid_to = _text(rec, ".//" + BWB + "geldigheidsperiode_einddatum")
+            results.append({
+                "identifier": ident,
+                "title": title,
+                "type": _text(rec, ".//" + DCTERMS + "type"),
+                "authority": _text(rec, ".//" + OWMS + "authority"),
+                "date": valid_from,
+                # Validity of the returned version, not of the regulation.
+                "valid_from": valid_from,
+                "valid_to": "" if valid_to.startswith("9999") else valid_to,
+                "legal_areas": ["".join(el.itertext()).strip()
+                                for el in rec.iter(BWB + "rechtsgebied")],
+                # Permanent address: always resolves to the version in force.
+                "url": "%s/%s" % (WETTEN, ident),
+                "version_url": "%s/%s/%s" % (WETTEN, ident, valid_from) if valid_from else "",
+                "xml_url": _text(rec, ".//" + BWB + "locatie_toestand"),
+                "citation": "%s (%s)" % (title, ident),
+            })
+        # BWB already tends to rank the exact title first; make sure of it.
+        wanted = terms.lower()
+        results.sort(key=lambda r: r["title"].lower() != wanted)
+        return {"source": "consolidated", "total": total, "returned": len(results),
+                "as_of": day, "request_url": url, "results": results}
+
+    def _search_publications(self, query: str, start: int, limit: int) -> Dict[str, Any]:
         # CQL: quote the phrase so spaces do not become separate clauses.
         cql = 'cql.textAndIndexes="%s"' % query.replace('"', "")
         params = {
@@ -214,31 +342,26 @@ class KoopClient:
             "maximumRecords": max(1, min(int(limit), 100)),
         }
         url = "%s?%s" % (KOOP_SRU, urllib.parse.urlencode(params))
-        raw = _fetch(url)
-        try:
-            root = ET.fromstring(raw.encode("utf-8"))
-        except ET.ParseError as exc:
-            raise NlError("KOOP returned unparseable SRU XML: %s" % exc) from exc
-        diag = root.find(".//{http://docs.oasis-open.org/ns/search-ws/diagnostic}message")
-        if diag is not None:
-            raise NlError("KOOP SRU diagnostic: %s" % "".join(diag.itertext()))
+        root = _sru_root(url)
         total = int(root.findtext(SRU + "numberOfRecords") or 0)
         results = []
         for rec in root.findall(".//" + SRU + "record"):
             def dcv(tag: str) -> str:
-                el = rec.find(".//" + DCTERMS + tag)
-                return "".join(el.itertext()).strip() if el is not None else ""
+                return _text(rec, ".//" + DCTERMS + tag)
             ident = dcv("identifier")
-            url_el = rec.find(".//" + GZD + "itemUrl")
+            # The publication's own page (officielebekendmakingen.nl). These
+            # are not consolidated law and have no wetten.overheid.nl address.
+            url_el = rec.find(".//" + GZD + "preferredUrl")
+            if url_el is None:
+                url_el = rec.find(".//" + GZD + "itemUrl")
             results.append({
                 "identifier": ident,
                 "title": dcv("title"),
                 "type": dcv("type"),
                 "date": dcv("modified") or dcv("issued") or dcv("date"),
                 "authority": dcv("creator") or dcv("publisher"),
-                "url": ("".join(url_el.itertext()).strip() if url_el is not None
-                        else ("https://wetten.overheid.nl/%s" % ident if ident else "")),
+                "url": "".join(url_el.itertext()).strip() if url_el is not None else "",
                 "citation": "%s (%s)" % (dcv("title"), ident) if ident else dcv("title"),
             })
-        return {"total": total, "returned": len(results), "request_url": url,
-                "results": results}
+        return {"source": "official_publications", "total": total,
+                "returned": len(results), "request_url": url, "results": results}

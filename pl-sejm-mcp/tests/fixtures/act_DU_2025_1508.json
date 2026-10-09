@@ -1,0 +1,61 @@
+{
+ "address": "WDU20250001508",
+ "announcementDate": "2025-10-09",
+ "changeDate": "2026-06-18T09:19:29",
+ "displayAddress": "Dz.U. 2025 poz. 1508",
+ "pos": 1508,
+ "promulgation": "2025-11-03",
+ "publisher": "DU",
+ "status": "akt objęty tekstem jednolitym",
+ "textHTML": false,
+ "textPDF": true,
+ "title": "Ustawa z dnia 9 października 2025 r. o zmianie ustawy - Kodeks cywilny",
+ "type": "Ustawa",
+ "volume": 0,
+ "year": 2025,
+ "authorizedBody": [],
+ "directives": [],
+ "entryIntoForce": "2025-12-04",
+ "inForce": "IN_FORCE",
+ "keywords": [
+  "kodeks cywilny"
+ ],
+ "keywordsNames": [],
+ "obligated": [],
+ "previousTitle": [],
+ "prints": [
+  {
+   "link": "https://www.sejm.gov.pl/Sejm10.nsf/PrzebiegProc.xsp?nr=1425",
+   "linkPrintAPI": "https://api.sejm.gov.pl/sejm/term10/prints/1425",
+   "linkProcessAPI": "https://api.sejm.gov.pl/sejm/term10/processes/1425",
+   "number": "1425",
+   "term": 10
+  }
+ ],
+ "references": {
+  "Akty zmienione": [
+   {
+    "id": "DU/1964/93",
+    "date": "2025-12-04"
+   }
+  ]
+ },
+ "releasedBy": [
+  "SEJM"
+ ],
+ "texts": [
+  {
+   "fileName": "D20251508.pdf",
+   "type": "O"
+  },
+  {
+   "fileName": "D20251508.pdf",
+   "type": "I"
+  },
+  {
+   "fileName": "D20251508L.pdf",
+   "type": "T"
+  }
+ ],
+ "ELI": "DU/2025/1508"
+}

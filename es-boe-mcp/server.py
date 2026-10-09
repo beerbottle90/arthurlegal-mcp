@@ -19,7 +19,7 @@ from boe import BoeClient, BoeError
 from mcpcore import McpError, Tool, run
 from retrieval import Index, embeddings_status
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 _client = BoeClient()
 _index = Index()
@@ -28,7 +28,10 @@ INSTRUCTIONS = """Spanish legislation from the BOE (Boletín Oficial del Estado)
 
 Call order
 1. `search_legislation` to find the act (searches the local index).
-2. `get_act` for metadata + status, or `get_act_text` for the consolidated text.
+2. `get_act` for metadata + status (no text), or `get_act_text` for the
+   consolidated text with the same header. The text gives each provision in the
+   version in force today; `as_of` gives it on another date. Long acts are
+   paged: pass `offset` = `next_offset`.
 3. `get_document` only when you deliberately want the text AS PUBLISHED.
 
 Two rules that matter for Spanish law:
@@ -80,15 +83,20 @@ def _t_search(args: Dict[str, Any]) -> Any:
 
 def _t_get_act(args: Dict[str, Any]) -> Any:
     try:
-        return _client.get_consolidated(args["boe_id"])
-    except BoeError as exc:
+        return _client.get_act(args["boe_id"])
+    except (BoeError, KeyError) as exc:
         raise McpError(str(exc)) from exc
 
 
 def _t_get_act_text(args: Dict[str, Any]) -> Any:
     try:
-        return _client.get_text(args["boe_id"], max_chars=int(args.get("max_chars", 60000)))
-    except BoeError as exc:
+        return _client.get_text(
+            args["boe_id"],
+            max_chars=int(args.get("max_chars", 60000)),
+            offset=int(args.get("offset", 0)),
+            as_of=args.get("as_of", "") or "",
+        )
+    except (BoeError, KeyError, ValueError) as exc:
         raise McpError(str(exc)) from exc
 
 
@@ -151,23 +159,28 @@ TOOLS = [
     ),
     Tool(
         "get_act",
-        "Consolidated act metadata: title, rango, department, dates, subjects "
-        "(materias) and the repeal/annulment status flags. Use before quoting an "
-        "act so you can state whether it is still in force.",
+        "Consolidated act metadata only — no text: title, rango, department, "
+        "dates, subjects (materias) and the repeal/annulment/spent status flags. "
+        "Use before quoting an act so you can state whether it is still in force.",
         {"type": "object", "properties": {"boe_id": _ID}, "required": ["boe_id"]},
         _t_get_act,
     ),
     Tool(
         "get_act_text",
-        "Full CONSOLIDATED text of an act — amendments applied, i.e. the law as "
-        "currently in force. Long acts are truncated with an explicit marker "
-        "(the Ley de Sociedades de Capital is ~960,000 characters); raise "
-        "max_chars or ask for a specific article.",
+        "CONSOLIDATED text of an act — amendments applied, each provision in the "
+        "version in force today (or on `as_of`) — with its header: title, rango, "
+        "dates, status flags and `citation`. Long acts come in windows of "
+        "max_chars; continue with `offset` = `next_offset` (the Código Civil in "
+        "force is ~900,000 characters).",
         {
             "type": "object",
             "properties": {
                 "boe_id": _ID,
                 "max_chars": {"type": "integer", "default": 60000},
+                "offset": {"type": "integer", "default": 0,
+                           "description": "Character offset to start from; use next_offset."},
+                "as_of": {"type": "string",
+                          "description": "YYYY-MM-DD: the text in force on that date. Default today."},
             },
             "required": ["boe_id"],
         },

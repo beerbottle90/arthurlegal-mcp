@@ -227,6 +227,31 @@ curl -s -X POST http://127.0.0.1:8000/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
+## Load on e-qanun.az
+
+Every request goes through one gate (`eqanun/_gate.py`), shared by all clients in
+a process:
+
+- **At most 30 calls a minute for all machines together.** With two machines that is
+  one call every 4 s on each, one in flight at a time. `EQANUN_DAKIKA_AZAMI` can lower
+  the budget but not raise it above 30.
+- **No long queues.** A request that would wait more than 20 s is refused before it
+  is sent (`EQANUN_KUYRUK_SN`).
+- **Backing off, not knocking.**
+  - 429 or 503 pauses all requests (Retry-After is honoured; the pause doubles up to
+    15 minutes).
+  - 401 or 403 pauses them for an hour.
+  - Three timeouts or server errors in a row pause them for a minute, doubling up to
+    15 minutes.
+  - A timeout is never retried.
+- **A daily cap** of 3,000 calls for all machines (`EQANUN_GUNLUK_AZAMI`).
+- **A cache** in front of the gate: the same question within 6 hours costs the server
+  nothing (32 MB, `EQANUN_ONBELLEK_MB`).
+
+`server_status` reports the gate and the cache, and probes e-qanun.az only when the
+gate is open. The machine count comes from `EQANUN_MAKINE_SAYISI`, else
+`TKGM_MAKINE_SAYISI`, else 2 on Fly and 1 elsewhere.
+
 ## Verify
 
 Offline unit tests — no network, safe to run in CI:

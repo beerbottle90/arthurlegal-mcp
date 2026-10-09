@@ -3,6 +3,7 @@
     python crawl.py --from 2024-01-01 --to 2026-08-30            # summaries (fast)
     python crawl.py --from 2026-01-01 --to 2026-08-30 --full     # + full judgment texts
     python crawl.py --from 2026-06-01 --to 2026-08-30 --full --embed
+    python crawl.py --backfill-court      # repair an older index, no network
 
 Two depths, because the cost difference is three orders of magnitude
 -------------------------------------------------------------------
@@ -21,6 +22,11 @@ index size, so a thin result is never mistaken for a settled question.
 
 Rechtspraak publishes metadata for far more decisions than it publishes texts, so
 some documents will legitimately have an empty body even in full mode.
+
+Summary crawls before 2026-10 stored no court, which leaves the ``court``
+filter of ``search_caselaw`` unable to match those rows. Every stored title
+names the court, so ``--backfill-court`` repairs such an index in place,
+offline, instead of crawling it again.
 """
 
 from __future__ import annotations
@@ -29,7 +35,7 @@ import argparse
 import sys
 import time
 
-from rechtspraak import NlError, RechtspraakClient
+from rechtspraak import NlError, RechtspraakClient, court_from_title
 from retrieval import Index, embeddings_available
 
 
@@ -48,12 +54,12 @@ def crawl(index: Index, date_from: str, date_to: str, full: bool = False,
             if not ecli:
                 continue
             body = item.get("summary") or ""
-            court, date_str, subject_str, docket = "", day, subject, ""
+            court, date_str, subject_str, docket = item.get("court", ""), day, subject, ""
             if full:
                 try:
                     doc = client.get_decision(ecli, max_chars=200000)
                     body = doc.get("text") or doc.get("abstract") or body
-                    court = doc.get("court", "")
+                    court = doc.get("court") or court
                     date_str = doc.get("date") or day
                     subject_str = doc.get("subject", "")
                     docket = doc.get("docket", "")
@@ -91,18 +97,42 @@ def crawl(index: Index, date_from: str, date_to: str, full: bool = False,
     return total
 
 
+def backfill_court(index: Index) -> int:
+    """Fill the court of rows stored without one, from their titles. No network.
+
+    Returns the number of rows repaired. The FTS tables do not index the court,
+    so no rebuild is needed afterwards.
+    """
+    rows = index.db.execute("SELECT id, title FROM docs WHERE court = ''").fetchall()
+    fixed = 0
+    for row in rows:
+        court = court_from_title(row["title"])
+        if court:
+            index.db.execute("UPDATE docs SET court = ? WHERE id = ?", (court, row["id"]))
+            fixed += 1
+    index.db.commit()
+    return fixed
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Build the nl-rechtspraak-mcp case-law index")
-    ap.add_argument("--from", dest="date_from", required=True, help="YYYY-MM-DD")
-    ap.add_argument("--to", dest="date_to", required=True, help="YYYY-MM-DD")
+    ap.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
+    ap.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
     ap.add_argument("--full", action="store_true", help="fetch full judgment texts (slow)")
     ap.add_argument("--subject", default="", help="rechtsgebied URI, see list_vocabulary")
     ap.add_argument("--max", dest="max_docs", type=int, default=0)
     ap.add_argument("--embed", action="store_true")
     ap.add_argument("--index", default=None)
+    ap.add_argument("--backfill-court", action="store_true",
+                    help="only fill missing courts from stored titles (offline), then exit")
     args = ap.parse_args()
 
     index = Index(args.index)
+    if args.backfill_court:
+        sys.stderr.write("court filled for %d decisions\n" % backfill_court(index))
+        return
+    if not (args.date_from and args.date_to):
+        ap.error("--from and --to are required unless --backfill-court is given")
     n = crawl(index, args.date_from, args.date_to, full=args.full,
               subject=args.subject, max_docs=args.max_docs)
     sys.stderr.write("indexed %d decisions\n" % n)

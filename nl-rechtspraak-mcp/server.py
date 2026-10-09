@@ -4,7 +4,7 @@
     python server.py                                 # stdio
     python server.py --transport http --port 8000    # http://127.0.0.1:8000/mcp
 
-Legislation search works immediately (KOOP SRU has real full-text search).
+Legislation search works immediately (KOOP SRU searches upstream).
 Case-law search needs an index first:
 
     python crawl.py --from 2024-01-01 --to 2026-08-30
@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from mcpcore import McpError, Tool, run
-from rechtspraak import KoopClient, NlError, RechtspraakClient
+from rechtspraak import KoopClient, NlError, RechtspraakClient, court_from_title
 from retrieval import Index, embeddings_status
 
 __version__ = "1.0.0"
@@ -25,7 +25,7 @@ _laws = KoopClient()
 _index = Index()
 
 INSTRUCTIONS = """Dutch law: case law from Rechtspraak Open Data and legislation
-from the KOOP SRU repository.
+from KOOP's SRU services (consolidated law and official publications).
 
 THE ONE THING TO INTERNALISE. The official Dutch case-law API has **no free-text
 search**, and it silently ignores parameters it does not recognise — passing
@@ -36,8 +36,13 @@ whatever has been crawled. Call `server_status` to see that coverage before
 concluding something does not exist. `browse_caselaw` uses only the filters the
 API genuinely honours (date, court, legal area).
 
-Legislation is the opposite: `search_legislation` passes a real CQL full-text
-query to KOOP and searches the whole corpus.
+Legislation is the opposite: `search_legislation` searches upstream, no index
+needed. By default it searches CONSOLIDATED law (BWB, the database behind
+wetten.overheid.nl) by title or abbreviation and returns the version in force
+today, or on `as_of`. Its `url` is the permanent wetten.overheid.nl address
+keyed by the BWBR id — cite that. Staatsblad, Staatscourant and other official
+publications are a separate source (`source="official_publications"`,
+full-text): announcements and amending acts, not the law as it now reads.
 
 ECLI DISCIPLINE. An ECLI is the citation. Copy it verbatim from a result; never
 construct or guess one. A malformed ECLI is rejected rather than guessed at.
@@ -69,6 +74,19 @@ def _t_search_caselaw(args: Dict[str, Any]) -> Any:
         limit=int(args.get("limit", 20)),
         filters=filters,
     )
+    for item in out["results"]:
+        if not item.get("court"):
+            # Summary crawls before 2026-10 stored no court; the title names it.
+            item["court"] = court_from_title(item.get("title", ""))
+    if filters.get("court"):
+        missing = _index.db.execute("SELECT COUNT(*) FROM docs WHERE court = ''").fetchone()[0]
+        if missing:
+            out["court_filter_warning"] = (
+                "%d indexed decisions have no court stored (crawled before courts "
+                "were recorded), so this filter cannot match them. The operator "
+                "can repair the index offline with `python crawl.py "
+                "--backfill-court`; until then, search without `court` and read "
+                "the court from each result." % missing)
     out["index_coverage"] = _index.get_state("coverage") or "unknown — call server_status"
     out["coverage_warning"] = (
         "Searches the LOCAL index only, not all 3.75M Dutch decisions. Absence "
@@ -110,11 +128,22 @@ def _t_get_decision(args: Dict[str, Any]) -> Any:
 def _t_search_legislation(args: Dict[str, Any]) -> Any:
     try:
         out = _laws.search(args["query"], start=int(args.get("start", 1)),
-                           limit=int(args.get("limit", 20)))
+                           limit=int(args.get("limit", 20)),
+                           source=args.get("source") or "consolidated",
+                           as_of=args.get("as_of", ""))
     except (NlError, KeyError) as exc:
         raise McpError(str(exc)) from exc
-    out["scope"] = ("Full-text CQL search across the whole KOOP repository — "
-                    "not limited by any local index.")
+    if out["source"] == "consolidated":
+        out["scope"] = (
+            "Consolidated law (BWB, wetten.overheid.nl), searched by title and "
+            "abbreviation — one result per regulation, the version valid on "
+            "`as_of`. For Staatsblad/Staatscourant texts use "
+            "source='official_publications'.")
+    else:
+        out["scope"] = (
+            "Full-text CQL search across KOOP's official publications "
+            "(gazettes, parliamentary papers). These are announcements and "
+            "amending acts, not consolidated law.")
     return out
 
 
@@ -131,7 +160,9 @@ def _t_status(args: Dict[str, Any]) -> Any:
         "version": __version__,
         "sources": {
             "case law": "data.rechtspraak.nl Open Data — 3,751,381 ECLIs, no auth",
-            "legislation": "repository.overheid.nl SRU 2.0 — full-text CQL, no auth",
+            "legislation": "zoekservice.overheid.nl SRU (BWB, consolidated law, "
+                           "default) + repository.overheid.nl SRU 2.0 (official "
+                           "publications, full-text) — no auth",
         },
         "indexed_decisions": _index.count(),
         "index_coverage": _index.get_state("coverage") or "not crawled",
@@ -209,17 +240,28 @@ TOOLS = [
     ),
     Tool(
         "search_legislation",
-        "Full-text search of Dutch legislation and official publications via KOOP "
-        "SRU 2.0. Unlike case law this IS a real upstream search across the whole "
-        "repository — verified to discriminate ('energiewet' 1,961 records, "
-        "'mededinging' 20,991). Returns titles, identifiers and wetten.overheid.nl "
-        "links.",
+        "Search Dutch legislation upstream via KOOP SRU. Default "
+        "(source='consolidated'): consolidated law in BWB, the database behind "
+        "wetten.overheid.nl, by title words or abbreviation ('Burgerlijk Wetboek "
+        "Boek 6', 'Awb', or a BWBR id). One result per regulation — the version "
+        "valid today or on `as_of` — with the permanent wetten.overheid.nl link "
+        "(`url`, keyed by the BWBR id), the dated version link and its validity "
+        "(`valid_from`/`valid_to`). source='official_publications' instead "
+        "full-text searches the Staatsblad, Staatscourant and parliamentary "
+        "papers: announcements and amending acts, not the law as it now reads.",
         {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Dutch terms, e.g. 'energiewet', 'warmtewet'."},
+                "query": {"type": "string", "description": "Title words, an abbreviation or a BWBR id, e.g. 'energiewet', 'Burgerlijk Wetboek Boek 6', 'Awb'."},
+                "source": {
+                    "type": "string",
+                    "enum": ["consolidated", "official_publications"],
+                    "default": "consolidated",
+                    "description": "consolidated = BWB / wetten.overheid.nl; official_publications = gazettes and parliamentary papers (full text).",
+                },
+                "as_of": {"type": "string", "description": "YYYY-MM-DD — consolidated only: the version valid on this date (default today). BWB's version history starts around 2002; earlier dates miss most regulations."},
                 "start": {"type": "integer", "default": 1, "description": "1-indexed record offset."},
-                "limit": {"type": "integer", "default": 20},
+                "limit": {"type": "integer", "default": 20, "description": "Max 100."},
             },
             "required": ["query"],
         },

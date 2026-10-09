@@ -10,7 +10,9 @@ occasional gap, so a single miss is not the end of the year.
 
 Whole Act bodies are indexed. Irish Acts are long but the yearly volume is small
 (a few dozen Acts), so unlike Spain this corpus fits comfortably and full-text
-search works properly.
+search works properly. The body is the print view ("View Full Act"): the ELI
+page the crawler used to read is the Act's contents page, so an index built
+from it held section headings and the long title but no section text.
 """
 
 from __future__ import annotations
@@ -28,20 +30,26 @@ def crawl(index: Index, year_from: int, year_to: int, probe_limit: int = 80,
     client = StatuteBookClient()
     total = 0
     for year in range(int(year_from), int(year_to) + 1):
-        acts = client.list_year(year, probe_limit=probe_limit)
+        acts = client.list_year(year, probe_limit=probe_limit, full_text=True)
         for act in acts:
+            # The enactment date the page states. It used to be "<year>-01-01"
+            # for every Act; an unknown date now stays empty instead.
+            date = act.get("date") or ""
             index.upsert({
                 "ref": "IE/%d/act/%d" % (act["year"], act["number"]),
                 "title": act["title"],
                 "body": act["text"],
                 "url": act["url"],
                 "lang": "en",
-                "date": "%d-01-01" % act["year"],
+                "date": date,
                 "status": "as enacted",
                 "court": "Oireachtas",
                 "citation": act["citation"],
                 "meta": {"year": act["year"], "number": act["number"],
-                         "version": "enacted"},
+                         "version": "enacted",
+                         # Marks rows written since dates were recorded; the
+                         # server corrects older rows' placeholder at search time.
+                         "date_source": act.get("date_source") or ""},
             })
             total += 1
         index.db.commit()
@@ -50,7 +58,7 @@ def crawl(index: Index, year_from: int, year_to: int, probe_limit: int = 80,
     index.reindex_fts()
     index.set_state("last_crawl", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     prev = index.get_state("coverage")
-    note = "Acts %s-%s (as enacted)" % (year_from, year_to)
+    note = "Acts %s-%s (as enacted, full text)" % (year_from, year_to)
     index.set_state("coverage", (prev + " | " + note) if prev else note)
     return total
 

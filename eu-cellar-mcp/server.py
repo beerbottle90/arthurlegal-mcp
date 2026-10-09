@@ -12,13 +12,17 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from cellar import LANGS, CellarClient, CellarError
+from cellar import LANGS, POOL_CAP, CellarClient, CellarError
 from mcpcore import McpError, Tool, run
 from retrieval import embeddings_status, semantic_rerank
 
 __version__ = "1.0.0"
 
 _client = CellarClient()
+
+# Candidates handed to the reranker: the head of the prior-ordered pool, as many
+# as semantic_rerank embeds in one call. The answer is cut to `limit` after.
+RERANK_POOL = 200
 
 INSTRUCTIONS = """EU law from CELLAR, the Publications Office's semantic
 repository — the machine-readable layer behind EUR-Lex. Regulations, directives,
@@ -60,13 +64,18 @@ TOOLS = [
     Tool(
         name="search_eu_law",
         description=(
-            "Search EU legislation and case law by words in the title. Returns "
-            "CELEX numbers, which every other tool needs. Results are reranked "
-            "locally by relevance."),
+            "Search EU legislation and case law by words in the title: every "
+            "word must appear (punctuation and one- or two-letter words such as "
+            "'v' or 'EU' are ignored). Returns CELEX numbers, which every other "
+            "tool needs, one entry per CELEX. Order: binding legislation, then "
+            "the Courts' judgments/opinions/orders, then consolidated texts, "
+            "then other documents (preparatory acts, OJ case notices, "
+            "questions); within each, titles containing the query as a phrase "
+            "first, then local relevance ranking."),
         input_schema={
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "words appearing in the title"},
+                "query": {"type": "string", "description": "words appearing in the title, e.g. 'general data protection regulation', 'Schrems'"},
                 "language": {"type": "string", "enum": sorted(LANGS), "default": "en"},
                 "date_from": {"type": "string", "description": "YYYY-MM-DD"},
                 "date_to": {"type": "string", "description": "YYYY-MM-DD"},
@@ -137,24 +146,40 @@ TOOLS = [
 
 def _t_search(args: Dict[str, Any]) -> Any:
     query = args.get("query", "")
+    limit = max(1, min(int(args.get("limit", 10)), 100))
     try:
         raw = _client.search(query, args.get("language", "en"),
                              args.get("date_from", ""), args.get("date_to", ""),
-                             int(args.get("limit", 10)))
+                             limit=RERANK_POOL)
     except CellarError as exc:
         raise McpError(str(exc)) from exc
+    # Rerank the whole candidate pool, then restore the prior (group, phrase):
+    # the sort is stable, so relevance decides the order inside each tier.
     ranked = semantic_rerank(query, raw["results"], fields=("title",))
-    return {
+    results = sorted(ranked["results"], key=lambda d: d["_tier"])[:limit]
+    for item in results:
+        item.pop("_tier", None)
+    out = {
         "query": query,
         "language": raw["language"],
-        "returned": len(ranked["results"]),
+        "returned": len(results),
+        "candidates": raw["matched"],
         "ranking": {"method": ranked["method"],
-                    "note": ranked.get("note") or ranked.get("warning")},
+                    "note": ranked.get("note") or ranked.get("warning"),
+                    "order": "group (legislation, case_law, consolidated, other), "
+                             "then whole-phrase title matches, then relevance"},
         "scope_note": ("Title search only — this does not search the body of "
-                       "acts. CELEX prefix 3 = legislation, 6 = case law, "
-                       "0 with a date suffix = consolidated text."),
-        "results": ranked["results"],
+                       "acts. Matched words: %s. CELEX prefix 3 = legislation, "
+                       "6 = case law, 0 with a date suffix = consolidated text."
+                       % ", ".join(raw["words"])),
+        "results": results,
     }
+    if raw["truncated"]:
+        out["candidates_note"] = (
+            "At least %d titles contain these words; only the first %d CELLAR "
+            "returned (in no particular order) were ranked. Add words or a date "
+            "range to narrow the search." % (POOL_CAP, POOL_CAP))
+    return out
 
 
 def _t_metadata(args: Dict[str, Any]) -> Any:

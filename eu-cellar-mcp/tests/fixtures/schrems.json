@@ -1,0 +1,388 @@
+{
+ "head": {
+  "link": [],
+  "vars": [
+   "celex",
+   "title",
+   "date"
+  ]
+ },
+ "results": {
+  "bindings": [
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62021CJ0446"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the Court (Fourth Chamber) of 4 October 2024.#Maximilian Schrems v Meta Platforms Ireland Limited.#Request for a preliminary ruling from the Oberster Gerichtshof.#Reference for a preliminary ruling – Protection of natural persons with regard to the processing of personal data – Regulation (EU) 2016/679 – Online social networks – General terms of use relating to contracts concluded between a digital platform and a user – Personalised advertising – Article 5(1)(b) – Principle of purpose limitation – Article 5(1)(c) – Principle of data minimisation – Article 9(1) and (2) – Processing of special categories of personal data – Data concerning sexual orientation – Data which are made public by the data subject.#Case C-446/21."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2024-10-04"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62021CA0446"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case C-446/21, Schrems (Disclosure of data to the general public): Judgment of the Court (Fourth Chamber) of 4 October 2024 (request for a preliminary ruling from the Oberster Gerichtshof – Austria) – Maximilian Schrems v Meta Platforms Ireland Ltd, formerly Facebook Ireland Ltd (Reference for a preliminary ruling – Protection of natural persons with regard to the processing of personal data – Regulation (EU) 2016/679 – Online social networks – General terms of use relating to contracts concluded between a digital platform and a user – Personalised advertising – Article 5(1)(b) – Principle of purpose limitation – Article 5(1)(c) – Principle of data minimisation – Article 9(1) and (2) – Processing of special categories of personal data – Data concerning sexual orientation – Data which are made public by the data subject)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2024-10-04"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62021CC0446"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Rantos delivered on 25 April 2024.#Maximilian Schrems v Meta Platforms Ireland Limited.#Request for a preliminary ruling from the Oberster Gerichtshof.#Reference for a preliminary ruling – Protection of natural persons with regard to the processing of personal data – Regulation (EU) 2016/679 – Online social networks – General terms of use relating to contracts concluded between a digital platform and a user – Personalised advertising – Article 5(1)(b) – Principle of purpose limitation – Article 5(1)(c) – Principle of data minimisation – Article 9(1) and (2) – Processing of special categories of personal data – Data concerning sexual orientation – Data which are made public by the data subject.#Case C-446/21."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2024-04-25"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62021CN0446"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case C-446/21: Request for a preliminary ruling from the Oberster Gerichtshof (Austria) lodged on 20 July 2021 — Maximilian Schrems v Facebook Ireland Ltd"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2021-07-20"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "52021IP0256"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "European Parliament resolution of 20 May 2021 on the ruling of the CJEU of 16 July 2020 — Data Protection Commissioner v Facebook Ireland Limited and Maximillian Schrems (‘Schrems II’), Case C-311/18 (2020/2789(RSP))"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2021-05-20"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62018CJ0311_RES"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the Court (Grand Chamber) of 16 July 2020.#Data Protection Commissioner v Facebook Ireland Limited and Maximillian Schrems.#Reference for a preliminary ruling — Protection of individuals with regard to the processing of personal data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Regulation (EU) 2016/679 — Article 2(2) — Scope — Transfers of personal data to third countries for commercial purposes — Article 45 — Commission adequacy decision — Article 46 — Transfers subject to appropriate safeguards — Article 58 — Powers of the supervisory authorities — Processing of the data transferred by the public authorities of a third country for national security purposes — Assessment of the adequacy of the level of protection in the third country — Decision 2010/87/EU — Protective standard clauses on the transfer of personal data to third countries — Suitable safeguards provided by the data controller — Validity — Implementing Decision (EU) 2016/1250 — Adequacy of the protection provided by the EU-US Privacy Shield — Validity — Complaint by a natural person whose data was transferred from the European Union to the United States.#Case C-311/18."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2020-07-16"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62018CJ0311"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the Court (Grand Chamber) of 16 July 2020.#Data Protection Commissioner v Facebook Ireland Limited and Maximillian Schrems.#Reference for a preliminary ruling — Protection of individuals with regard to the processing of personal data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Regulation (EU) 2016/679 — Article 2(2) — Scope — Transfers of personal data to third countries for commercial purposes — Article 45 — Commission adequacy decision — Article 46 — Transfers subject to appropriate safeguards — Article 58 — Powers of the supervisory authorities — Processing of the data transferred by the public authorities of a third country for national security purposes — Assessment of the adequacy of the level of protection in the third country — Decision 2010/87/EU — Protective standard clauses on the transfer of personal data to third countries — Suitable safeguards provided by the data controller — Validity — Implementing Decision (EU) 2016/1250 — Adequacy of the protection provided by the EU-US Privacy Shield — Validity — Complaint by a natural person whose data was transferred from the European Union to the United States.#Case C-311/18."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2020-07-16"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62018CJ0311"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the Court (Grand Chamber) of 16 July 2020.#Data Protection Commissioner v Facebook Ireland Limited and Maximillian Schrems.#Request for a preliminary ruling from the High Court (Ireland).#Reference for a preliminary ruling — Protection of individuals with regard to the processing of personal data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Regulation (EU) 2016/679 — Article 2(2) — Scope — Transfers of personal data to third countries for commercial purposes — Article 45 — Commission adequacy decision — Article 46 — Transfers subject to appropriate safeguards — Article 58 — Powers of the supervisory authorities — Processing of the data transferred by the public authorities of a third country for national security purposes — Assessment of the adequacy of the level of protection in the third country — Decision 2010/87/EU — Protective standard clauses on the transfer of personal data to third countries — Suitable safeguards provided by the data controller — Validity — Implementing Decision (EU) 2016/1250 — Adequacy of the protection provided by the EU-US Privacy Shield — Validity — Complaint by a natural person whose data was transferred from the European Union to the United States.#Case C-311/18."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2020-07-16"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62018CA0311"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case C-311/18: Judgment of the Court (Grand Chamber) of 16 July 2020 (request for a preliminary ruling from the High Court (Ireland) — Ireland) — Data Protection Commissioner v Facebook Ireland Ltd, Maximillian Schrems (Reference for a preliminary ruling — Protection of individuals with regard to the processing of personal data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Regulation (EU) 2016/679 — Article 2(2) — Scope — Transfers of personal data to third countries for commercial purposes — Article 45 — Commission adequacy decision — Article 46 — Transfers subject to appropriate safeguards — Article 58 — Powers of the supervisory authorities — Processing of the data transferred by the public authorities of a third country for national security purposes — Assessment of the adequacy of the level of protection in the third country — Decision 2010/87/EU — Protective standard clauses on the transfer of personal data to third countries — Suitable safeguards provided by the data controller — Validity — Implementing Decision (EU) 2016/1250 — Adequacy of the protection provided by the EU-US Privacy Shield — Validity — Complaint by a natural person whose data was transferred from the European Union to the United States)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2020-07-16"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62018CC0311"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Saugmandsgaard Øe delivered on 19 December 2019.#Data Protection Commissioner v Facebook Ireland Limited and Maximillian Schrems.#Request for a preliminary ruling from the High Court (Ireland).#Reference for a preliminary ruling — Protection of individuals with regard to the processing of personal data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Regulation (EU) 2016/679 — Article 2(2) — Scope — Transfers of personal data to third countries for commercial purposes — Article 45 — Commission adequacy decision — Article 46 — Transfers subject to appropriate safeguards — Article 58 — Powers of the supervisory authorities — Processing of the data transferred by the public authorities of a third country for national security purposes — Assessment of the adequacy of the level of protection in the third country — Decision 2010/87/EU — Protective standard clauses on the transfer of personal data to third countries — Suitable safeguards provided by the data controller — Validity — Implementing Decision (EU) 2016/1250 — Adequacy of the protection provided by the EU-US Privacy Shield — Validity — Complaint by a natural person whose data was transferred from the European Union to the United States.#Case C-311/18."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2019-12-19"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62018CN0311"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case C-311/18: Reference for a preliminary ruling from the High Court (Ireland) made on 9 May 2018 — Data Protection Commissioner v Facebook Ireland Limited, Maximillian Schrems"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2018-05-09"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62016CA0498"
+    },
+    "title": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "Case C-498/16: Judgment of the Court (Third Chamber) of 25 January 2018 (request for a preliminary ruling from the Oberster Gerichtshof) — Maximilian Schrems v Facebook Ireland Limited (Reference for a preliminary ruling — Area of freedom, security and justice — Regulation (EC) No 44/2001 — Articles 15 and 16 — Jurisdiction in respect of consumer contracts — Definition of ‘consumer’ — Assignment between consumers of claims against the same trader or professional)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2018-01-25"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62016CJ0498"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the Court (Third Chamber) of 25 January 2018.#Maximilian Schrems v Facebook Ireland Limited.#Request for a preliminary ruling from the Oberster Gerichtshof.#Reference for a preliminary ruling — Area of freedom, security and justice — Regulation (EC) No 44/2001 — Articles 15 and 16 — Jurisdiction in respect of consumer contracts — Definition of ‘consumer’ — Assignment between consumers of claims against the same trader or professional.#Case C-498/16."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2018-01-25"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62016CC0498"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Bobek delivered on 14 November 2017.#Maximilian Schrems v Facebook Ireland Limited.#Request for a preliminary ruling from the Oberster Gerichtshof.#Reference for a preliminary ruling — Area of freedom, security and justice — Regulation (EC) No 44/2001 — Articles 15 and 16 — Jurisdiction in respect of consumer contracts — Definition of ‘consumer’ — Assignment between consumers of claims against the same trader or professional.#Case C-498/16."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2017-11-14"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62016CN0498"
+    },
+    "title": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "Case C-498/16: Request for a preliminary ruling from the Oberster Gerichtshof (Austria) lodged on 19 September 2016 — Maximilian Schrems v Facebook Ireland Limited"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2016-09-19"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "52015DC0566"
+    },
+    "title": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "COMMUNICATION FROM THE COMMISSION TO THE EUROPEAN PARLIAMENT AND THE COUNCIL on the Transfer of Personal Data from the EU to the United States of America under Directive 95/46/EC following the Judgment by the Court of Justice in Case C-362/14 (Schrems)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2015-11-06"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62014CA0362"
+    },
+    "title": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "Case C-362/14: Judgment of the Court (Grand Chamber) of 6 October 2015 (request for a preliminary ruling from the High Court (Ireland)) — Maximillian Schrems v Data Protection Commissioner (Reference for a preliminary ruling — Personal data — Protection of individuals with regard to the processing of such data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Directive 95/46/EC — Articles 25 and 28 — Transfer of personal data to third countries — Decision 2000/520/EC — Transfer of personal data to the United States — Inadequate level of protection — Validity — Complaint by an individual whose data has been transferred from the European Union to the United States — Powers of the national supervisory authorities)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2015-10-06"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62014CJ0362"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the Court (Grand Chamber) of 6 October 2015.#Maximillian Schrems v Data Protection Commissioner.#Request for a preliminary ruling from the High Court (Ireland).#Reference for a preliminary ruling — Personal data — Protection of individuals with regard to the processing of such data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Directive 95/46/EC — Articles 25 and 28 — Transfer of personal data to third countries — Decision 2000/520/EC — Transfer of personal data to the United States — Inadequate level of protection — Validity — Complaint by an individual whose data has been transferred from the European Union to the United States — Powers of the national supervisory authorities.#Case C-362/14."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2015-10-06"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62014CJ0362"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the Court (Grand Chamber) of 6 October 2015.#Maximillian Schrems v Data Protection Commissioner.#Reference for a preliminary ruling — Personal data — Protection of individuals with regard to the processing of such data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Directive 95/46/EC — Articles 25 and 28 — Transfer of personal data to third countries — Decision 2000/520/EC — Transfer of personal data to the United States — Inadequate level of protection — Validity — Complaint by an individual whose data has been transferred from the European Union to the United States — Powers of the national supervisory authorities.#Case C-362/14."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2015-10-06"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62014CC0362"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Bot delivered on 23 September 2015.#Maximillian Schrems v Data Protection Commissioner.#Request for a preliminary ruling from the High Court (Ireland).#Reference for a preliminary ruling — Personal data — Protection of individuals with regard to the processing of such data — Charter of Fundamental Rights of the European Union — Articles 7, 8 and 47 — Directive 95/46/EC — Articles 25 and 28 — Transfer of personal data to third countries — Decision 2000/520/EC — Transfer of personal data to the United States — Inadequate level of protection — Validity — Complaint by an individual whose data has been transferred from the European Union to the United States — Powers of the national supervisory authorities.#Case C-362/14."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2015-09-23"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62014CN0362"
+    },
+    "title": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "Case C-362/14: Reference for a preliminary ruling from High Court of Ireland (Ireland) made on 25 July 2014 — Maximillian Schrems v Data Protection Commissioner"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2014-07-25"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "82014IE0717(01)"
+    },
+    "title": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "High Court of Ireland, request of 17/07/2014 # Maximillian Schrems / Data Protection Commissioner"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2014-07-17"
+    }
+   }
+  ]
+ }
+}

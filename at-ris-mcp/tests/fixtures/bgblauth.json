@@ -1,0 +1,147 @@
+{
+ "OgdSearchResult": {
+  "OgdDocumentResults": {
+   "Hits": {
+    "@pageNumber": "1",
+    "@pageSize": "10",
+    "#text": "180"
+   },
+   "OgdDocumentReference": [
+    {
+     "Data": {
+      "Metadaten": {
+       "Technisch": {
+        "ID": "BGBLA_2026_I_58",
+        "Applikation": "BgblAuth",
+        "Organ": "BMWET (Bundesministerium für Wirtschaft, Energie und Tourismus)",
+        "Einbringer": "BMWET (Bundesministerium für Wirtschaft, Energie und Tourismus)",
+        "ImportTimestamp": {
+         "@xsi:nil": "true",
+         "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+        }
+       },
+       "Allgemein": {
+        "DokumentUrl": "https://ogd.ris.bka.gv.at/eli/bgbl/I/2026/58/20260728"
+       },
+       "Bundesrecht": {
+        "Kurztitel": "Änderung des Bundesgesetzes gegen den unlauteren Wettbewerb 1984",
+        "Titel": "Bundesgesetz, mit dem das Bundesgesetz gegen den unlauteren Wettbewerb 1984 geändert wird ",
+        "Eli": "https://www.ris.bka.gv.at/eli/bgbl/I/2026/58/20260728",
+        "BgblAuth": {
+         "Bgblnummer": "BGBl. I Nr. 58/2026",
+         "Teil": "Teil1",
+         "Ausgabedatum": "2026-07-28",
+         "Typ": "Bundesgesetz",
+         "Gesetzgebungsperiode": "XXVIII",
+         "DatumNationalrat": "2026-07-07",
+         "NummerNationalrat": "87",
+         "Regierungsvorlage": {
+          "item": "528"
+         },
+         "AusschussberichtNationalrat": {
+          "item": "552"
+         },
+         "DatumBundesrat": "2026-07-16",
+         "NummerBundesrat": "994",
+         "AusschussberichtBundesrat": {
+          "item": "11863"
+         },
+         "CelexNummer": {
+          "item": [
+           "32023L2673",
+           "32024L0825"
+          ]
+         },
+         "AlteDokumentnummer": "BGBLA_2026_I_58"
+        }
+       }
+      },
+      "Dokumentliste": {
+       "ContentReference": {
+        "ContentType": "MainDocument",
+        "Name": "Hauptdokument",
+        "Urls": {
+         "ContentUrl": [
+          {
+           "DataType": "Xml",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_I_58/BGBLA_2026_I_58.xml"
+          },
+          {
+           "DataType": "Html",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_I_58/BGBLA_2026_I_58.html"
+          },
+          {
+           "DataType": "Rtf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_I_58/BGBLA_2026_I_58.rtf"
+          },
+          {
+           "DataType": "Authentisch",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_I_58/BGBLA_2026_I_58.pdf"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "Data": {
+      "Metadaten": {
+       "Technisch": {
+        "ID": "BGBLA_2026_II_197",
+        "Applikation": "BgblAuth",
+        "Organ": "BMWET (Bundesministerium für Wirtschaft, Energie und Tourismus)",
+        "Einbringer": "BMWET (Bundesministerium für Wirtschaft, Energie und Tourismus)",
+        "ImportTimestamp": {
+         "@xsi:nil": "true",
+         "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+        }
+       },
+       "Allgemein": {
+        "DokumentUrl": "https://ogd.ris.bka.gv.at/eli/bgbl/II/2026/197/20260713"
+       },
+       "Bundesrecht": {
+        "Kurztitel": "Glasbautechnik-Ausbildungsordnung",
+        "Titel": "Verordnung des Bundesministers für Wirtschaft, Energie und Tourismus über die Berufsausbildung im Lehrberuf Glasbautechnik (Glasbautechnik-Ausbildungsordnung)",
+        "Eli": "https://www.ris.bka.gv.at/eli/bgbl/II/2026/197/20260713",
+        "BgblAuth": {
+         "Bgblnummer": "BGBl. II Nr. 197/2026",
+         "Teil": "Teil2",
+         "Ausgabedatum": "2026-07-13",
+         "Typ": "Verordnung",
+         "AlteDokumentnummer": "BGBLA_2026_II_197"
+        }
+       }
+      },
+      "Dokumentliste": {
+       "ContentReference": {
+        "ContentType": "MainDocument",
+        "Name": "Hauptdokument",
+        "Urls": {
+         "ContentUrl": [
+          {
+           "DataType": "Xml",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_II_197/BGBLA_2026_II_197.xml"
+          },
+          {
+           "DataType": "Html",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_II_197/BGBLA_2026_II_197.html"
+          },
+          {
+           "DataType": "Rtf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_II_197/BGBLA_2026_II_197.rtf"
+          },
+          {
+           "DataType": "Authentisch",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_II_197/BGBLA_2026_II_197.pdf"
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}
