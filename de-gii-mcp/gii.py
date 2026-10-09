@@ -217,16 +217,25 @@ def toc() -> List[Dict[str, str]]:
 
 
 def search_laws(query: str, limit: int = 10) -> List[Dict[str, str]]:
-    """Acts whose title (or page name) matches ``query``; shorter titles first."""
+    """Acts whose title (or page name) matches ``query``; shorter titles first.
+
+    A query word standing as a word of the title ranks above one buried in a
+    compound: "Gesetzbuch" is the second word of "Bürgerliches Gesetzbuch" but
+    only the tail of "Strafgesetzbuch", and ranking both alike put the shorter
+    StGB, BauGB and HGB ahead of the BGB (hosted endpoint, 2026-10-09).
+    """
     q = query.strip().casefold()
     words = [w for w in re.split(r"\W+", q) if w]
     scored = []
     for it in toc():
         title = it["title"].casefold()
+        title_words = set(re.split(r"\W+", title))
         if q in (it["slug"], title):
             score = 3.0
         elif title.startswith(q):
             score = 2.0
+        elif words and all(w in title_words for w in words):
+            score = 1.5
         elif words and all(w in title for w in words):
             score = 1.0
         else:
