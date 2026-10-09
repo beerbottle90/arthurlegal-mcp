@@ -84,6 +84,11 @@ STDLIB_BACKENDS = [
     # file paths.
     ("tkgm", os.path.join(ROOT, "tkgm-mcp"), "srv_tkgm",
      "🇹🇷 Tapu-kadastro — canlı parsel (TKGM Parsel Sorgu, dakikada en çok 30 istek), rapor, kroki"),
+    # German statute text from gesetze-im-internet.de. NeuRIS, behind the proxied
+    # de-eli tools, lacks the core codes in its test phase (BGB, HGB, StGB, ZPO ...),
+    # so the text of a norm comes from here: same de_ prefix, different tool names.
+    ("de", os.path.join(ROOT, "de-gii-mcp"), "srv_de_gii",
+     "🇩🇪 Almanya — kanun metni (gesetze-im-internet.de)"),
 ]
 
 # The three older servers expose TOOLS as dicts with a "handler" key rather than
