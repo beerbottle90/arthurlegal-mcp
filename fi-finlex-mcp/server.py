@@ -34,8 +34,10 @@ TWO OFFICIAL LANGUAGES. Finnish (`fin@`) and Swedish (`swe@`) texts are equally
 authoritative and both are indexed. A search may return either; the `lang` field
 says which. That is correct behaviour, not a bug.
 
-NEVER BUILD AN IDENTIFIER. `get_act` needs a `lang_version` like `fin@20221099`
-— the trailing digits are a version stamp. Take it from `browse_year` or
+NEVER BUILD AN IDENTIFIER. A `lang_version` like `fin@20221099` carries a
+version stamp. For the current consolidated text pass just `fin@` or `swe@`
+(or nothing): the server asks Finlex for the latest version and reports the
+stamp it got in `lang_version`. A specific stamp comes from `browse_year` or
 `recent_changes`; an invented one is rejected, not guessed at.
 
 SEARCH IS LOCAL. Finlex has no full-text search endpoint, so `search_acts` runs
@@ -94,7 +96,7 @@ def _t_get_act(args: Dict[str, Any]) -> Any:
     try:
         return _client.get_act(
             args.get("act_type", "statute-consolidated"), int(args["year"]),
-            str(args["number"]), str(args["lang_version"]),
+            str(args["number"]), str(args.get("lang_version") or "fin@"),
             max_chars=int(args.get("max_chars", 60000)),
         )
     except (FinlexError, KeyError, ValueError) as exc:
@@ -164,20 +166,23 @@ TOOLS = [
     ),
     Tool(
         "get_act",
-        "Full text of one act. `lang_version` must be copied from a listing "
-        "(e.g. 'fin@20221099'); invented values are rejected. Returns the "
-        "consolidated text by default — `statute` gives the original publication "
-        "with amendments NOT applied.",
+        "Full text of one act. Returns the consolidated text by default — "
+        "`statute` gives the original publication with amendments NOT applied. "
+        "For the consolidated text, leave `lang_version` out or give 'fin@' / "
+        "'swe@': Finlex resolves the current version and the response names it "
+        "in `lang_version` (e.g. 412/1974 -> 'fin@20101051'). A full stamp from "
+        "a listing pins that version; invented stamps are rejected.",
         {
             "type": "object",
             "properties": {
                 "year": {"type": "integer"},
                 "number": {"type": "string", "description": "Act number within the year, e.g. '469'."},
-                "lang_version": {"type": "string", "description": "From a listing, e.g. 'fin@20221099' or 'swe@'."},
+                "lang_version": {"type": "string", "default": "fin@",
+                                 "description": "'fin@' / 'swe@' for the current version, or a stamp from a listing, e.g. 'fin@20221099'."},
                 "act_type": dict(_TYPE),
                 "max_chars": {"type": "integer", "default": 60000},
             },
-            "required": ["year", "number", "lang_version"],
+            "required": ["year", "number"],
         },
         _t_get_act,
     ),
