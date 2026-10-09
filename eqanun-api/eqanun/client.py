@@ -30,6 +30,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, Iterable, List, Optional, Union
 
+from ._gate import CACHE, GATE, ByteCache, Gate, GateRefused
 from ._html import decode_html, html_to_text
 
 API_BASE = "https://api.e-qanun.az"
@@ -59,6 +60,13 @@ def _timed_out(exc: BaseException) -> bool:
         or "timed out" in str(reason).lower()
 
 
+def _retry_after(exc: urllib.error.HTTPError) -> Optional[float]:
+    try:
+        return float((exc.headers or {}).get("Retry-After") or "")
+    except (TypeError, ValueError):
+        return None
+
+
 class EqanunClient:
     """Thin, polite client over the e-qanun.az public API."""
 
@@ -69,7 +77,13 @@ class EqanunClient:
         timeout: Optional[float] = None,
         retries: Optional[int] = None,
         retry_backoff: float = 1.5,
+        gate: Optional[Gate] = None,
+        cache: Union[bool, ByteCache] = True,
     ) -> None:
+        # Every client shares one gate unless a test hands it its own: the budget
+        # is per machine, not per client object.
+        self._gate = gate or GATE
+        self._cache = cache if isinstance(cache, ByteCache) else (CACHE if cache else None)
         # Precedence: explicit argument > EQANUN_USER_AGENT > library default.
         # Reading the env var here means the CLI and the MCP server inherit it
         # without either of them needing a flag of its own.
@@ -84,6 +98,10 @@ class EqanunClient:
 
     # ---------------------------------------------------------------- transport
     def _request(self, url: str, *, referer: Optional[str] = None) -> bytes:
+        if self._cache is not None:
+            cached = self._cache.get(url)
+            if cached is not None:
+                return cached     # costs e-qanun.az nothing
         headers = {
             "User-Agent": self.user_agent,
             "Accept": "application/json, text/html;q=0.9, */*;q=0.8",
@@ -95,14 +113,31 @@ class EqanunClient:
         for attempt in range(self.retries + 1):
             req = urllib.request.Request(url, headers=headers, method="GET")
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                    return resp.read()
+                with self._gate:
+                    with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                        body = resp.read()
+                self._gate.ok()
+                if self._cache is not None:
+                    self._cache.put(url, body)
+                return body
+            except GateRefused as exc:
+                raise EqanunError(str(exc)) from exc
             except urllib.error.HTTPError as exc:
-                # 4xx are deterministic; do not retry those.
+                if exc.code in (429, 503):
+                    self._gate.throttled(_retry_after(exc))
+                    raise EqanunError(f"e-qanun.az asked to slow down (HTTP {exc.code}); "
+                                      f"requests are paused") from exc
+                if exc.code in (401, 403):
+                    self._gate.refused()
+                    raise EqanunError(f"HTTP {exc.code} for {url}: access refused; requests "
+                                      f"are paused for an hour") from exc
+                # Other 4xx are deterministic; do not retry those.
                 if 400 <= exc.code < 500:
                     raise EqanunError(f"HTTP {exc.code} for {url}") from exc
+                self._gate.failed()
                 last_exc = exc
             except (urllib.error.URLError, TimeoutError) as exc:
+                self._gate.failed()
                 last_exc = exc
                 if _timed_out(exc):
                     # A host that silently drops the connection does not answer a

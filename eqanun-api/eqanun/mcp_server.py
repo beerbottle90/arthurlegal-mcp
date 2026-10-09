@@ -26,6 +26,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._gate import CACHE, GATE
 from .client import EqanunClient, EqanunError, __version__
 from .retrieval import embeddings_status, semantic_rerank
 
@@ -173,8 +174,10 @@ _STATUS = {"type": "string", "enum": ["in_force", "cancelled", "all"], "default"
 WARNING = "UYARI: veri çekilemedi, teyidiniz gerekli: https://e-qanun.az/"
 
 # The status probe gets its own short-fused client: status is called when
-# something looks wrong, and must answer before the caller gives up.
-_probe_client = EqanunClient(timeout=8.0, retries=0)
+# something looks wrong, and must answer before the caller gives up. It skips the
+# cache, since a cached answer says nothing about whether e-qanun answers now,
+# but it still goes through the shared gate.
+_probe_client = EqanunClient(timeout=8.0, retries=0, cache=False)
 
 
 def _guard(fn: Callable[[Dict[str, Any]], Any]) -> Callable[[Dict[str, Any]], Any]:
@@ -200,15 +203,25 @@ def _t_server_status(args: Dict[str, Any]) -> Any:
             'status defaults to in_force, which EXCLUDES repealed acts.',
         ],
     }
-    started = time.time()
-    try:
-        _probe_client.search("qanun", scope="title", length=1)
-        out["upstream_reachable"] = True
-        out["probe_seconds"] = round(time.time() - started, 2)
-    except Exception as exc:  # noqa: BLE001 - unreachable is a reportable state
+    gate = GATE.state()
+    out["gate"] = gate
+    out["cache"] = CACHE.state()
+    if gate["paused"]:
+        # Probing a paused upstream would be exactly the knocking the pause prevents.
         out["upstream_reachable"] = False
-        out["error"] = "%s (after %.1f s)" % (exc, time.time() - started)
+        out["error"] = "not probed: requests are paused for %d s (%s)" % (
+            gate["paused_for_s"], gate["pause_reason"])
         out["warning"] = WARNING
+    else:
+        started = time.time()
+        try:
+            _probe_client.search("qanun", scope="title", length=1)
+            out["upstream_reachable"] = True
+            out["probe_seconds"] = round(time.time() - started, 2)
+        except Exception as exc:  # noqa: BLE001 - unreachable is a reportable state
+            out["upstream_reachable"] = False
+            out["error"] = "%s (after %.1f s)" % (exc, time.time() - started)
+            out["warning"] = WARNING
     out.update(embeddings_status())
     return out
 
