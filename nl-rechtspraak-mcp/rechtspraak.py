@@ -69,6 +69,9 @@ SRU_DIAGNOSTICS = ("{http://docs.oasis-open.org/ns/search-ws/diagnostic}",
 
 ECLI_RE = re.compile(r"^ECLI:NL:[A-Z]+:\d{4}:[A-Z0-9.]+$", re.IGNORECASE)
 BWB_ID_RE = re.compile(r"^BWBR\d{7}$", re.IGNORECASE)
+# Atom titles read "ECLI:NL:HR:2026:919, Hoge Raad, 12-06-2026, 24/04627"; the
+# content record writes the same as "ECLI:NL:HR:2026:919 Hoge Raad , 12-06-2026 / ...".
+TITLE_COURT_RE = re.compile(r"^ECLI:\S+?[,\s]\s*(.+?)\s*,\s*\d{2}-\d{2}-\d{4}")
 
 # Parameters data.rechtspraak.nl actually honours. Anything else is dropped with
 # a warning rather than passed through to be silently ignored upstream.
@@ -94,6 +97,17 @@ def _fetch(url: str, timeout: int = 90) -> str:
 def _plain(xml_text: str) -> str:
     text = re.sub(r"<[^>]+>", " ", xml_text)
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
+
+
+def court_from_title(title: str) -> str:
+    """The court named in a Rechtspraak title, or "" when the title has another shape.
+
+    Search entries carry no separate court field, but every title names it. The
+    summary crawl used to store nothing, so this is also how rows indexed
+    before that fix get their court back without a re-crawl.
+    """
+    m = TITLE_COURT_RE.match((title or "").strip())
+    return m.group(1).strip() if m else ""
 
 
 class RechtspraakClient:
@@ -130,9 +144,11 @@ class RechtspraakClient:
         results = []
         for entry in root.findall(ATOM + "entry"):
             ecli = (entry.findtext(ATOM + "id") or "").strip()
+            title = (entry.findtext(ATOM + "title") or "").strip()
             results.append({
                 "ecli": ecli,
-                "title": (entry.findtext(ATOM + "title") or "").strip(),
+                "title": title,
+                "court": court_from_title(title),
                 "summary": (entry.findtext(ATOM + "summary") or "").strip(),
                 "updated": (entry.findtext(ATOM + "updated") or "").strip(),
                 "url": "https://uitspraken.rechtspraak.nl/details?id=%s" % ecli,
@@ -165,6 +181,11 @@ class RechtspraakClient:
             body_el = root.find(".//{*}conclusie")
             kind = "conclusie" if body_el is not None else "unknown"
         body = _plain(ET.tostring(body_el, encoding="unicode")) if body_el is not None else ""
+        # dcterms:abstract is only a pointer ("../../rs:inhoudsindicatie"); the
+        # official summary itself is the <inhoudsindicatie> element.
+        summary_el = root.find(".//{*}inhoudsindicatie")
+        summary = (_plain(ET.tostring(summary_el, encoding="unicode"))
+                   if summary_el is not None else "")
 
         docket = root.findtext(".//" + PSI + "zaaknummer") or ""
         out: Dict[str, Any] = {
@@ -178,7 +199,7 @@ class RechtspraakClient:
             "procedure": (root.findtext(".//" + PSI + "procedure") or "").strip(),
             "subject": dc("subject"),
             "language": dc("language") or "nl",
-            "abstract": dc("abstract"),
+            "abstract": summary or dc("abstract"),
             "document_kind": kind,
             "url": "https://uitspraken.rechtspraak.nl/details?id=%s" % ecli,
             "length_chars": len(body),

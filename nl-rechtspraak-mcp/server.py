@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from mcpcore import McpError, Tool, run
-from rechtspraak import KoopClient, NlError, RechtspraakClient
+from rechtspraak import KoopClient, NlError, RechtspraakClient, court_from_title
 from retrieval import Index, embeddings_status
 
 __version__ = "1.0.0"
@@ -74,6 +74,19 @@ def _t_search_caselaw(args: Dict[str, Any]) -> Any:
         limit=int(args.get("limit", 20)),
         filters=filters,
     )
+    for item in out["results"]:
+        if not item.get("court"):
+            # Summary crawls before 2026-10 stored no court; the title names it.
+            item["court"] = court_from_title(item.get("title", ""))
+    if filters.get("court"):
+        missing = _index.db.execute("SELECT COUNT(*) FROM docs WHERE court = ''").fetchone()[0]
+        if missing:
+            out["court_filter_warning"] = (
+                "%d indexed decisions have no court stored (crawled before courts "
+                "were recorded), so this filter cannot match them. The operator "
+                "can repair the index offline with `python crawl.py "
+                "--backfill-court`; until then, search without `court` and read "
+                "the court from each result." % missing)
     out["index_coverage"] = _index.get_state("coverage") or "unknown — call server_status"
     out["coverage_warning"] = (
         "Searches the LOCAL index only, not all 3.75M Dutch decisions. Absence "
