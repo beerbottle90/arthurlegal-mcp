@@ -1,11 +1,10 @@
 """One polite gate for every request to e-qanun.az, and a small cache in front of it.
 
-Access rests on the site owner's verbal permission, given on one condition: never
-more than 30 calls a minute and never a load the Ministry's server would notice.
-So the budget is for every machine together, a request that would queue too long
-is refused here and never sent, and repeated failures close the gate for a while
-instead of retrying into a server that is not answering. The same shape as the
-TKGM gate (tkgm-mcp/tkgm_canli.py), which has run under a similar promise.
+The load on e-qanun.az is kept negligible by design: never more than 30 calls a
+minute, and never a load the server would notice. The budget is for every machine
+together, a request that would queue too long is refused here and never sent, and
+repeated failures close the gate for a while instead of retrying into a server that
+is not answering. The same shape as the TKGM gate (tkgm-mcp/tkgm_canli.py).
 
     EQANUN_DAKIKA_AZAMI   calls a minute, all machines together     default 30
     EQANUN_MAKINE_SAYISI  machines sharing that budget              else TKGM_MAKINE_SAYISI,

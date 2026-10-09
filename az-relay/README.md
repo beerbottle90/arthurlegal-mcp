@@ -19,7 +19,7 @@ this relay in Frankfurt.
 - Sees host names, never content: TLS runs end to end between the main app and
   e-qanun.az.
 - Allows at most 30 tunnels a minute in total, whichever machine of the main app asks.
-  This is the site owner's condition. `RELAY_DAKIKA_AZAMI` can lower it, not raise it.
+  `RELAY_DAKIKA_AZAMI` can lower it, not raise it.
   Each main-app machine also keeps its own gate (`eqanun-api/eqanun/_gate.py`).
 
 ## Deploy

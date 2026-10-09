@@ -14,9 +14,8 @@ What it will and will not do:
   so only apps of the same organization reach it, as arthurlegal-az-relay.internal.
 - See host names, never content: TLS runs end to end between the main app and
   e-qanun.az.
-- Hold the one global budget of the site owner's condition: at most 30 tunnels a
-  minute, whichever machine of the main app asks (RELAY_DAKIKA_AZAMI can lower it,
-  not raise it).
+- Hold the one global load budget: at most 30 tunnels a minute, whichever
+  machine of the main app asks (RELAY_DAKIKA_AZAMI can lower it, not raise it).
 
     python relay.py                  # listens on [::]:8080 (RELAY_PORT)
 

@@ -1,7 +1,7 @@
 """The gate in front of e-qanun.az -- offline, on a fake clock.
 
-The condition of access: never more than 30 calls a minute for all machines
-together, and no load the server would notice.
+The load limit: never more than 30 calls a minute for all machines together,
+and no load the server would notice.
 
     python3 -m unittest discover -s tests -v
 """
