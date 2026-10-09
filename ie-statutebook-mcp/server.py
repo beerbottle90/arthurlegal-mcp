@@ -17,7 +17,7 @@ from mcpcore import McpError, Tool, run
 from retrieval import Index, embeddings_status
 from statutebook import IeError, StatuteBookClient, date_from_text
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 _client = StatuteBookClient()
 _index = Index()
@@ -32,8 +32,9 @@ version it is. Never present an "as enacted" text as the current law without
 saying so.
 
 SECTION, NOT ACT. Irish Acts are long — the Companies Act 2014 has 1,448
-sections and 106,000 characters. Use `get_section` when the question is about a
-provision; `get_act` only when you genuinely need the whole instrument.
+sections and 2.76 million characters. Use `get_section` when the question is
+about a provision; `get_act` when you need the whole instrument — it returns the
+text in windows (`next_offset`) and a section index to pick sections from.
 
 SEARCH IS LOCAL. The Statute Book publishes no search endpoint (`/search` 404s),
 so `search_acts` runs against a local index whose coverage is whatever was
@@ -68,8 +69,14 @@ def _t_search(args: Dict[str, Any]) -> Any:
     )
     for result in out["results"]:
         _enactment_date(result)
-    out["index_coverage"] = _index.get_state("coverage") or "unknown — call server_status"
+    coverage = _index.get_state("coverage") or ""
+    out["index_coverage"] = coverage or "unknown — call server_status"
     out["version_note"] = "Indexed texts are AS ENACTED — amendments not applied."
+    if coverage and "full text" not in coverage:
+        out["index_note"] = (
+            "This index was built from each Act's contents page: titles, the long "
+            "title and section headings are searchable, section text is not. A "
+            "re-crawl with crawl.py indexes the full text.")
     return out
 
 
@@ -99,6 +106,7 @@ def _t_get_act(args: Dict[str, Any]) -> Any:
             int(args["year"]), int(args["number"]),
             version=args.get("version", "enacted"),
             max_chars=int(args.get("max_chars", 60000)),
+            offset=int(args.get("offset", 0)),
         )
     except (IeError, KeyError, ValueError) as exc:
         raise McpError(str(exc)) from exc
@@ -192,12 +200,19 @@ TOOLS = [
     ),
     Tool(
         "get_act",
-        "The whole Act. Long instruments are truncated with an explicit marker — "
-        "the Companies Act 2014 alone is ~106,000 characters — so prefer "
-        "get_section unless you really need the entire text.",
+        "The whole Act as enacted: its full text (the Statute Book's print view, "
+        "without the site menu), the enactment date, and an index of its "
+        "sections by number and heading. Long Acts come in windows of max_chars; "
+        "`next_offset` gives where the next one starts. Prefer get_section for a "
+        "single provision.",
         {
             "type": "object",
-            "properties": {**_LOC, "max_chars": {"type": "integer", "default": 60000}},
+            "properties": {
+                **_LOC,
+                "max_chars": {"type": "integer", "default": 60000},
+                "offset": {"type": "integer", "default": 0,
+                           "description": "Character offset to start from; use next_offset."},
+            },
             "required": ["year", "number"],
         },
         _t_get_act,
