@@ -30,18 +30,24 @@ def crawl(index: Index, year_from: int, year_to: int, probe_limit: int = 80,
     for year in range(int(year_from), int(year_to) + 1):
         acts = client.list_year(year, probe_limit=probe_limit)
         for act in acts:
+            # The enactment date the page states. It used to be "<year>-01-01"
+            # for every Act; an unknown date now stays empty instead.
+            date = act.get("date") or ""
             index.upsert({
                 "ref": "IE/%d/act/%d" % (act["year"], act["number"]),
                 "title": act["title"],
                 "body": act["text"],
                 "url": act["url"],
                 "lang": "en",
-                "date": "%d-01-01" % act["year"],
+                "date": date,
                 "status": "as enacted",
                 "court": "Oireachtas",
                 "citation": act["citation"],
                 "meta": {"year": act["year"], "number": act["number"],
-                         "version": "enacted"},
+                         "version": "enacted",
+                         # Marks rows written since dates were recorded; the
+                         # server corrects older rows' placeholder at search time.
+                         "date_source": act.get("date_source") or ""},
             })
             total += 1
         index.db.commit()

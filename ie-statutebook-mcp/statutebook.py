@@ -26,7 +26,7 @@ import html
 import re
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 __version__ = "1.0.0"
 
@@ -85,6 +85,52 @@ def _title(page: str) -> str:
     return html.unescape(m.group(1)).strip() if m else ""
 
 
+_MONTHS = {name: i for i, name in enumerate(
+    ("january", "february", "march", "april", "may", "june", "july", "august",
+     "september", "october", "november", "december"), 1)}
+_BRACKETED = re.compile(r"\[([^\[\]]{6,40})\]")
+_LONG_TITLE_DATE = re.compile(r"^(\d{1,2})(?:st|nd|rd|th)?([a-z]+),?(\d{4})$")
+_ELI_DATE = re.compile(
+    r'<meta[^>]+property="eli:date_document"[^>]+content="(\d{4}-\d{2}-\d{2})"', re.I)
+_LD_DATE = re.compile(r'"legislationDate"\s*:\s*"(\d{4}-\d{2}-\d{2})"')
+
+
+def date_from_text(text: str) -> str:
+    """ISO date from the long title's closing "[12th November, 2024]", or "".
+
+    The rendered pages break the date with markup ("[2 nd Jun e, 2022]",
+    "[11 thJuly , 2023]" in the 2022 and 2023 Acts), so whitespace is dropped
+    before it is read. The first such date precedes "Be it enacted".
+    """
+    head = text.split("Be it enacted", 1)[0] if "Be it enacted" in text else text
+    for chunk in (head, text):
+        for m in _BRACKETED.finditer(chunk):
+            parts = _LONG_TITLE_DATE.match(re.sub(r"\s+", "", m.group(1)).lower())
+            if parts and parts.group(2) in _MONTHS:
+                day, month, year = int(parts.group(1)), _MONTHS[parts.group(2)], int(parts.group(3))
+                if 1 <= day <= 31:
+                    return "%04d-%02d-%02d" % (year, month, day)
+    return ""
+
+
+def _dated(page: str) -> Tuple[str, str]:
+    """``(date, source)`` of the Act's enactment, from the page itself.
+
+    ELI metadata first (``eli:date_document``), then the schema.org block,
+    then the long title. Never a placeholder: an unknown date is ``("", "")``.
+    """
+    for rx, source in ((_ELI_DATE, "eli:date_document"), (_LD_DATE, "schema:legislationDate")):
+        m = rx.search(page)
+        if m:
+            return m.group(1), source
+    date = date_from_text(_plain(page))
+    return (date, "long title") if date else ("", "")
+
+
+def _enacted_date(page: str) -> str:
+    return _dated(page)[0]
+
+
 class StatuteBookClient:
     def act_url(self, year: int, number: int, version: str = "enacted") -> str:
         if version not in VERSIONS:
@@ -113,11 +159,14 @@ class StatuteBookClient:
             "number": int(number),
             "version": version,
             "title": title,
+            "date_enacted": _enacted_date(page),
             "url": url,
             "citation": "%s (No. %d of %d)" % (title or "Act", int(number), int(year)),
             "length_chars": len(body),
             "text": body[:max_chars],
         }
+        if not out["date_enacted"]:
+            out["date_note"] = "The page states no enactment date; none is assumed."
         if version == "enacted":
             out["version_warning"] = (
                 "This is the Act AS ENACTED — later amendments are not applied. "
@@ -177,8 +226,12 @@ class StatuteBookClient:
             misses = 0
             title = _title(page)
             body = _plain(page)
+            date, source = _dated(page)
             found.append({
                 "year": int(year), "number": no, "title": title,
+                # The enactment date as the page states it; "" when it does not.
+                "date": date,
+                "date_source": source,
                 "url": self.act_url(year, no),
                 "citation": "%s (No. %d of %d)" % (title or "Act", no, int(year)),
                 "length_chars": len(body),

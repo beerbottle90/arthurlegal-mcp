@@ -15,7 +15,7 @@ from typing import Any, Dict
 
 from mcpcore import McpError, Tool, run
 from retrieval import Index, embeddings_status
-from statutebook import IeError, StatuteBookClient
+from statutebook import IeError, StatuteBookClient, date_from_text
 
 __version__ = "1.0.0"
 
@@ -66,9 +66,31 @@ def _t_search(args: Dict[str, Any]) -> Any:
         limit=int(args.get("limit", 20)),
         filters=filters,
     )
+    for result in out["results"]:
+        _enactment_date(result)
     out["index_coverage"] = _index.get_state("coverage") or "unknown — call server_status"
     out["version_note"] = "Indexed texts are AS ENACTED — amendments not applied."
     return out
+
+
+def _enactment_date(result: Dict[str, Any]) -> None:
+    """Give a search result its enactment date, never a placeholder.
+
+    Rows crawled before dates were recorded carry "<year>-01-01" for every Act
+    and no ``date_source``. For those the date is read from the long title kept
+    in the row's text ("[12th November, 2024]"); failing that it is blanked.
+    A re-crawl writes the date from the Act's page metadata.
+    """
+    doc = _index.get(result["ref"]) or {}
+    meta = doc.get("meta") or {}
+    if "date_source" not in meta:
+        result["date"] = date_from_text(doc.get("body") or "")
+        if result["date"]:
+            result["date_source"] = "long title in the indexed text"
+    if not result.get("date"):
+        result["date"] = ""
+        result["date_note"] = ("Enactment date not recorded in the index; get_act "
+                               "reads it from the Statute Book.")
 
 
 def _t_get_act(args: Dict[str, Any]) -> Any:
@@ -137,7 +159,8 @@ TOOLS = [
         "(BM25 + fuzzy, plus dense vectors when EMBEDDINGS_URL is set). Unlike "
         "Spain, whole Act bodies are indexed here, so a phrase inside a section "
         "IS findable. Check `index_coverage` — the index holds the crawled year "
-        "range, not all of Irish law.",
+        "range, not all of Irish law. `date` is the enactment date; it is empty "
+        "(with `date_note`) when the source does not state one, never guessed.",
         {
             "type": "object",
             "properties": {
