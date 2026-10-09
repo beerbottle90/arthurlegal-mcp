@@ -9,7 +9,14 @@ set -e
 
 if command -v de-eli-mcp >/dev/null 2>&1; then
     echo "de-eli backend starting on 127.0.0.1:8790" >&2
-    TRANSPORT=http PORT=8790 de-eli-mcp >/tmp/de-eli.log 2>&1 &
+    # Keep it alive: nothing else restarts a background process, and a dead de-eli
+    # takes all fifteen de_ tools with it. A restarted de-eli forgets its sessions;
+    # the aggregator opens a new one on the first 404 (server.py, _DeEliProxy).
+    ( while :; do
+          TRANSPORT=http PORT=8790 de-eli-mcp >>/tmp/de-eli.log 2>&1 || true
+          echo "de-eli exited; restarting in 3 s" >&2
+          sleep 3
+      done ) &
     # Give it a moment to bind before the aggregator probes it.
     sleep 4
 else

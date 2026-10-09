@@ -38,6 +38,7 @@ import importlib.util
 import json
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -191,12 +192,20 @@ class _DeEliProxy:
     FastMCP hands out a session id on initialize that later calls must echo, and
     answers in SSE frames. Both are handled here so the rest of the aggregator
     does not have to know de-eli is different.
+
+    A session does not outlive the de-eli process. The MCP Streamable HTTP spec
+    answers a request carrying an unknown session id with HTTP 404, after which
+    the client must initialize again. Before this was handled, one de-eli restart
+    left all fifteen de_ tools failing with "Not Found" until the aggregator itself
+    restarted (observed live on 2026-10-09).
     """
 
     def __init__(self, url: str) -> None:
         self.url = url
         self.session: Optional[str] = None
         self.tools: List[Dict[str, Any]] = []
+        self.renewals = 0
+        self._lock = threading.Lock()
 
     def _post(self, payload: dict, timeout: float = 90.0):
         body = json.dumps(payload).encode("utf-8")
@@ -228,7 +237,38 @@ class _DeEliProxy:
         raw, _ = self._post({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}, timeout)
         self.tools = self._unwrap(raw).get("result", {}).get("tools", []) or []
 
+    def _renewing(self, attempt: Callable[[], Any]) -> Any:
+        """Run ``attempt``; on an unknown session (404) open a new one and retry once.
+
+        The lock makes concurrent callers that all hit the 404 share one new
+        session instead of each opening their own. Anything other than a 404 --
+        a refused connection, a timeout, a 5xx -- is not a session problem and is
+        raised unchanged.
+        """
+        stale = self.session
+        try:
+            return attempt()
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+        with self._lock:
+            if self.session == stale:
+                self.session = None
+                self.connect()
+                self.renewals += 1
+        return attempt()
+
+    def ping(self, timeout: float = 10.0) -> int:
+        """A tools/list round trip through the current session; returns the tool count."""
+        def attempt() -> int:
+            raw, _ = self._post({"jsonrpc": "2.0", "id": 4, "method": "tools/list"}, timeout)
+            return len(self._unwrap(raw).get("result", {}).get("tools", []) or [])
+        return self._renewing(attempt)
+
     def call(self, name: str, arguments: dict) -> Any:
+        return self._renewing(lambda: self._call_once(name, arguments))
+
+    def _call_once(self, name: str, arguments: dict) -> Any:
         raw, _ = self._post({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
                              "params": {"name": name, "arguments": arguments}})
         result = self._unwrap(raw).get("result", {})
@@ -243,7 +283,11 @@ class _DeEliProxy:
             return text
 
 
+_de_proxy: Optional[_DeEliProxy] = None
+
+
 def _load_de_eli(url: str) -> None:
+    global _de_proxy
     label = "🇩🇪 Almanya — mevzuat + içtihat"
     proxy = _DeEliProxy(url)
     try:
@@ -253,6 +297,7 @@ def _load_de_eli(url: str) -> None:
                         "error": "proxy unreachable at %s (%s)" % (url, exc),
                         "hint": "de-eli is a separate process; start it or set DE_ELI_URL."})
         return
+    _de_proxy = proxy
 
     count = 0
     for spec in proxy.tools:
@@ -311,6 +356,17 @@ def _t_status(args: Dict[str, Any]) -> Any:
                 detail[entry["prefix"]] = {"error": str(exc)}
     if detail:
         out["backend_status"] = detail
+    # de-eli is a separate process, so "loaded at boot" says nothing about now.
+    # Probe it live: a dead or wedged German backend must show up here instead of
+    # as fifteen tools that each fail on their own.
+    if _de_proxy is not None:
+        try:
+            out["de_live"] = {"reachable": True, "tools": _de_proxy.ping(),
+                              "session_renewals": _de_proxy.renewals}
+        except Exception as exc:  # noqa: BLE001
+            out["de_live"] = {"reachable": False, "error": "%s: %s" % (type(exc).__name__, exc)}
+            out["warning"] = (out.get("warning", "") + " The German backend is loaded but "
+                              "not answering: every de_ tool will fail until it is back.").strip()
     return out
 
 
