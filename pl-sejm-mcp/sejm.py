@@ -1,8 +1,16 @@
 """Client for Poland's Sejm ELI API — standard library only.
 
 The API is genuinely good: ELI-compliant, no auth, and it carries the two things
-Polish legal research turns on — ``status`` (``obowiązujący`` = in force,
-``uchylony`` = repealed) and ``references``, the graph of what amended what.
+Polish legal research turns on — whether an act is in force, and
+``references``, the graph of what amended what.
+
+In force is the API's ``inForce`` flag, not the ``status`` label. The flag is
+now text (``IN_FORCE`` / ``NOT_IN_FORCE`` / ``UNKNOWN``, the StatusInForce enum
+of the published OpenAPI spec); it used to be a JSON boolean. The label is the
+publisher's own vocabulary and often describes consolidation rather than
+validity: the Civil Code is ``akt posiada tekst jednolity`` ("has a
+consolidated text") and IN_FORCE. Reading the label as the answer is how the
+Code came out "not in force".
 
 What it does **not** do is search bodies: ``/eli/acts/search`` matches titles
 only. A phrase inside article 49 of the Energy Law is unreachable by title
@@ -19,9 +27,9 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 API = "https://api.sejm.gov.pl/eli"
 UA = "arthurlegal-pl-sejm-mcp/%s (+https://github.com/beerbottle90/arthurlegal-mcp)" % __version__
@@ -33,6 +41,32 @@ PUBLISHERS = {
 
 # The publisher's own status vocabulary, echoed rather than translated away.
 STATUS_IN_FORCE = "obowiązujący"
+
+# The API's in-force flag (StatusInForce). Anything else — UNKNOWN, or a value
+# added upstream later — is reported as unknown, never guessed.
+IN_FORCE_FLAGS = {"IN_FORCE": True, "NOT_IN_FORCE": False}
+
+# Fallback for responses that carry a label but no flag: the /references
+# headers, and index rows written before the flag was recorded. In a sample of
+# 1,224 acts (2026-10-09) every act with one of the first three labels was
+# flagged IN_FORCE, and every act with a label from the second set was flagged
+# NOT_IN_FORCE; the second set's other labels say repeal or expiry outright.
+# "bez statusu" went both ways (27 / 77) and "akt jednorazowy" is a one-off
+# act, so those and any unlisted label stay unknown.
+STATUS_LABELS_IN_FORCE = frozenset({
+    "obowiązujący",
+    "akt posiada tekst jednolity",
+    "akt objęty tekstem jednolitym",
+})
+STATUS_LABELS_NOT_IN_FORCE = frozenset({
+    "uchylony",
+    "uchylony wykazem",
+    "uznany za uchylony",
+    "wygaśnięcie aktu",
+    "nieobowiązujący - przyczyna nieustalona",
+    "nieobowiązujący - uchylona podstawa prawna",
+    "brak mocy prawnej",
+})
 
 
 class SejmError(Exception):
@@ -66,12 +100,60 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None, timeout: int = 45) 
         raise SejmError("Sejm API returned unparseable JSON: %s" % exc) from exc
 
 
+def in_force_from_status(status: str) -> Optional[bool]:
+    """The label-only reading, for data that carries no ``inForce`` flag."""
+    label = (status or "").strip()
+    if label in STATUS_LABELS_IN_FORCE:
+        return True
+    if label in STATUS_LABELS_NOT_IN_FORCE:
+        return False
+    return None
+
+
+def _in_force(item: Dict[str, Any]) -> Tuple[Optional[bool], str]:
+    """``(in_force, warning)``. ``in_force`` is None when the API does not say.
+
+    The flag decides whenever it is present. The label is consulted only when
+    the flag is absent, and only the labels in the two sets above count.
+    """
+    raw = item.get("inForce")
+    if isinstance(raw, bool):                    # the API's older encoding
+        return raw, ""
+    if isinstance(raw, str) and raw.strip():
+        flag = IN_FORCE_FLAGS.get(raw.strip().upper())
+        if flag is not None:
+            return flag, ""
+        return None, ("The Sejm API reports inForce=%r, which this server does not "
+                      "interpret. In-force status is unknown — check the act on "
+                      "isap.sejm.gov.pl before relying on it." % raw)
+    status = item.get("status") or ""
+    flag = in_force_from_status(status)
+    if flag is None:
+        return None, ("No inForce flag in this response and the status label %r does "
+                      "not settle it. In-force status is unknown — call get_act."
+                      % (status or "(none)"))
+    return flag, ""
+
+
 def _norm(item: Dict[str, Any]) -> Dict[str, Any]:
     """One act, with the citation and status a lawyer actually needs."""
     display = item.get("displayAddress") or ""
     status = item.get("status") or ""
-    in_force = bool(item.get("inForce") is True or status == STATUS_IN_FORCE)
-    return {
+    in_force, warning = _in_force(item)
+    raw_flag = item.get("inForce")
+    if isinstance(raw_flag, bool):
+        raw_flag = "IN_FORCE" if raw_flag else "NOT_IN_FORCE"
+    # The bracket carries the publisher's label AND the in-force flag: the label
+    # alone ("akt posiada tekst jednolity") does not tell a reader the act is law.
+    if in_force is None:
+        force_note = "in force: unknown"
+    else:
+        force_note = raw_flag or ("IN_FORCE" if in_force else "NOT_IN_FORCE")
+    keywords: List[str] = []
+    for name in (item.get("keywords") or []) + (item.get("keywordsNames") or []):
+        if name and name not in keywords:
+            keywords.append(name)
+    out = {
         "address": item.get("address", ""),           # WDU20240001984
         "display_address": display,                    # Dz.U. 2024 poz. 1984
         "title": item.get("title", ""),
@@ -82,19 +164,24 @@ def _norm(item: Dict[str, Any]) -> Dict[str, Any]:
         # Status is part of the citation for Polish law, not a footnote.
         "status": status,
         "in_force": in_force,
+        "in_force_api": raw_flag if isinstance(raw_flag, str) else None,
         "announcement_date": item.get("announcementDate", ""),
         "promulgation": item.get("promulgation", ""),
         "entry_into_force": item.get("entryIntoForce", ""),
         "valid_from": item.get("validFrom", ""),
         "eli": item.get("ELI", ""),
-        "keywords": item.get("keywordsNames") or item.get("keywords") or [],
+        "keywords": keywords,
         "released_by": item.get("releasedBy", ""),
         "has_html": bool(item.get("textHTML")),
         "has_pdf": bool(item.get("textPDF")),
         "url": "https://api.sejm.gov.pl/eli/acts/%s/%s/%s"
                % (item.get("publisher"), item.get("year"), item.get("pos")),
-        "citation": "%s — %s [%s]" % (display, item.get("title", ""), status or "status unknown"),
+        "citation": "%s — %s [%s | %s]" % (display, item.get("title", ""),
+                                          status or "status unknown", force_note),
     }
+    if warning:
+        out["in_force_warning"] = warning
+    return out
 
 
 class SejmClient:
@@ -121,13 +208,22 @@ class SejmClient:
 
     def list_year(self, publisher: str, year: int, limit: int = 100,
                   offset: int = 0) -> Dict[str, Any]:
+        """Acts published in a year, newest position first.
+
+        Served by ``/acts/search?publisher&year`` rather than ``/acts/{p}/{y}``:
+        the year listing omits ``inForce``, leaving only the status label, and
+        for 111 of the 122 "bez statusu" acts of 1964 the flag says IN_FORCE.
+        Same order, upstream paging instead of slicing a full-year download.
+        """
         if publisher not in PUBLISHERS:
             raise SejmError("publisher must be DU or MP")
-        data = _get("acts/%s/%d" % (publisher, int(year)))
+        data = _get("acts/search", {
+            "publisher": publisher, "year": int(year),
+            "limit": max(1, min(int(limit), 500)), "offset": max(0, int(offset)),
+        })
         items = [_norm(i) for i in (data.get("items") or [])]
-        total = data.get("count", len(items))
-        window = items[int(offset): int(offset) + max(1, min(int(limit), 500))]
-        return {"count": total, "returned": len(window), "results": window}
+        total = data.get("totalCount", data.get("count", len(items)))
+        return {"count": total, "returned": len(items), "results": items}
 
     def get_act(self, publisher: str, year: int, pos: int) -> Dict[str, Any]:
         if publisher not in PUBLISHERS:
@@ -196,6 +292,8 @@ class SejmClient:
             "in_force": meta["in_force"],
             "citation": meta["citation"],
             "url": url,
+            **({"in_force_warning": meta["in_force_warning"]}
+               if meta.get("in_force_warning") else {}),
             "length_chars": len(raw),
             "text": raw[:max_chars],
         }

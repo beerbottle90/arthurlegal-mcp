@@ -11,9 +11,11 @@ Law" and useless for "which act mentions capacity-market obligations", because
 the phrase lives in an article, not a title.
 
 This crawler indexes each act's title, type, issuing body and — the useful part —
-its ``keywordsNames``, the Sejm's own controlled subject vocabulary. Combined
-with the shared hybrid retrieval that gives real subject search without pulling
-down every act's full text.
+its ``keywords``/``keywordsNames``, the Sejm's own controlled subject vocabulary.
+Combined with the shared hybrid retrieval that gives real subject search without
+pulling down every act's full text. Both come from the search endpoint, which
+``SejmClient.list_year`` uses because the plain year listing carries neither the
+keywords nor the ``inForce`` flag that ``in_force_only`` filters on.
 
 Bodies are not indexed: most acts are PDF-only (``textHTML: false``), so there is
 no text to index for them and a body index would be silently lopsided. Stated in
@@ -50,23 +52,31 @@ def crawl(index: Index, publisher: str, year_from: int, year_to: int,
             got.extend(more["results"])
         for act in got:
             keywords = ", ".join(act.get("keywords") or [])
+            # Search records list the issuing bodies (["SEJM"]); join them so
+            # the text fields stay text.
+            released = act.get("released_by") or ""
+            if isinstance(released, list):
+                released = ", ".join(r for r in released if r)
             index.upsert({
                 "ref": act["address"],
                 "title": act["title"],
                 "body": "\n".join(x for x in (
-                    act.get("type"), act.get("released_by"), keywords,
+                    act.get("type"), released, keywords,
                     act.get("display_address"),
                 ) if x),
                 "url": act["url"],
                 "lang": "pl",
                 "date": act.get("announcement_date") or act.get("promulgation") or "",
                 "status": act.get("status") or "",
-                "court": act.get("released_by") or "",
+                "court": released,
                 "subject": keywords[:200],
                 "citation": act["citation"],
                 "meta": {
                     "publisher": act.get("publisher"), "year": act.get("year"),
                     "pos": act.get("pos"), "in_force": act.get("in_force"),
+                    # The API's own flag. Its presence also tells the server
+                    # that `in_force` above came from the flag, not the label.
+                    "in_force_api": act.get("in_force_api"),
                     "has_html": act.get("has_html"), "has_pdf": act.get("has_pdf"),
                     "eli": act.get("eli"),
                 },

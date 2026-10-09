@@ -11,13 +11,13 @@ Optional, for subject search across acts:
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from mcpcore import McpError, Tool, run
 from retrieval import Index, embeddings_status, rerank
-from sejm import PUBLISHERS, SejmClient, SejmError
+from sejm import PUBLISHERS, SejmClient, SejmError, in_force_from_status
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 _client = SejmClient()
 _index = Index()
@@ -25,8 +25,12 @@ _index = Index()
 INSTRUCTIONS = """Polish legislation from the Sejm's ELI API — Dziennik Ustaw
 (Journal of Laws) and Monitor Polski.
 
-STATUS IS PART OF THE CITATION. Every act carries the publisher's own status:
-`obowiązujący` = in force, `uchylony` = repealed. Always report it. Citing a
+STATUS IS PART OF THE CITATION. Every act carries `in_force` — the API's own
+`inForce` flag (`IN_FORCE` / `NOT_IN_FORCE`) — and `status`, the publisher's
+label. The label is often about consolidation, not validity: the Civil Code is
+`akt posiada tekst jednolity` ("has a consolidated text") and in force. Read
+`in_force` for validity and report both. `in_force: null` means the API did not
+say; the response then carries `in_force_warning` — do not guess. Citing a
 Polish act without its status is an incomplete citation, the same discipline the
 Azerbaijani e-qanun source follows.
 
@@ -65,6 +69,23 @@ def _t_search_title(args: Dict[str, Any]) -> Any:
     return result
 
 
+def _indexed_in_force(doc: Optional[Dict[str, Any]]) -> Optional[bool]:
+    """In force for one index row.
+
+    Rows from a crawl that recorded the API flag carry ``in_force_api`` and
+    their ``in_force`` is the flag. Older rows hold an ``in_force`` computed as
+    "status == obowiązujący", which is wrong for every act with a consolidated
+    text, so for those only the status label is read.
+    """
+    if not doc:
+        return None
+    meta = doc.get("meta") or {}
+    if "in_force_api" in meta:
+        value = meta.get("in_force")
+        return value if isinstance(value, bool) else None
+    return in_force_from_status(doc.get("status") or "")
+
+
 def _t_search_indexed(args: Dict[str, Any]) -> Any:
     query = (args.get("query") or "").strip()
     if not query:
@@ -74,18 +95,42 @@ def _t_search_indexed(args: Dict[str, Any]) -> Any:
             "The local index is empty — run `python crawl.py --from 2015 --to 2026`. "
             "search_by_title works without it (titles only)."
         )
+    limit = max(1, int(args.get("limit", 20)))
+    in_force_only = bool(args.get("in_force_only"))
     filters: Dict[str, Any] = {}
-    if args.get("in_force_only"):
-        filters["status"] = "obowiązujący"
     for key in ("date_from", "date_to"):
         if args.get(key):
             filters[key] = args[key]
+    # In force is not one status label (the Civil Code's is "akt posiada tekst
+    # jednolity"), so it cannot be an equality filter on the index. Over-fetch
+    # and keep the rows whose in-force reading is True.
     out = _index.search(
         query,
         mode=args.get("mode", "hybrid"),
-        limit=int(args.get("limit", 20)),
+        limit=limit * 5 if in_force_only else limit,
         filters=filters,
     )
+    kept, dropped_unknown, dropped_repealed = [], 0, 0
+    for result in out["results"]:
+        flag = _indexed_in_force(_index.get(result["ref"]))
+        result["in_force"] = flag
+        if in_force_only and flag is not True:
+            if flag is None:
+                dropped_unknown += 1
+            else:
+                dropped_repealed += 1
+            continue
+        kept.append(result)
+    out["results"] = kept[:limit]
+    out["total"] = len(out["results"])
+    if in_force_only:
+        out["in_force_filter"] = {
+            "excluded_not_in_force": dropped_repealed,
+            "excluded_unknown": dropped_unknown,
+            "note": "Kept acts whose in-force reading is true. Unknown means the "
+                    "index row carries no flag and its label does not settle it "
+                    "(e.g. 'bez statusu'); a re-crawl records the API flag.",
+        }
     out["coverage"] = _index.get_state("coverage") or "unknown — check server_status"
     out["scope_note"] = (
         "Covers titles, act types, issuing bodies and the Sejm's subject "
@@ -169,7 +214,8 @@ TOOLS = [
         "and the Sejm's own controlled keywords. Hybrid retrieval (BM25 + fuzzy, "
         "plus dense vectors when EMBEDDINGS_URL is configured). Use this for "
         "'which act governs X'. Check `coverage` — the index holds the year range "
-        "that was crawled, not all of Polish law.",
+        "that was crawled, not all of Polish law. in_force_only keeps acts the "
+        "index records as in force and reports what it excluded.",
         {
             "type": "object",
             "properties": {
