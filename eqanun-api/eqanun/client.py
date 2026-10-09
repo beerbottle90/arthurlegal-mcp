@@ -79,11 +79,19 @@ class EqanunClient:
         retry_backoff: float = 1.5,
         gate: Optional[Gate] = None,
         cache: Union[bool, ByteCache] = True,
+        proxy: Optional[str] = None,
     ) -> None:
         # Every client shares one gate unless a test hands it its own: the budget
         # is per machine, not per client object.
         self._gate = gate or GATE
         self._cache = cache if isinstance(cache, ByteCache) else (CACHE if cache else None)
+        # From Fly's Amsterdam region e-qanun.az does not answer; from Frankfurt it
+        # does. The hosted endpoint therefore tunnels through az-relay
+        # (EQANUN_PROXY=http://arthurlegal-az-relay.internal:8080). TLS stays end to
+        # end; unset, requests go direct as before.
+        self.proxy = (proxy if proxy is not None else os.environ.get("EQANUN_PROXY", "")).strip()
+        self._opener = (urllib.request.build_opener(urllib.request.ProxyHandler(
+            {"https": self.proxy, "http": self.proxy})) if self.proxy else None)
         # Precedence: explicit argument > EQANUN_USER_AGENT > library default.
         # Reading the env var here means the CLI and the MCP server inherit it
         # without either of them needing a flag of its own.
@@ -113,8 +121,9 @@ class EqanunClient:
         for attempt in range(self.retries + 1):
             req = urllib.request.Request(url, headers=headers, method="GET")
             try:
+                send = self._opener.open if self._opener else urllib.request.urlopen
                 with self._gate:
-                    with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    with send(req, timeout=self.timeout) as resp:
                         body = resp.read()
                 self._gate.ok()
                 if self._cache is not None:

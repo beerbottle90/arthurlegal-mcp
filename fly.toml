@@ -11,6 +11,9 @@ primary_region = "ams"
   # tkgm_canli bütçesi süreç başınadır; iki makine toplamda dakikada 30 TKGM isteğini aşmasın diye
   # aralık makine sayısıyla çarpılır (tkgm-mcp/docs/MANIFESTO.md). Makine sayısı değişirse bu da değişir.
   TKGM_MAKINE_SAYISI = "2"
+  # e-qanun.az does not answer from Amsterdam (10 s timeouts, 2026-10-09); the az_ tools
+  # tunnel through az-relay in Frankfurt over the private network (az-relay/README.md).
+  EQANUN_PROXY = "http://arthurlegal-az-relay.internal:8080"
 
 [http_service]
   internal_port = 8080

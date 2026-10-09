@@ -206,6 +206,7 @@ def _t_server_status(args: Dict[str, Any]) -> Any:
     gate = GATE.state()
     out["gate"] = gate
     out["cache"] = CACHE.state()
+    out["route"] = ("via relay %s" % _probe_client.proxy) if _probe_client.proxy else "direct"
     if gate["paused"]:
         # Probing a paused upstream would be exactly the knocking the pause prevents.
         out["upstream_reachable"] = False
