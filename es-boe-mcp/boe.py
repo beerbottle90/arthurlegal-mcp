@@ -17,19 +17,31 @@ The second reason: the list endpoint takes only ``limit`` and ``offset`` —
 there is **no title or full-text search parameter** (``?query=`` returns 500,
 ``?titulo=`` returns 400). Search therefore has to be built locally, which is
 what ``crawl.py`` and the shared ``retrieval`` index do.
+
+Two traps in the consolidated document itself:
+
+* ``/legislacion-consolidada/id/{id}`` is the WHOLE document — metadata,
+  analysis, ELI RDF and the full text (3.4 MB for the Código Civil). Metadata
+  lives at ``/metadatos`` and ``/analisis``; the text at ``/texto``, which in
+  turn carries no metadata.
+* ``/texto`` is versioned: each ``<bloque>`` holds every ``<version>`` it has
+  had, each with its ``fecha_vigencia``. The law on a given day is one version
+  per block, not all of them — joined, article 1 of the Código Civil reads
+  twice, in its 1889 and its 1974 wording.
 """
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 BASE = "https://www.boe.es"
 API = BASE + "/datosabiertos/api"
@@ -94,6 +106,68 @@ def _parse_root(raw: bytes) -> ET.Element:
     return root
 
 
+def _compact_date(value: str) -> str:
+    """``YYYY-MM-DD`` or ``YYYYMMDD`` -> ``YYYYMMDD``; "" means today."""
+    if not (value or "").strip():
+        return datetime.date.today().strftime("%Y%m%d")
+    digits = re.sub(r"\D", "", value)
+    if len(digits) != 8:
+        raise BoeError("as_of must be YYYY-MM-DD or YYYYMMDD, got %r" % value)
+    return digits
+
+
+_DATE8 = re.compile(r"^\d{8}$")
+
+
+def _version_on(bloque: ET.Element, day: str) -> Tuple[Optional[ET.Element], int]:
+    """``(version in force on day, number of the block's other versions)``.
+
+    The version in force is the one with the latest ``fecha_vigencia`` on or
+    before ``day`` — by date, not position: the Código Civil lists art. 278's
+    1978 version before its 1943 one. A version without a date (art. 56 has
+    one, deferred and then superseded) never wins over a dated one. A block
+    with no dated version at all keeps its last version; a block whose every
+    dated version starts after ``day`` was not yet law and yields None.
+    """
+    versions = bloque.findall("version")
+    dated = [(v.get("fecha_vigencia"), i, v) for i, v in enumerate(versions)
+             if _DATE8.match(v.get("fecha_vigencia") or "")]
+    live = [d for d in dated if d[0] <= day]
+    if live:
+        return max(live, key=lambda d: (d[0], d[1]))[2], len(versions) - 1
+    if not dated and versions:
+        return versions[-1], len(versions) - 1
+    return None, 0
+
+
+def _lines(el: ET.Element) -> List[str]:
+    """One line per paragraph; table rows as cells joined by " | "."""
+    out: List[str] = []
+
+    def walk(node: ET.Element) -> None:
+        if node.tag == "table":
+            for tr in node.iter("tr"):
+                cells = [re.sub(r"\s+", " ", "".join(td.itertext())).strip()
+                         for td in tr if td.tag in ("td", "th")]
+                if any(cells):
+                    out.append(" | ".join(cells))
+            return
+        if node.tag == "p":
+            line = re.sub(r"\s+", " ", "".join(node.itertext())).strip()
+            if line:
+                out.append(line)
+            return
+        for child in node:
+            walk(child)
+
+    walk(el)
+    if not out:
+        flat = re.sub(r"\s+", " ", "".join(el.itertext())).strip()
+        if flat:
+            out.append(flat)
+    return out
+
+
 class BoeClient:
     """Thin, honest wrapper. Every method names the endpoint it calls."""
 
@@ -135,56 +209,115 @@ class BoeClient:
             )
         return out
 
-    def get_consolidated(self, boe_id: str, part: str = "") -> Dict[str, Any]:
-        """``GET /legislacion-consolidada/id/{id}[/metadatos|/analisis|/texto]``."""
+    def _part(self, boe_id: str, part: str) -> ET.Element:
+        """``GET /legislacion-consolidada/id/{id}/{part}`` -> its ``<data>``."""
         boe_id = (boe_id or "").strip().upper()
         if not BOE_ID.match(boe_id):
             raise BoeError("Malformed BOE id %r — expected e.g. BOE-A-2010-10544" % boe_id)
+        if part not in ("metadatos", "analisis", "texto"):
+            raise BoeError("part must be one of: metadatos, analisis, texto")
+        url = "%s/legislacion-consolidada/id/%s/%s" % (API, boe_id, part)
+        data = _parse_root(_get(url)).find("./data")
+        if data is None:
+            raise BoeError("No <data> in BOE response for %s" % boe_id)
+        return data
+
+    def metadata(self, boe_id: str) -> Dict[str, Any]:
+        """``/metadatos`` — the act's header and BOE's own status flags."""
+        boe_id = (boe_id or "").strip().upper()
+        data = self._part(boe_id, "metadatos")
+        meta = data.find("metadatos") if data.find("metadatos") is not None else data
+        title = _text(meta.find("titulo"))
+        return {
+            "id": boe_id,
+            "title": title,
+            "rango": _text(meta.find("rango")),
+            "departamento": _text(meta.find("departamento")),
+            "ambito": _text(meta.find("ambito")),
+            "date": _iso(_text(meta.find("fecha_disposicion"))),
+            "published": _iso(_text(meta.find("fecha_publicacion"))),
+            "diario": _text(meta.find("diario")),
+            "diario_numero": _text(meta.find("diario_numero")),
+            # These are the status discipline: BOE says outright whether the act
+            # has been repealed or annulled, or its validity is spent. Never
+            # report a text as being in force without echoing them.
+            "estatus_derogacion": _text(meta.find("estatus_derogacion")),
+            "estatus_anulacion": _text(meta.find("estatus_anulacion")),
+            "vigencia_agotada": _text(meta.find("vigencia_agotada")).upper() == "S",
+            "fecha_vigencia": _iso(_text(meta.find("fecha_vigencia"))),
+            "estado_consolidacion": _text(meta.find("estado_consolidacion")),
+            "updated": _text(meta.find("fecha_actualizacion")),
+            "eli": _text(meta.find("url_eli")),
+            "url": "%s/buscar/act.php?id=%s" % (BASE, boe_id),
+            "citation": "%s (%s)" % (title, boe_id),
+        }
+
+    def get_act(self, boe_id: str) -> Dict[str, Any]:
+        """Header, status flags and subjects (``/metadatos`` + ``/analisis``). No text."""
+        result = self.metadata(boe_id)
+        materias = [_text(m) for m in self._part(result["id"], "analisis").findall(".//materias/materia")]
+        if materias:
+            result["materias"] = materias
+        return result
+
+    def get_consolidated(self, boe_id: str, part: str = "") -> Dict[str, Any]:
+        """Kept for callers of the old name: ``texto`` is get_text, else get_act.
+
+        It used to fetch the whole document and return every version of every
+        block as one string; neither is what a caller of this name wants.
+        """
         part = (part or "").strip("/")
         if part and part not in ("metadatos", "analisis", "texto"):
             raise BoeError("part must be one of: metadatos, analisis, texto")
-        url = "%s/legislacion-consolidada/id/%s%s" % (API, boe_id, "/" + part if part else "")
-        root = _parse_root(_get(url))
-        data = root.find("./data")
-        if data is None:
-            raise BoeError("No <data> in BOE response for %s" % boe_id)
+        if part == "texto":
+            return self.get_text(boe_id)
+        return self.metadata(boe_id) if part == "metadatos" else self.get_act(boe_id)
 
-        meta = data.find("metadatos") if data.find("metadatos") is not None else data
-        result: Dict[str, Any] = {
-            "id": boe_id,
-            "title": _text(meta.find("titulo")),
-            "rango": _text(meta.find("rango")),
-            "departamento": _text(meta.find("departamento")),
-            "date": _iso(_text(meta.find("fecha_disposicion"))),
-            "published": _iso(_text(meta.find("fecha_publicacion"))),
-            # These two are the status discipline: BOE says outright whether the
-            # act has been repealed or annulled. Never report a text as being in
-            # force without echoing them.
-            "estatus_derogacion": _text(meta.find("estatus_derogacion")),
-            "estatus_anulacion": _text(meta.find("estatus_anulacion")),
-            "fecha_vigencia": _iso(_text(meta.find("fecha_vigencia"))),
-            "url": "%s/buscar/act.php?id=%s" % (BASE, boe_id),
-            "citation": "%s (%s)" % (_text(meta.find("titulo")), boe_id),
-        }
-        materias = [_text(m) for m in data.findall(".//materias/materia")]
-        if materias:
-            result["materias"] = materias
-        text_el = data.find("texto")
-        if text_el is not None:
-            result["text"] = _text(text_el)
-        return result
+    def get_text(self, boe_id: str, max_chars: int = 60000, offset: int = 0,
+                 as_of: str = "") -> Dict[str, Any]:
+        """The consolidated text in force on ``as_of`` (default today), with its header.
 
-    def get_text(self, boe_id: str, max_chars: int = 60000) -> Dict[str, Any]:
-        """Consolidated full text. Long acts are truncated with an explicit marker."""
-        doc = self.get_consolidated(boe_id, part="texto")
-        body = doc.get("text") or ""
-        doc["length_chars"] = len(body)
-        if len(body) > max_chars:
-            doc["text"] = body[:max_chars]
-            doc["truncated"] = (
-                "Text truncated at %d of %d characters. Request a specific article "
-                "or raise max_chars." % (max_chars, len(body))
-            )
+        One version per block — the one in force that day. Long acts come in
+        windows of ``max_chars``; ``next_offset`` says where the next starts.
+        """
+        day = _compact_date(as_of)
+        doc = self.metadata(boe_id)
+        texto = self._part(doc["id"], "texto").find("texto")
+        if texto is None:
+            raise BoeError("No <texto> in BOE response for %s" % doc["id"])
+        blocks: List[str] = []
+        omitted = not_yet = 0
+        for bloque in texto.findall("bloque"):
+            version, others = _version_on(bloque, day)
+            if version is None:
+                not_yet += 1
+                continue
+            omitted += others
+            lines = _lines(version)
+            if lines:
+                blocks.append("\n".join(lines))
+        body = "\n\n".join(blocks)
+        start = max(0, int(offset))
+        window = body[start:start + max(1, int(max_chars))]
+        doc.update({
+            "consolidated": True,
+            "as_of": _iso(day),
+            "blocks": len(blocks),
+            "length_chars": len(body),
+            "offset": start,
+            "text": window,
+            "version_note": (
+                "Each block in the version in force on %s; %d earlier or later "
+                "versions of those blocks are not included%s. Pass as_of for the "
+                "text on another date."
+                % (_iso(day), omitted,
+                   "" if not not_yet else "; %d blocks were not yet in force" % not_yet)),
+        })
+        end = start + len(window)
+        if end < len(body):
+            doc["next_offset"] = end
+            doc["truncated"] = ("Characters %d-%d of %d. Continue with offset=%d."
+                                % (start, end, len(body), end))
         return doc
 
     # -- daily gazette ---------------------------------------------------- #
