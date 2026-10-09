@@ -300,20 +300,26 @@ def test_ictihat_tek_tarafli_tarih_araligi_tamamlanir():
     eski = bedesten_ictihat._http.post_json
 
     def sahte(path, payload, **kw):
-        gonderilen.append(payload["data"])
+        gonderilen.append(dict(payload["data"]))
         return {"metadata": {"FMTY": "SUCCESS"}, "data": {"emsalKararList": [], "total": 0}}
 
     bedesten_ictihat._http.post_json = sahte
+    aramalar = []
     try:
-        bedesten_ictihat.search({"query": "işe iade", "date_from": "2025-01-01"})
-        bedesten_ictihat.search({"query": "işe iade", "date_to": "2015-12-31"})
-        bedesten_ictihat.search({"query": "işe iade"})
+        for args in ({"query": "işe iade", "date_from": "2025-01-01"},
+                     {"query": "işe iade", "date_to": "2015-12-31"},
+                     {"query": "işe iade"}):
+            del gonderilen[:]
+            bedesten_ictihat.search(args)
+            aramalar.append(list(gonderilen))
     finally:
         bedesten_ictihat._http.post_json = eski
-    a, b, c = gonderilen
-    assert a["kararTarihiStart"].startswith("2025-01-01") and a["kararTarihiEnd"].startswith("2100")
-    assert b["kararTarihiStart"].startswith("1900") and b["kararTarihiEnd"].startswith("2015-12-31")
-    assert "kararTarihiStart" not in c and "kararTarihiEnd" not in c
+    a, b, c = aramalar
+    # Sonuç çıkmayınca sorgu merdiveni üç basamak dener; süzgeç her basamakta aynı kalmalı.
+    assert [p["phrase"] for p in a] == ['"işe iade"', "+işe +iade", "işe iade"]
+    assert all(p["kararTarihiStart"].startswith("2025-01-01") and p["kararTarihiEnd"].startswith("2100") for p in a)
+    assert all(p["kararTarihiStart"].startswith("1900") and p["kararTarihiEnd"].startswith("2015-12-31") for p in b)
+    assert all("kararTarihiStart" not in p and "kararTarihiEnd" not in p for p in c)
 
 
 def test_backfill_yalniz_basliktan_ibaret_govdeyi_doldurur():

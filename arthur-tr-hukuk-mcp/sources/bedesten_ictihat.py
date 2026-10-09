@@ -10,8 +10,9 @@ The document comes back base64-encoded as HTML or PDF. Measured rate limit
 (2026-05, per source IP): 10 requests / 30 s. One request every 3.5 s keeps
 clear of it; a 429 pauses the bucket for the server's Retry-After.
 
-Search syntax accepted by ``phrase``: bare words (AND), ``"tam cümle"``,
-``+zorunlu``, ``-hariç``, ``AND``/``OR``/``NOT``. No wildcards.
+Search syntax accepted by ``phrase``: bare words (OR -- measured, see
+``_ladder``), ``"tam cümle"``, ``+zorunlu``, ``-hariç``, ``AND``/``OR``/``NOT``.
+No wildcards.
 
 Citation contract: cite as ``Yargıtay 9. HD, E. 2023/1234, K. 2024/567,
 12.03.2024`` using the *esasNo/kararNo/kararTarihiStr* fields verbatim; the
@@ -25,7 +26,8 @@ from __future__ import annotations
 
 import base64
 import os
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 from net import Http, HttpError, TokenBucket
 from textx import html_to_text, paginate, pdf_to_text, HAS_PYPDF
@@ -87,10 +89,42 @@ def _iso(d: Optional[str], end: bool = False) -> Optional[str]:
     return d + ("T23:59:59.999Z" if end else "T00:00:00.000Z")
 
 
+# A query the user already shaped (a quote, a +/- prefixed word, a boolean
+# operator) is sent as written; only plain multi-word queries get the ladder.
+_OPERATOR = re.compile(r'"|(?:^|\s)[+-]\S|\b(?:AND|OR|NOT)\b')
+_LADDER_LABELS = {"ifade": "tam ifade", "hepsi": "kelimelerin hepsi", "herhangi": "kelimelerden herhangi biri"}
+
+
+def _ladder(phrase: str, mode: str) -> List[Tuple[str, str]]:
+    """Queries to try for ``phrase``, most precise first, as (query, label) pairs.
+
+    Bedesten joins bare words with OR. Measured 2026-10-09 on Yargıtay +
+    Danıştay: ``kira tespit davası`` unquoted -> 2,514,700 hits, newest first, the
+    top one a pasture case; ``+kira +tespit +davası`` -> 53,830, a criminal
+    chamber among the first two; ``"kira tespit davası"`` -> 2,127, the 3rd civil
+    chamber's rent decisions. Sorted by date, the unquoted query is noise, so a
+    plain multi-word query is tried as a phrase first and widened only when the
+    stricter rung returns nothing -- the same precision-first ladder the local
+    index uses.
+    """
+    words = phrase.split()
+    if mode == "herhangi" or len(words) < 2 or _OPERATOR.search(phrase):
+        return [(phrase, "olduğu gibi")]
+    steps: List[Tuple[str, str]] = []
+    if mode == "ifade":
+        steps.append(('"%s"' % phrase, _LADDER_LABELS["ifade"]))
+    steps.append((" ".join("+" + w for w in words), _LADDER_LABELS["hepsi"]))
+    steps.append((phrase, _LADDER_LABELS["herhangi"]))
+    return steps
+
+
 def search(args: Dict[str, Any]) -> Dict[str, Any]:
     phrase = (args.get("query") or "").strip()
     if not phrase:
         return {"error": "query gerekli. Örnek: 'lisans iptali \"hizmet kusuru\" -tazminat'"}
+    mode = (args.get("kelime_modu") or "ifade").strip().lower()
+    if mode not in _LADDER_LABELS:
+        return {"error": "kelime_modu: ifade, hepsi ya da herhangi."}
     courts = args.get("courts") or ["YARGITAYKARARI", "DANISTAYKARAR"]
     if isinstance(courts, str):
         courts = [c.strip() for c in courts.split(",") if c.strip()]
@@ -117,15 +151,22 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
     if bas or son:
         data["kararTarihiStart"] = bas or "1900-01-01T00:00:00.000Z"
         data["kararTarihiEnd"] = son or "2100-01-01T23:59:59.999Z"
-    payload = {"data": data, "applicationName": "UyapMevzuat", "paging": True}
-    try:
-        body = _http.post_json("/emsal-karar/searchDocuments", payload)
-    except HttpError as exc:
-        return _http_error(exc)
-    meta = body.get("metadata") or {}
-    if meta.get("FMTY") != "SUCCESS":
-        return {"error": "Bedesten: %s" % (meta.get("FMTE") or meta), "query": phrase}
-    d = body.get("data") or {}
+    steps = _ladder(phrase, mode)
+    tried: List[Dict[str, Any]] = []
+    for query, label in steps:
+        data["phrase"] = query
+        payload = {"data": data, "applicationName": "UyapMevzuat", "paging": True}
+        try:
+            body = _http.post_json("/emsal-karar/searchDocuments", payload)
+        except HttpError as exc:
+            return _http_error(exc)
+        meta = body.get("metadata") or {}
+        if meta.get("FMTY") != "SUCCESS":
+            return {"error": "Bedesten: %s" % (meta.get("FMTE") or meta), "query": phrase}
+        d = body.get("data") or {}
+        tried.append({"sorgu": query, "mod": label, "total": d.get("total", 0)})
+        if d.get("total", 0):
+            break
     items = []
     for e in d.get("emsalKararList") or []:
         it = e.get("itemType") or {}
@@ -143,12 +184,22 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
                                   e.get("kararNo"), e.get("kararTarihiStr")),
             "source_url": "https://mevzuat.adalet.gov.tr/ictihat/%s" % e.get("documentId"),
         })
-    return {
+    out = {
         "query": phrase, "courts": courts, "page": data["pageNumber"], "page_size": page_size,
         "total": d.get("total", 0), "results": items,
         "note": "Metin için ictihat_getir(document_id). Karar listesi metin içermez; "
                 "alıntı için citation alanını birebir kullanın.",
     }
+    if len(steps) > 1:
+        out["uygulanan_sorgu"] = data["phrase"]
+        out["arama_modu"] = tried[-1]["mod"]
+        out["denenenler"] = tried
+        out["arama_notu"] = (
+            "Tırnaksız çok kelimeli sorgu en dar biçimden başlanarak arandı. Bedesten "
+            "çıplak kelimeleri VEYA ile birleştirir; tırnaksız arama milyonlarca ilgisiz "
+            "karar getirir. Değiştirmek için kelime_modu: 'hepsi' (her kelime geçsin) ya da "
+            "'herhangi' (Bedesten'in ham davranışı).")
+    return out
 
 
 _SHORT = {"Yargıtay Kararı": "Yargıtay", "Danıştay Kararı": "Danıştay",
@@ -209,7 +260,9 @@ def _http_error(exc: HttpError) -> Dict[str, Any]:
 SEARCH_SCHEMA = {
     "type": "object",
     "properties": {
-        "query": {"type": "string", "description": "Arama ifadesi. 'kelime', \"tam cümle\", +zorunlu, -hariç, AND/OR/NOT. Joker yok."},
+        "query": {"type": "string", "description": "Arama ifadesi. Tırnaksız çok kelime önce tam ifade olarak aranır (bkz. kelime_modu). \"tam cümle\", +zorunlu, -hariç, AND/OR/NOT olduğu gibi gönderilir. Joker yok."},
+        "kelime_modu": {"type": "string", "enum": ["ifade", "hepsi", "herhangi"], "default": "ifade",
+                        "description": "Tırnaksız çok kelimeli sorgu: ifade = önce tam ifade, sonuç yoksa her kelime, o da yoksa herhangi biri; hepsi = her kelime geçsin; herhangi = Bedesten'in ham davranışı (VEYA, çok geniş)."},
         "courts": {"type": "array", "items": {"type": "string", "enum": list(COURT_TYPES)},
                    "description": "Mahkeme türleri. Varsayılan: Yargıtay + Danıştay."},
         "chamber": {"type": "string", "description": "Daire/kurul kodu: H1-H23, C1-C23, HGK, CGK, D1-D17, IDDK, VDDK, IBK … veya tam Türkçe adı. Boş = tümü."},
