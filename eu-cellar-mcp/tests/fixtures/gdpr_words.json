@@ -1,0 +1,693 @@
+{
+ "head": {
+  "link": [],
+  "vars": [
+   "celex",
+   "title",
+   "date"
+  ]
+ },
+ "results": {
+  "bindings": [
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TA0529"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-529/24: Judgment of the General Court of 15 July 2026 – Kverulant.org v Parliament (Access to documents – Regulation (EC) No 1049/2001 – Documents relating to remuneration and allowances of the Members elected by the Czech Republic – Partial refusal of access – Exception relating to the protection of privacy and the integrity of the individual – Article 4(1)(b) of Regulation No 1049/2001 – Protection of personal data – Need to transmit personal data for a specific purpose in the public interest – Article 9(1) of Regulation (EU) No 2018/1725)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2026-07-15"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TA0084"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-84/24: Judgment of the General Court of 22 April 2026 – UU v Court of Justice of the European Union (Processing of personal data – Protection of natural persons with regard to the processing of personal data by the Union institutions, bodies, offices and agencies – Regulation (EU) 2018/1725 – Documents relating to assistance and whistleblowing procedures – Refusal of access – Request for review – Action for annulment – Absence of new and substantial facts – Inadmissibility – Non-contractual liability – Sufficiently serious breach of a rule of law intended to confer rights on individuals)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2026-04-22"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62025TO0144"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Order of the General Court (Seventh Chamber) of 25 March 2026.#WS v European Data Protection Supervisor.#Action for annulment and damages – Law governing the institutions – Protection of personal data – Regulation (EU) 2018/1725 – Complaint to the EDPS concerning the processing of personal data by EUIPO – No need to adjudicate in part – Manifest inadmissibility in part.#Case T-144/25."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2026-03-25"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62025TO0144_RES"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Order of the General Court (Seventh Chamber) of 25 March 2026.#WS v European Data Protection Supervisor.#Action for annulment and damages – Law governing the institutions – Protection of personal data – Regulation (EU) 2018/1725 – Complaint to the EDPS concerning the processing of personal data by EUIPO – No need to adjudicate in part – Manifest inadmissibility in part.#Case T-144/25."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2026-03-25"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62025TB0144"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-144/25: Order of the General Court of 25 March 2026 – WS v EDPS (Action for annulment and damages – Law governing the institutions – Protection of personal data – Regulation (EU) 2018/1725 – Complaint to the EDPS concerning the processing of personal data by EUIPO – No need to adjudicate in part – Manifest inadmissibility in part)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2026-03-25"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024CC0798"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Norkus delivered on 18 December 2025.#A et autres v Latvijas Republikas Saeima.#Request for a preliminary ruling from the Satversmes tiesa.#Reference for a preliminary ruling – Protection of natural persons with regard to the processing of personal data – Regulation (EU) 2016/679 – Article 5 – Principles relating to processing of personal data – Article 6 – Lawfulness of processing – Company law – Directive (EU) 2017/1132 – Article 14 – Documents and particulars to be disclosed – Concept of ‘persons who take part in the administration, supervision or control of a company’ – Making available to the public personal data relating to the shareholders of public limited liability companies – Minority shareholders.#Case C-798/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-12-18"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TJ0318"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Tenth Chamber) of 3 December 2025.#WS v European Commission.#Processing of personal data – Protection of natural persons with regard to the processing of personal data by the Union institutions, bodies, offices and agencies – Regulation (EU) 2018/1725 – Requests made to EPSO concerning access to and processing of personal data – Error of law.#Cases T-318/24 and T-362/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-12-03"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TA0318"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Cases T-318/24 and T-362/24: Judgment of the General Court of 3 December 2025 – WS v Commission (Processing of personal data – Protection of natural persons with regard to the processing of personal data by the Union institutions, bodies, offices and agencies – Regulation (EU) 2018/1725 – Requests made to EPSO concerning access to and processing of personal data – Error of law)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-12-03"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TJ0318_INF"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Tenth Chamber) of 3 December 2025.#WS v European Commission.#Processing of personal data – Protection of natural persons with regard to the processing of personal data by the Union institutions, bodies, offices and agencies – Regulation (EU) 2018/1725 – Requests made to EPSO concerning access to and processing of personal data – Error of law.#Cases T-318/24 and T-362/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-12-03"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TJ0367"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Seventh Chamber, Extended Composition) of 19 November 2025.#Amazon EU Sàrl, venant aux droits de Amazon Services Europe Sàrl v European Commission.#Digital services – Regulation (EU) 2022/2065 – Designation as a very large online platform – Plea of illegality – Admissibility – Article 33(1) and (4) of Regulation 2022/2065 – Right to respect for private and family life – Freedom to conduct a business – Right to property – Equal treatment – Freedom of expression – Data protection.#Case T-367/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-11-19"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TJ0367_RES"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Seventh Chamber, Extended Composition) of 19 November 2025.#Amazon EU Sàrl, venant aux droits de Amazon Services Europe Sàrl v European Commission.#Digital services – Regulation (EU) 2022/2065 – Designation as a very large online platform – Plea of illegality – Admissibility – Article 33(1) and (4) of Regulation 2022/2065 – Right to respect for private and family life – Freedom to conduct a business – Right to property – Equal treatment – Freedom of expression – Data protection.#Case T-367/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-11-19"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TA0367"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-367/23: Judgment of the General Court of 19 November 2025 – Amazon EU v Commission (Digital services – Regulation (EU) 2022/2065 – Designation as a very large online platform – Plea of illegality – Admissibility – Article 33(1) and (4) of Regulation 2022/2065 – Right to respect for private and family life – Freedom to conduct a business – Right to property – Equal treatment – Freedom of expression – Data protection)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-11-19"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "52025AP0238"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "P10_TA(2025)0238 – General Data Protection Regulation: additional procedural rules relating to the enforcement of the Regulation – European Parliament legislative resolution of 21 October 2025 on the proposal for a regulation of the European Parliament and of the Council laying down additional procedural rules relating to the enforcement of Regulation (EU) 2016/679 (COM(2023)0348 – C9-0231/2023 – 2023/0202(COD)) (Ordinary legislative procedure: first reading)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-10-21"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TJ1047"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Fourth Chamber) of 1 October 2025.#AF v Council of the European Union.#Civil service – Officials – Administrative investigation – Annex IX to the Staff Regulations – Disciplinary proceedings without consultation of the Disciplinary Board – Warning – Principle of impartiality – Regulation (EU) 2018/1725 – Protection of personal data – Reimbursement of costs – Article 21 of Annex IX to the Staff Regulations – Liability – Non-material damage.#Case T-1047/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-10-01"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TA1047"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-1047/23: Judgment of the General Court of 1 October 2025 – AF v Council (Civil service – Officials – Administrative investigation – Annex IX to the Staff Regulations – Disciplinary proceedings without consultation of the Disciplinary Board – Warning – Principle of impartiality – Regulation (EU) 2018/1725 – Protection of personal data – Reimbursement of costs – Article 21 of Annex IX to the Staff Regulations – Liability – Non-material damage)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-10-01"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TJ1047_INF"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Fourth Chamber) of 1 October 2025.#AF v Council of the European Union.#Civil service – Officials – Administrative investigation – Annex IX to the Staff Regulations – Disciplinary proceedings without consultation of the Disciplinary Board – Warning – Principle of impartiality – Regulation (EU) 2018/1725 – Protection of personal data – Reimbursement of costs – Article 21 of Annex IX to the Staff Regulations – Liability – Non-material damage.#Case T-1047/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-10-01"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024CC0312"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Szpunar delivered on 4 September 2025.#CL v Prokuratura na Republika Bulgaria.#Request for a preliminary ruling from the Sofiyski rayonen sad.#Reference for a preliminary ruling – Protection of natural persons with regard to the processing of personal data in criminal matters – Regulation (EU) 2016/679 – Directive (EU) 2016/680 – Scope – Processing of data collected in the course of an investigation against a police officer as a person suspected of a criminal offence – Recording of data relating to this investigation in the police officer’s personnel file – Lawfulness of processing – Point (c) of the first subparagraph of Article 6(1) and Article 6(3) of that regulation – Processing necessary for compliance with a legal obligation – Legal basis for the processing – Article 17 of that regulation – Right to erasure.#Case C-312/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-09-04"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TJ0183"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Tenth Chamber, Extended Composition) of 16 July 2025.#Lisa Ballmann v European Data Protection Board.#Protection of personal data – Complaint against the controller of personal data of users of an online social network in the European Union – Article 65(1)(a) of Regulation (EU) 2016/679 – Binding decision of the European Data Protection Board – Complainant’s request for access to the file prepared for the purposes of the binding decision – Refusal to grant access – Action for annulment – Actionable measure – Admissibility – Article 41(2)(b) of the Charter of Fundamental Rights.#Case T-183/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-07-16"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TJ0183_RES"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Tenth Chamber, Extended Composition) of 16 July 2025.#Lisa Ballmann v European Data Protection Board.#Protection of personal data – Complaint against the controller of personal data of users of an online social network in the European Union – Article 65(1)(a) of Regulation (EU) 2016/679 – Binding decision of the European Data Protection Board – Complainant’s request for access to the file prepared for the purposes of the binding decision – Refusal to grant access – Action for annulment – Actionable measure – Admissibility – Article 41(2)(b) of the Charter of Fundamental Rights.#Case T-183/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-07-16"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023TA0183"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-183/23: Judgment of the General Court of 16 July 2025 – Ballmann v European Data Protection Board (Protection of personal data – Complaint against the controller of personal data of users of an online social network in the European Union – Article 65(1)(a) of Regulation (EU) 2016/679 – Binding decision of the European Data Protection Board – Complainant’s request for access to the file prepared for the purposes of the binding decision – Refusal to grant access – Action for annulment – Actionable measure – Admissibility – Article 41(2)(b) of the Charter of Fundamental Rights)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-07-16"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TJ0235"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Fifth Chamber) of 18 June 2025.#Milan Zver v European Commission.#Access to documents – Regulation (EC) No 1049/2001 – Documents relating to a meeting between the Vice-President of the Commission and the President of the Slovenian Constitutional Court – Partial refusal of access – Exception relating to the protection of personal data – Exception relating to the protection of the decision-making process – Overriding public interest – Compliance with time limits – Misuse of powers.#Case T-235/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-06-18"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TJ0235_INF"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Judgment of the General Court (Fifth Chamber) of 18 June 2025.#Milan Zver v European Commission.#Access to documents – Regulation (EC) No 1049/2001 – Documents relating to a meeting between the Vice-President of the Commission and the President of the Slovenian Constitutional Court – Partial refusal of access – Exception relating to the protection of personal data – Exception relating to the protection of the decision-making process – Overriding public interest – Compliance with time limits – Misuse of powers.#Case T-235/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-06-18"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TA0235"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-235/24: Judgment of the General Court of 18 June 2025 – Zver v Commission (Access to documents – Regulation (EC) No 1049/2001 – Documents relating to a meeting between the Vice-President of the Commission and the President of the Slovenian Constitutional Court – Partial refusal of access – Exception relating to the protection of personal data – Exception relating to the protection of the decision-making process – Overriding public interest – Compliance with time limits – Misuse of powers)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-06-18"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023CC0209"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Emiliou delivered on 15 May 2025.#FT and RRC Sports GmbH v Fédération internationale de football association (FIFA).#Request for a preliminary ruling from the Landgericht Mainz.#Reference for a preliminary ruling – Internal market – Competition – Professional football – Fédération Internationale de Football Association (FIFA) Football Agent Regulations – Rules on agents’ remuneration, agent licences, multiple representation, making an approach and the communication of certain information to FIFA, other agents, clubs and players – Article 101(1) TFEU – Prohibition of agreements, decisions and concerted practices – Agreements between undertakings, decisions by associations of undertakings and concerted practices – Restrictions on competition – Concepts of anticompetitive ‘object’ and ‘effect’ – Exception to the prohibition laid down in Article 101(1) TFEU – Conditions – Exemption under Article 101(3) TFEU – Conditions – Concept of ‘efficiency gains’ – Article 102 TFEU – Abuse of dominant position – Justification – Conditions – Article 56 TFEU – Obstacle to the freedom to provide services – Objectives – Proportionality – Protection of personal data – Regulation (EU) 2016/679 – Point (f) of the first subparagraph of Article 6(1) – Lawfulness of processing – Conditions.#Case C-209/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-05-15"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TB0319"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-319/24: Order of the General Court of 29 April 2025 – Meta Platforms Ireland v European Data Protection Board (Action for annulment – Protection of personal data – Opinion of the European Data Protection Board on valid consent in the context of consent or pay models implemented by large online platforms – Article 64(2) of Regulation (EU) 2016/679 – Act not open to challenge – Inadmissibility – Liability – Damage – Causal link – Action manifestly lacking any foundation in law)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-04-29"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TO0319_RES"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Order of the General Court (Tenth Chamber) of 29 April 2025.#Meta Platforms Ireland Ltd v European Data Protection Board.#Action for annulment – Protection of personal data – Opinion of the European Data Protection Board on valid consent in the context of ‘consent or pay’ models implemented by large online platforms – Article 64(2) of Regulation (EU) 2016/679 – Act not open to challenge – Inadmissibility – Liability – Damage – Causal link – Action manifestly lacking any foundation in law.#Case T-319/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-04-29"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TO0319"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Order of the General Court (Tenth Chamber) of 29 April 2025.#Meta Platforms Ireland Ltd v European Data Protection Board.#Action for annulment – Protection of personal data – Opinion of the European Data Protection Board on valid consent in the context of ‘consent or pay’ models implemented by large online platforms – Article 64(2) of Regulation (EU) 2016/679 – Act not open to challenge – Inadmissibility – Liability – Damage – Causal link – Action manifestly lacking any foundation in law.#Case T-319/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-04-29"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TO0349"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Order of the General Court (Tenth Chamber) of 28 March 2025.#WS v European Union Intellectual Property Office.#Action for annulment – Law governing the institutions – Protection of personal data – Regulation (EU) 2018/1725 – Requests sent to EUIPO concerning the processing of the applicant’s personal data – Act not open to challenge – Inadmissibility.#Case T-349/24."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-03-28"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TB0349"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-349/24: Order of the General Court of 28 March 2025 – WS v EUIPO (Action for annulment – Law governing the institutions – Protection of personal data – Regulation (EU) 2018/1725 – Requests sent to EUIPO concerning the processing of the applicant’s personal data – Act not open to challenge – Inadmissibility)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-03-28"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023CC0097"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Ćapeta delivered on 27 March 2025.#WhatsApp Ireland Ltd v European Data Protection Board.#Appeal – Protection of natural persons with regard to the processing of personal data – Regulation (EU) 2016/679 – Article 63 – Consistency mechanism – Article 65 – Dispute resolution by the European Data Protection Board – Binding decision – Action for annulment – First paragraph of Article 263 TFEU – Act open to challenge – Fourth paragraph of Article 263 TFEU – Condition that the measure against which the action has been brought must be of direct concern to the applicant.#Case C-97/23 P."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-03-27"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023CC0654"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Szpunar delivered on 27 March 2025.#Inteligo Media SA v Autoritatea Naţională de Supraveghere a Prelucrării Datelor cu Caracter Personal (ANSPDCP).#Request for a preliminary ruling from the Curtea de Apel Bucureşti.#Reference for a preliminary ruling – Processing of personal data and the protection of privacy in the electronic communications sector – Directive 2002/58/EC – Article 13(1) and (2) – Unsolicited communications – Concept of communication ‘for the purposes of direct marketing’ – Obtaining electronic contact details ‘in the context of the sale of a product or a service’ – Registration on an online platform giving access to additional content – Sending of a daily newsletter via email – Regulation (EU) 2016/679 – Article 6 – Lawfulness of processing – Article 95 – Relationship with Directive 2002/58.#Case C-654/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-03-27"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023CC0655"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Campos Sánchez-Bordona delivered on 20 March 2025.#IP v Quirin Privatbank AG.#Request for a preliminary ruling from the Bundesgerichtshof.#Reference for a preliminary ruling – Protection of natural persons with regard to the processing of personal data – Regulation (EU) 2016/679 – Rights of the data subject – Article 17 – Right to erasure of data – Article 18 – Right to restriction of processing – Article 79 – Right to an effective judicial remedy – Unlawful processing of personal data – Action seeking an order requiring the controller to refrain from any further unlawful processing in the future – Basis – Conditions – Article 82(1) – Right to compensation – Concept of ‘non-material damage’ – Assessment of the compensation – Possible consideration of the degree of fault on the part of the controller – Possible impact of the grant of a ‘prohibitory injunction’.#Case C-655/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-03-20"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023CC0492"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Szpunar delivered on 6 February 2025.#X v Russmedia Digital SRL and Inform Media Press SRL.#Request for a preliminary ruling from the Curtea de Apel Cluj.#Reference for a preliminary ruling – Protection of personal data – Regulation (EU) 2016/679 – Article 4(7) – Concept of ‘controller’ – Responsibility of the operator of an online marketplace for the publication of personal data contained in advertisements placed on its online marketplace by user advertisers – Article 5(2) – Principle of accountability – Article 26 – Joint control with user advertisers – Article 9(1) and (2)(a) – Advertisements containing sensitive data – Lawfulness of processing – Consent – Articles 24, 25 and 32 – Obligations of the controller – Prior identification of the advertisements containing such data – Prior identification of the identity of the user advertiser – Refusal of publication of unlawful advertisements – Security measures such as to prevent the copying of advertisements and their publication on other websites – Electronic commerce – Directive 2000/31/EC – Articles 12 to 15 – Possibility for such an operator, with regard to an infringement of those obligations, to rely on the exemption from liability of an intermediary information society service provider.#Case C-492/23."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-02-06"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023CC0413"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Spielmann delivered on 6 February 2025.#European Data Protection Supervisor (EDPS) v Single Resolution Board (SRB).#Appeal – Protection of natural persons with regard to the processing of personal data – Procedure for granting compensation to shareholders and creditors of a banking institution following the resolution of that institution – Decision of the European Data Protection Supervisor finding that the Single Resolution Board failed to fulfil its obligations relating to the processing of personal data – Regulation (EU) 2018/1725 – Article 15(1)(d) – Obligation to inform the data subject – Transmission of pseudonymised data to a third party – Article 3(1) – Concept of ‘personal data’ – Article 3(6) – Concept of ‘pseudonymisation’.#Case C-413/23 P."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-02-06"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62024TB0316"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Case T-316/24: Order of the General Court of 5 February 2025 – EF v EUIPO (Access to documents – Regulation (EC) No 1049/2001 – Selection procedures organised remotely by EUIPO during the COVID-19 pandemic – Data protection impact assessment – Refusal to grant access – Decision to grant access adopted after the action was brought – No need to adjudicate)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-02-05"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "62023CC0529"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Opinion of Advocate General Medina delivered on 30 January 2025.#European Parliament v TC.#Appeal – Law governing the institutions – European Parliament – Rules governing expenses and allowances for Members of Parliament – Parliamentary assistance allowance – Recovery of sums unduly paid – Article 41(2) of the Charter of Fundamental Rights of the European Union – Right to be heard – Right of access to the file – Regulation (EU) 2018/1725 – Protection of natural persons with regard to the processing of personal data by the European Union institutions, bodies, offices and agencies – Article 9 – Transmissions of personal data to recipients established in the European Union other than Union institutions and bodies – Article 26 of the Staff Regulations of Officials of the European Union.#Case C-529/23 P."
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2025-01-30"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "32018D0893"
+    },
+    "title": {
+     "type": "literal",
+     "xml:lang": "en",
+     "value": "Council Decision (EU) 2018/893 of 18 June 2018 on the position to be adopted, on behalf of the European Union, within the EEA Joint Committee concerning the amendment of Annex XI (Electronic communication, audiovisual services and information society) and Protocol 37 containing the list provided for in Article 101 to the EEA Agreement (General Data Protection Regulation) (Text with EEA relevance.)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2018-06-18"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "32016R0679R(02)"
+    },
+    "title": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "Corrigendum to Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data, and repealing Directive 95/46/EC (General Data Protection Regulation) (OJ L 119, 4.5.2016)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2018-05-23"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "02016R0679-20160504"
+    },
+    "title": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data, and repealing Directive 95/46/EC (General Data Protection Regulation) (Text with EEA relevance) "
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2016-05-04"
+    }
+   },
+   {
+    "celex": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#string",
+     "value": "32016R0679"
+    },
+    "title": {
+     "type": "literal",
+     "value": "Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data, and repealing Directive 95/46/EC (General Data Protection Regulation) (Text with EEA relevance)"
+    },
+    "date": {
+     "type": "literal",
+     "datatype": "http://www.w3.org/2001/XMLSchema#date",
+     "value": "2016-04-27"
+    }
+   }
+  ]
+ }
+}
