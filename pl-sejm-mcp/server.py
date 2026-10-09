@@ -14,8 +14,9 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from mcpcore import McpError, Tool, run
-from retrieval import Index, embeddings_status, rerank
-from sejm import PUBLISHERS, SejmClient, SejmError, in_force_from_status
+from retrieval import Index, embeddings_status, semantic_rerank
+from sejm import (PUBLISHERS, TITLE_POOL, SejmClient, SejmError, in_force_from_status,
+                  rank_title_matches)
 
 __version__ = "1.1.0"
 
@@ -41,7 +42,9 @@ still have been amended many times; check the graph before treating a text as
 current.
 
 TWO SEARCHES, DIFFERENT REACH.
-- `search_by_title` hits the live API but matches TITLES ONLY.
+- `search_by_title` hits the live API but matches TITLES ONLY. Acts the title
+  names come first, in force before repealed (`title_match: exact title` is
+  the act bearing the name), then amending acts and notices, newest first.
 - `search_indexed` hits the local index and covers titles plus the Sejm's own
   subject keywords — use it for "which act governs X".
 Neither searches article text: most acts are PDF-only (`textHTML: false`), so
@@ -52,21 +55,66 @@ verbatim. Never construct a Dz.U. number."""
 
 
 def _t_search_title(args: Dict[str, Any]) -> Any:
+    title = (args.get("title") or "").strip()
+    limit = max(1, min(int(args.get("limit", 20)), 100))
+    offset = max(0, int(args.get("offset", 0)))
+    common = dict(
+        publisher=args.get("publisher", ""),
+        year=args.get("year"),
+        act_type=args.get("act_type", ""),
+        in_force_only=bool(args.get("in_force_only")),
+    )
     try:
-        result = _client.search(
-            title=args.get("title", ""),
-            publisher=args.get("publisher", ""),
-            year=args.get("year"),
-            act_type=args.get("act_type", ""),
-            in_force_only=bool(args.get("in_force_only")),
-            limit=int(args.get("limit", 20)),
-            offset=int(args.get("offset", 0)),
-        )
+        if not title or offset >= TITLE_POOL:
+            # A listing by year/type, or a page past the ranked pool: upstream
+            # order and paging, exactly as the API gives them.
+            result = _client.search(title=title, limit=limit, offset=offset, **common)
+            if title:
+                result["ranking"] = {
+                    "method": "upstream order (newest first)",
+                    "note": "offset is past the %d title matches that are ranked; "
+                            "narrow with year or act_type instead." % TITLE_POOL,
+                }
+            return result
+        pool = _client.search_pool(title, **common)
     except SejmError as exc:
         raise McpError(str(exc)) from exc
-    if args.get("title"):
-        result["results"] = rerank(args["title"], result["results"], fields=("title",))
-    return result
+
+    # The Sejm returns title matches newest first, so a code with a hundred
+    # amending acts comes last. Rank the whole pool, then page through it:
+    # a base order (cosine when an embeddings backend is up, BM25 otherwise),
+    # then the structural tier, which is what actually separates the Code from
+    # acts that merely name it.
+    base = semantic_rerank(title, pool["results"], fields=("title",))
+    ranked = rank_title_matches(title, base["results"])
+    window = []
+    for act in ranked[offset: offset + limit]:
+        item = {k: v for k, v in act.items() if k not in ("_upstream_pos", "_rerank_score")}
+        window.append(item)
+    ranking: Dict[str, Any] = {
+        "method": base.get("method", "none"),
+        "ranked": len(ranked),
+        "order": "acts the title names (in force first; then exact title, title "
+                 "starts with query, title contains query) > amending acts and "
+                 "notices (newest first) > words matching elsewhere. See "
+                 "`title_match` on each result.",
+    }
+    if pool["count"] > len(ranked):
+        ranking["pool_note"] = (
+            "Ranked the newest %d of %d upstream matches. An older act outside them "
+            "is not in these results — narrow with year or act_type."
+            % (len(ranked), pool["count"]))
+    for key in ("note", "warning"):
+        if base.get(key):
+            ranking[key] = base[key]
+    return {
+        "count": pool["count"],
+        "returned": len(window),
+        "scope": "TITLE MATCH ONLY — the Sejm search endpoint does not read "
+                 "act bodies. Use search_indexed for body/keyword search.",
+        "ranking": ranking,
+        "results": window,
+    }
 
 
 def _indexed_in_force(doc: Optional[Dict[str, Any]]) -> Optional[bool]:
@@ -191,9 +239,11 @@ TOOLS = [
     Tool(
         "search_by_title",
         "Search Polish acts by TITLE via the live Sejm API. Precise when you know "
-        "the act's name ('Prawo energetyczne', 'Kodeks spółek handlowych'). It "
-        "does NOT read act bodies — for subject search use search_indexed. Every "
-        "result carries the publisher's `status`; report it.",
+        "the act's name ('Prawo energetyczne', 'Kodeks spółek handlowych'): the "
+        "act that bears the name ranks first (`title_match: exact title`), ahead "
+        "of the acts that amend it. It does NOT read act bodies — for subject "
+        "search use search_indexed. Every result carries `in_force` and the "
+        "publisher's `status`; report both.",
         {
             "type": "object",
             "properties": {
