@@ -164,6 +164,22 @@ class StatusProbeTest(unittest.TestCase):
         self.assertFalse(out["de_live"]["reachable"])
         self.assertIn("German backend", out["warning"])
 
+    def test_status_names_the_build_that_answered(self) -> None:
+        # v17, v18 and v19 all said "1.1.0"; the image tag tells them apart.
+        saved = {k: os.environ.get(k) for k in ("FLY_IMAGE_REF", "FLY_MACHINE_ID", "FLY_REGION")}
+        os.environ.update(FLY_IMAGE_REF="registry.fly.io/arthurlegal-mcp:onarim-20261009c",
+                          FLY_MACHINE_ID="85e991b4657008", FLY_REGION="ams")
+        try:
+            out = server._t_status({})
+        finally:
+            for k, v in saved.items():
+                os.environ.pop(k, None)
+                if v is not None:
+                    os.environ[k] = v
+        self.assertEqual(out["build"]["image"], "registry.fly.io/arthurlegal-mcp:onarim-20261009c")
+        self.assertEqual(out["build"]["region"], "ams")
+        self.assertNotIn("build", server._t_status({}))
+
 
 def _act(abbr, published, name="Gesetz"):
     return {"name": name, "abbreviation": abbr, "alternateName": None,

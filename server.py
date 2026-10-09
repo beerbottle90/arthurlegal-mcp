@@ -48,7 +48,7 @@ from typing import Any, Callable, Dict, List, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcpcore import McpError, Tool, run  # noqa: E402
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Deployed bundle: every backend sits next to this file.
@@ -514,11 +514,41 @@ def _load_de_eli(url: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+def _runtime() -> Dict[str, Any]:
+    """Which build answered and how much memory it holds.
+
+    Three deploys in a row reported version 1.1.0 (2026-10-09), so a measurement
+    could not tell which one it had measured; the image tag can. Memory is read
+    from /proc, where there is one (the hosted machines run Linux).
+    """
+    out: Dict[str, Any] = {}
+    if os.environ.get("FLY_IMAGE_REF"):
+        out["build"] = {"image": os.environ["FLY_IMAGE_REF"],
+                        "machine": os.environ.get("FLY_MACHINE_ID", ""),
+                        "region": os.environ.get("FLY_REGION", "")}
+    memory: Dict[str, int] = {}
+    for path, key, name in (("/proc/self/status", "VmRSS:", "process_rss_mb"),
+                            ("/proc/meminfo", "MemTotal:", "machine_total_mb"),
+                            ("/proc/meminfo", "MemAvailable:", "machine_available_mb")):
+        try:
+            with open(path) as fh:
+                for line in fh:
+                    if line.startswith(key):
+                        memory[name] = int(line.split()[1]) // 1024
+                        break
+        except (OSError, ValueError, IndexError):
+            pass
+    if memory:
+        out["memory"] = memory
+    return out
+
+
 def _t_status(args: Dict[str, Any]) -> Any:
     """One health answer for the whole package."""
     out: Dict[str, Any] = {
         "server": "arthurlegal-mcp",
         "version": __version__,
+        **_runtime(),
         "backends_loaded": _loaded,
         "tools_exposed": len(_tools),
         "note": "Every tool is prefixed with its jurisdiction (nl_, pl_, at_, ie_, "
