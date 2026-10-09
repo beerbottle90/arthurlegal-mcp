@@ -12,6 +12,12 @@ Three things this wrapper exists to handle, all found by testing the live API:
    had filtered when they had not. This client never sends it.
 
 3. **The version tuple moved.** ``v2.5`` now 404s; ``v2.6`` is current.
+
+4. **Documents are files, not pages.** A result's ``url`` (``Dokument.wxe`` or
+   ``eli/``) is the RIS web page, which answers 503 to automated clients; the
+   same document is served as html/xml/rtf/pdf files under ``/Dokumente/``.
+   The HTML file opens with ~4,000 characters of head and CSS, so a fetch
+   returns extracted text unless the raw file is asked for (2026-10-09).
 """
 
 from __future__ import annotations
@@ -21,11 +27,13 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, List, Optional
+from html.parser import HTMLParser
+from typing import Any, Dict, List, Optional, Tuple
 
 __version__ = "1.0.0"
 
 API = "https://data.bka.gv.at/ris/api/v2.6"
+OGD = "https://ogd.ris.bka.gv.at"
 UA = "arthurlegal-at-ris-mcp/%s (+https://github.com/beerbottle90/arthurlegal-mcp)" % __version__
 
 # RIS pages in fixed sizes; the API rejects arbitrary integers.
@@ -101,6 +109,106 @@ def _items(value: Any) -> List[str]:
     if isinstance(value, dict):
         value = value.get("item")
     return [str(v) for v in _listify(value) if v not in (None, "")]
+
+
+class _Text(HTMLParser):
+    """Readable text from a RIS document file, HTML or XML rendition.
+
+    Drops what is never document text: the HTML head with its script and CSS;
+    the screen-reader copies RIS puts beside every § and Roman numeral
+    ("Paragraph 5," next to "§ 5.", "römisch zwei c" next to "IIc"); and the
+    XML rendition's running page headers and footers ("Seite 1 von 2").
+    Block elements become line breaks.
+    """
+
+    SKIP = {"head", "script", "style", "kzinhalt", "fzinhalt"}
+    BLOCK = {"p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr",
+             "table", "ol", "ul", "absatz", "ueberschrift", "abstand"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: List[str] = []
+        self._skip_tag = ""
+        self._depth = 0
+        self._spans: List[bool] = []
+
+    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+        if self._depth:
+            if tag == self._skip_tag:
+                self._depth += 1
+            return
+        classes = (dict(attrs).get("class") or "").split()
+        if tag in self.SKIP or "sr-only" in classes:
+            self._skip_tag, self._depth = tag, 1
+        elif tag in self.BLOCK:
+            self.parts.append("\n")
+        elif tag in ("td", "th", "tab"):
+            self.parts.append(" ")
+        elif tag == "span":
+            # Paragraph numbers ("(1)") sit flush against their text; CSS spaces them.
+            self._spans.append("Absatzzahl" in classes)
+
+    def handle_startendtag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+        if not self._depth:
+            if tag in self.BLOCK:
+                self.parts.append("\n")
+            elif tag == "tab":
+                self.parts.append(" ")
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._depth:
+            if tag == self._skip_tag:
+                self._depth -= 1
+        elif tag in self.BLOCK:
+            self.parts.append("\n")
+        elif tag == "span" and self._spans and self._spans.pop():
+            self.parts.append(" ")
+
+    def handle_data(self, data: str) -> None:
+        if not self._depth:
+            self.parts.append(data)
+
+    def text(self) -> str:
+        lines = (" ".join(line.split()) for line in "".join(self.parts).splitlines())
+        return "\n".join(line for line in lines if line)
+
+
+def _to_text(markup: str) -> str:
+    parser = _Text()
+    parser.feed(markup)
+    parser.close()
+    return parser.text()
+
+
+def _document_file(url: str, raw: bool) -> Tuple[str, str]:
+    """The /Dokumente/ file behind a RIS URL, with a note when it differs.
+
+    ``Dokument.wxe?Abfrage=X&Dokumentnummer=Y`` is served as
+    ``/Dokumente/X/Y/Y.html`` (checked for Justiz, Vwgh, Vfgh, Bvwg, Lvwg and
+    the decisions listed in a Rechtssatz); an ``eli/`` URL ending in a federal
+    norm number (NOR...) as ``/Dokumente/Bundesnormen/NOR.../NOR....html``.
+    PDF and RTF are read from the HTML rendition unless the raw file is wanted.
+    """
+    parts = urllib.parse.urlsplit(url)
+    if parts.path.endswith("/Dokument.wxe"):
+        query = urllib.parse.parse_qs(parts.query)
+        app = (query.get("Abfrage") or [""])[0]
+        number = (query.get("Dokumentnummer") or [""])[0]
+        if re.fullmatch(r"\w+", app) and re.fullmatch(r"\w+", number):
+            return ("%s/Dokumente/%s/%s/%s.html" % (OGD, app, number, number),
+                    "Read from the document's HTML file; the RIS web page "
+                    "refuses automated clients.")
+    norm = re.search(r"/eli/.+/(NOR\d+)/?$", parts.path)
+    if norm:
+        number = norm.group(1)
+        return ("%s/Dokumente/Bundesnormen/%s/%s.html" % (OGD, number, number),
+                "Read from the norm's HTML file; the RIS web page refuses "
+                "automated clients.")
+    if not raw and re.search(r"\.(pdf|rtf)$", parts.path, re.IGNORECASE):
+        return (re.sub(r"\.(pdf|rtf)$", ".html", url, flags=re.IGNORECASE),
+                "Read from the HTML rendition of the same document; PDF and "
+                "RTF are not text.")
+    return url, ""
 
 
 def _content_urls(data: Dict[str, Any]) -> Dict[str, str]:
@@ -277,21 +385,42 @@ class RisClient:
         return out
 
     # -- full text -------------------------------------------------------- #
-    def fetch(self, url: str, max_chars: int = 60000) -> Dict[str, Any]:
-        """Fetch one of the ``formats`` URLs a search result carried."""
+    def fetch(self, url: str, max_chars: int = 60000, raw: bool = False) -> Dict[str, Any]:
+        """Fetch a RIS document: readable text by default, the file as served if ``raw``."""
         if not url.startswith(("https://ogd.ris.bka.gv.at/", "https://www.ris.bka.gv.at/")):
             # Refuse to be a generic fetcher: this server speaks for RIS only.
             raise RisError("Refusing to fetch a non-RIS URL: %s" % url)
-        req = urllib.request.Request(url, method="GET")
+        target, note = _document_file(url, raw)
+        req = urllib.request.Request(target, method="GET")
         req.add_header("User-Agent", UA)
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
-                raw = resp.read().decode("utf-8", "replace")
+                body = resp.read().decode("utf-8", "replace")
+                ctype = (resp.headers.get("Content-Type") or "").lower()
         except urllib.error.HTTPError as exc:
-            raise RisError("HTTP %s fetching %s" % (exc.code, url)) from exc
+            if exc.code == 503 and "/Dokumente/" not in target:
+                raise RisError(
+                    "RIS answered 503 for %s: its web pages refuse automated "
+                    "clients. Fetch one of the result's `formats` URLs (html or "
+                    "xml) instead." % url) from exc
+            raise RisError("HTTP %s fetching %s" % (exc.code, target)) from exc
         except urllib.error.URLError as exc:
             raise RisError("Could not reach RIS: %s" % exc.reason) from exc
-        out: Dict[str, Any] = {"url": url, "length_chars": len(raw), "text": raw[:max_chars]}
-        if len(raw) > max_chars:
-            out["truncated"] = "Truncated at %d of %d characters." % (max_chars, len(raw))
+        path = urllib.parse.urlsplit(target).path.lower()
+        if raw:
+            fmt, text = "raw", body
+        elif "xml" in ctype or path.endswith(".xml"):
+            fmt, text = "xml", _to_text(body)
+        elif "html" in ctype or path.endswith((".html", ".htm")):
+            fmt, text = "html", _to_text(body)
+        else:
+            fmt, text = "raw", body
+        out: Dict[str, Any] = {"url": url, "format": fmt, "length_chars": len(text),
+                               "text": text[:max_chars]}
+        if target != url:
+            out["fetched_url"] = target
+        if note:
+            out["note"] = note
+        if len(text) > max_chars:
+            out["truncated"] = "Truncated at %d of %d characters." % (max_chars, len(text))
         return out

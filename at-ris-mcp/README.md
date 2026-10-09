@@ -71,6 +71,9 @@ this server cannot verify it.
 - `Kurztitel` is SILENTLY IGNORED: passing it returns all 441,066 documents.
 - API v2.5 was retired and now 404s; this client uses v2.6.
 - Much of the OGH corpus is Rechtssätze — legal propositions, not judgments.
+- A result's `url` (Dokument.wxe, eli/) is a web page that answers 503 to
+  automated clients; `fetch_document` reads the same document from its
+  /Dokumente/ file and returns extracted text, not page source.
 
 ## Run it
 

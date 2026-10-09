@@ -107,8 +107,9 @@ def _t_search_caselaw(args: Dict[str, Any]) -> Any:
 
 def _t_fetch(args: Dict[str, Any]) -> Any:
     try:
-        return _client.fetch(args["url"], max_chars=int(args.get("max_chars", 60000)))
-    except RisError as exc:
+        return _client.fetch(args["url"], max_chars=int(args.get("max_chars", 60000)),
+                             raw=bool(args.get("raw", False)))
+    except (RisError, KeyError) as exc:
         raise McpError(str(exc)) from exc
 
 
@@ -188,14 +189,19 @@ TOOLS = [
     ),
     Tool(
         "fetch_document",
-        "Fetch the full text of a RIS document from one of the URLs a search "
-        "result listed under `formats` (html, xml, rtf, pdf) or `url`. Only "
-        "ris.bka.gv.at and ogd.ris.bka.gv.at URLs are accepted.",
+        "Fetch the full text of a RIS document as readable text: extracted from "
+        "the HTML or XML file, without page head, CSS, screen-reader duplicates "
+        "or page headers. Takes a URL from a search result's `formats` (html, "
+        "xml; pdf and rtf are read from the html file), its `url`, or a "
+        "Rechtssatz decision's `url` — RIS web pages refuse automated clients, "
+        "so those are read from the document file. raw=true returns the file "
+        "as served. Only ris.bka.gv.at and ogd.ris.bka.gv.at URLs are accepted.",
         {
             "type": "object",
             "properties": {
                 "url": {"type": "string", "description": "A URL taken from a search result's `formats` or `url` field."},
                 "max_chars": {"type": "integer", "default": 60000},
+                "raw": {"type": "boolean", "default": False, "description": "Return the file as served (markup) instead of extracted text."},
             },
             "required": ["url"],
         },
