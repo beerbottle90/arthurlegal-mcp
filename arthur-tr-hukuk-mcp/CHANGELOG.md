@@ -2,6 +2,12 @@
 
 ## Yayımlanmamış
 
+- İçtihat araması (`ictihat_ara`): Bedesten çıplak kelimeleri VEYA ile birleştiriyor (kaynak notu "VE" diyordu).
+  09.10.2026 ölçümü, Yargıtay + Danıştay: "kira tespit davası" tırnaksız 2.514.700 karar (ilk sonuç mera davası),
+  her kelime zorunlu (+) 53.830, tırnaklı 2.127 (3. Hukuk Dairesi kira kararları). Tırnak ve işleç içermeyen çok
+  kelimeli sorgu artık önce tam ifade, sonuç yoksa her kelime zorunlu, o da yoksa olduğu gibi aranır; ilk sonuç veren
+  basamakta durur. Yanıtta `uygulanan_sorgu`, `arama_modu`, `denenenler`. `kelime_modu` (ifade | hepsi | herhangi) ile
+  değiştirilir. Her basamak bir Bedesten isteğidir (yerel kova 3,5 sn/istek).
 - Rekabet: Kurum'un PdfText araması kelime bazlıdır; tırnaksız çok kelimeli sorgu ifade aramaz ve `total` şişer
   (29.09.2026 ölçümü: 'karşı oy' 2.737, 'farklı gerekçe' 5.222 karar; tırnaklı "karşı oy gerekçesi" 61). Kaynak notu
   ve `query` açıklaması bunu söyler; tırnaksız çok kelimeli sorgunun yanıt notuna DİKKAT satırı eklenir ("UYARI"

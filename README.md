@@ -6,7 +6,7 @@ Türkiye - Netherlands - Poland - Austria - Ireland - Finland - Spain - United
 Kingdom - European Union - Japan - Azerbaijan - Germany - legal scholarship -
 signed resource contracts - GLEIF entity identity.
 
-104 tools, one hosted endpoint, no authentication:
+123 tools, one hosted endpoint, no authentication:
 
     https://arthurlegal-mcp.fly.dev/mcp
 
@@ -89,7 +89,24 @@ prefix is what keeps a Spanish question from being answered with Finnish law.
 documents each has indexed, how many are vectorised, and whether semantic
 search is live. A backend that fails to load is announced there rather than
 quietly returning nothing -- "no results" and "not searched" are different
-answers.
+answers. The German backend runs as a separate process, so `status` also probes
+it live (`de_live`); Azerbaijan's probe reports whether e-qanun.az answers now.
+
+## Germany (`de_`)
+
+Two sources stand behind the `de_` prefix:
+
+- **de-eli** (pinned `de-eli-mcp==0.5.4`, a separate FastMCP process proxied over
+  HTTP): NeuRIS legislation and case law (`/v1/rechtsprechung`, seven federal courts
+  since 2010, full text), rechtsprechung-im-internet.de, the Bundestag DIP and Open
+  Legal Data. The aggregator reranks its search results with the same embeddings as
+  every other jurisdiction, rebuilds decision citations from NeuRIS's German field
+  names, returns `de_recent_changes` newest first and compacts DIP results.
+- **de-gii-mcp** (`de_norm_getir`, `de_gesetz_ara`): the consolidated text of one
+  norm from gesetze-im-internet.de. NeuRIS is still in its test phase and lacks the
+  core codes -- on 2026-10-09 `/v1/legislation?abbreviation=` returned 0 for BGB, HGB,
+  StGB, ZPO, StPO, AO, UrhG, GWB and InsO -- so `de_search` points there when an
+  abbreviation is missing.
 
 ## Indexes
 
