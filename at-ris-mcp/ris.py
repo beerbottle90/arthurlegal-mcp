@@ -17,6 +17,7 @@ Three things this wrapper exists to handle, all found by testing the live API:
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -44,6 +45,22 @@ CASELAW_APPS = {
     "Bvwg": "Bundesverwaltungsgericht — Federal Administrative Court",
     "Lvwg": "Landesverwaltungsgerichte — provincial administrative courts",
 }
+
+# A Rechtssatz lists every decision that applied it, each with a note: one OGH
+# proposition found under "Schadenersatz" lists 275, and ten such hits made a
+# 256,833-character answer (2026-10-09). Search results keep the first few
+# decisions (where the line starts) and the latest few (that it still holds),
+# with the total; the Rechtssatz document itself has the full list.
+DECISIONS_FIRST = 3
+DECISIONS_LATEST = 2
+DOCKETS_SHOWN = 3
+NOTE_CHARS = 200
+
+
+def _clip(text: str, limit: int) -> str:
+    # RIS notes carry inline <br/> between Beisätze.
+    text = " ".join(re.sub(r"<[^>]+>", " ", str(text or "")).split())
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
 
 class RisError(Exception):
@@ -215,6 +232,11 @@ class RisClient:
             # not a judgment. Saying so matters: citing it as "the decision" would
             # misdescribe what it is, and it lists every case that applied it.
             out["rechtssatz_numbers"] = _items(sub.get("Rechtssatznummern"))
+            # RIS packs every docket of the line into one string.
+            all_dockets = [x.strip() for x in "; ".join(docket).split(";") if x.strip()]
+            if len(all_dockets) > DOCKETS_SHOWN:
+                out["docket"] = "%s … (+%d)" % ("; ".join(all_dockets[:DOCKETS_SHOWN]),
+                                               len(all_dockets) - DOCKETS_SHOWN)
             decisions = []
             for d in _listify((sub.get("Entscheidungstexte") or {}).get("item")):
                 if isinstance(d, dict):
@@ -224,15 +246,26 @@ class RisClient:
                             "court": d.get("Gericht", ""),
                             "date": d.get("Entscheidungsdatum", ""),
                             "url": d.get("DokumentUrl", ""),
-                            "note": d.get("Anmerkung", ""),
+                            "note": _clip(d.get("Anmerkung", ""), NOTE_CHARS),
                         }
                     )
+            total = len(decisions)
+            if total > DECISIONS_FIRST + DECISIONS_LATEST:
+                # RIS appends each new decision, so the tail is the latest.
+                decisions = decisions[:DECISIONS_FIRST] + decisions[-DECISIONS_LATEST:]
+                out["decisions_omitted"] = total - len(decisions)
             out["decisions"] = decisions
+            out["decisions_total"] = total
             out["note"] = (
                 "Rechtssatz — a legal proposition abstracted from %d decision(s), "
                 "not a single judgment. Cite the underlying decision from "
-                "`decisions` when you need a judgment." % len(decisions)
+                "`decisions` when you need a judgment." % total
             )
+            if total > len(decisions):
+                out["note"] += (
+                    " Shown: the first %d and the latest %d; the full list is in "
+                    "the Rechtssatz document (fetch_document with formats.html)."
+                    % (DECISIONS_FIRST, DECISIONS_LATEST))
             rs_no = out["rechtssatz_numbers"]
             out["citation"] = " ".join(
                 x for x in (court, rs_no[0] if rs_no else "", ecli) if x
