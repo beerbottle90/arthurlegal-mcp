@@ -66,17 +66,20 @@ reports the model and both measurements. Do not use it for publication verificat
 
 ## Turkish land-registry parcel tools (`tkgm_`)
 
-`tkgm_` tools work on a parcel file **the user downloads themselves** from TKGM's Parsel Sorgu
-(GeoJSON/KML): plane-projected area and edge lengths, a to-scale A4 SVG sketch, an OSM map, format
-conversion (DXF/KML/CSV), route-corridor intersection, 2026 title-deed fee and revolving-fund
-tariff lookups (every figure stored with a verbatim source quote), and a bridge from the parcel to
-the statutes and case law to check with the `tr_` tools. This server **never calls TKGM**: Parsel
-Sorgu's terms of use forbid direct or indirect access to its web services (art. 3) and commercial
-use of its output (art. 4). Parsel Sorgu exports vertices rounded to 5 decimals (~1.1 m), so the
-tools report the resulting area uncertainty instead of presenting a rounding artefact as a
-cadastral discrepancy. On this hosted endpoint file paths are refused (parcel text is passed in
-`icerik`) and the tools that write files, fetch elevation data or read title records are disabled;
-run `tkgm-mcp/server.py` locally over stdio for those. Source: the `tkgm-mcp/` folder.
+`tkgm_` tools fetch single parcels live from TKGM's Parsel Sorgu -- by province, district and
+neighbourhood with block and parcel, by coordinates, or by place name -- and work with them:
+plane-projected area and edge lengths, a to-scale A4 SVG sketch, an OSM map, format conversion
+(DXF/KML/CSV), route-corridor intersection, 2026 title-deed fee and revolving-fund tariff lookups
+(every figure stored with a verbatim source quote), and a bridge from the parcel to the statutes
+and case law to check with the `tr_` tools. Live lookups pass one rate-limited gate: at most 30
+TKGM requests a minute for all users and machines together, one request in flight per machine, at
+least 4 s between starts, at most 3,000 a day; it backs off on 429/503 and stops on 403 (see
+`tkgm-mcp/docs/MANIFESTO.md`). The first live call answers with an approval card, so start with
+`tkgm_baslangic`. Parsel Sorgu exports vertices rounded to 5 decimals (~1.1 m), so the tools report
+the resulting area uncertainty instead of presenting a rounding artefact as a cadastral
+discrepancy. On this hosted endpoint file paths are refused (parcel text is passed in `icerik`)
+and the tools that write files, fetch elevation data or read title records are disabled; run
+`tkgm-mcp/server.py` locally over stdio for those. Source: the `tkgm-mcp/` folder.
 
 ## Tool naming
 
