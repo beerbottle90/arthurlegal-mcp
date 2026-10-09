@@ -15,8 +15,8 @@ from typing import Any, Dict, Optional
 
 from mcpcore import McpError, Tool, run
 from retrieval import Index, embeddings_status, semantic_rerank
-from sejm import (PUBLISHERS, TITLE_POOL, SejmClient, SejmError, in_force_from_status,
-                  rank_title_matches)
+from sejm import (PUBLISHERS, REFERENCES_LIMIT, TITLE_POOL, SejmClient, SejmError,
+                  in_force_from_status, rank_title_matches)
 
 __version__ = "1.1.0"
 
@@ -37,9 +37,10 @@ Azerbaijani e-qanun source follows.
 
 AMENDMENTS. `get_act` returns a `references` graph with the publisher's own
 relation names — `Akty zmieniające` (amending acts), `Akty uchylone` (repealed
-acts), `Akty wykonawcze` (implementing acts). An act can be `obowiązujący` and
-still have been amended many times; check the graph before treating a text as
-current.
+acts), `Akty wykonawcze` (implementing acts), `Inf. o tekście jednolitym`
+(consolidated-text notices). Each relation is cut to `references_limit` entries;
+`references_total` gives the full counts. An act can be in force and still have
+been amended many times; check the graph before treating a text as current.
 
 TWO SEARCHES, DIFFERENT REACH.
 - `search_by_title` hits the live API but matches TITLES ONLY. Acts the title
@@ -189,7 +190,12 @@ def _t_search_indexed(args: Dict[str, Any]) -> Any:
 
 def _t_get_act(args: Dict[str, Any]) -> Any:
     try:
-        return _client.get_act(args["publisher"], int(args["year"]), int(args["pos"]))
+        return _client.get_act(
+            args["publisher"], int(args["year"]), int(args["pos"]),
+            references_limit=int(args.get("references_limit", REFERENCES_LIMIT)),
+            relation=args.get("relation", "") or "",
+            references_offset=int(args.get("references_offset", 0)),
+        )
     except (SejmError, KeyError, ValueError) as exc:
         raise McpError(str(exc)) from exc
 
@@ -286,11 +292,26 @@ TOOLS = [
     ),
     Tool(
         "get_act",
-        "Full metadata for one act: title, status, entry into force, ELI, subject "
-        "keywords, transposed EU directives, and the `references` amendment graph "
-        "(which acts amended, repealed or implement it). Read the graph before "
-        "treating the text as current law.",
-        {"type": "object", "properties": dict(_LOC), "required": ["publisher", "year", "pos"]},
+        "Full metadata for one act: title, in force + status, entry into force, "
+        "ELI, subject keywords, transposed EU directives, and the `references` "
+        "amendment graph (which acts amended, repealed or implement it), each "
+        "entry with its own Dz.U./M.P. citation. Long relations are cut to "
+        "`references_limit` with totals in `references_total`; page one relation "
+        "with `relation` + `references_offset`. Read the graph before treating "
+        "the text as current law.",
+        {
+            "type": "object",
+            "properties": {
+                **_LOC,
+                "references_limit": {"type": "integer", "default": REFERENCES_LIMIT,
+                                     "description": "Entries per relation; 0 = totals only."},
+                "relation": {"type": "string",
+                             "description": "Return only this relation, e.g. 'Akty zmieniające'."},
+                "references_offset": {"type": "integer", "default": 0,
+                                      "description": "Start within `relation` (with relation only)."},
+            },
+            "required": ["publisher", "year", "pos"],
+        },
         _t_get_act,
     ),
     Tool(

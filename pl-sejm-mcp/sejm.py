@@ -77,6 +77,10 @@ STATUS_LABELS_NOT_IN_FORCE = frozenset({
 # ("Kodeks cywilny" 61 matches, "Kodeks karny" 153, "podatku dochodowym" 385).
 TITLE_POOL = 500
 
+# Entries per relation that get_act returns by default. The Civil Code's graph
+# is 373 entries, 223 of them implementing acts.
+REFERENCES_LIMIT = 10
+
 
 class SejmError(Exception):
     """An upstream failure worth explaining to the caller."""
@@ -298,6 +302,30 @@ def rank_title_matches(query: str, acts: List[Dict[str, Any]]) -> List[Dict[str,
     return [item for _, _, item in keyed]
 
 
+def _as_list(vals: Any) -> List[Dict[str, Any]]:
+    return [v for v in (vals if isinstance(vals, list) else [vals]) if isinstance(v, dict)]
+
+
+def _reference(entry: Dict[str, Any]) -> Dict[str, Any]:
+    """One graph entry, from either shape the API uses.
+
+    /references gives ``{"act": {ELI, displayAddress, title, status, ...},
+    "art", "date"}``; the act payload gives ``{"id", "art", "date"}``. No
+    display address is ever built from an id: older ones carry a volume
+    ("Dz.U. 1964 nr 16 poz. 94") that the id does not.
+    """
+    act = entry.get("act") if isinstance(entry.get("act"), dict) else None
+    out: Dict[str, Any] = {"id": (act or {}).get("ELI") or entry.get("id", "")}
+    if act:
+        out["display_address"] = act.get("displayAddress", "")
+        out["title"] = act.get("title", "")
+        out["status"] = act.get("status", "")
+    for key in ("art", "date"):
+        if entry.get(key):
+            out[key] = entry[key]
+    return out
+
+
 class SejmClient:
     def search(self, title: str = "", publisher: str = "", year: Optional[int] = None,
                act_type: str = "", in_force_only: bool = False,
@@ -364,29 +392,58 @@ class SejmClient:
         total = data.get("totalCount", data.get("count", len(items)))
         return {"count": total, "returned": len(items), "results": items}
 
-    def get_act(self, publisher: str, year: int, pos: int) -> Dict[str, Any]:
+    def _act_meta(self, publisher: str, year: int, pos: int) -> Dict[str, Any]:
+        """The act's own record, without the amendment graph."""
         if publisher not in PUBLISHERS:
             raise SejmError("publisher must be DU or MP")
-        data = _get("acts/%s/%d/%d" % (publisher, int(year), int(pos)))
+        return _norm(_get("acts/%s/%d/%d" % (publisher, int(year), int(pos))))
+
+    def get_act(self, publisher: str, year: int, pos: int,
+                references_limit: int = REFERENCES_LIMIT, relation: str = "",
+                references_offset: int = 0) -> Dict[str, Any]:
+        if publisher not in PUBLISHERS:
+            raise SejmError("publisher must be DU or MP")
+        path = "acts/%s/%d/%d" % (publisher, int(year), int(pos))
+        data = _get(path)
         out = _norm(data)
         # references maps relationship -> list of related acts: which act amended
-        # this one, which it repealed, and so on.
-        refs = data.get("references") or {}
-        if refs:
-            out["references"] = {
-                k: [
-                    {"display_address": v.get("displayAddress", ""), "id": v.get("id", ""),
-                     "art": v.get("art", "")}
-                    for v in (vals if isinstance(vals, list) else [vals])
-                    if isinstance(v, dict)
-                ]
-                for k, vals in refs.items()
-            }
+        # this one, which it repealed, and so on. The act payload holds only an
+        # ELI id per entry; /references holds each related act's header, which is
+        # where its citation (displayAddress) and title live.
+        warning = ""
+        graph: Dict[str, List[Dict[str, Any]]] = {}
+        try:
+            detailed = _get(path + "/references") or {}
+            for rel, vals in detailed.items():
+                graph[rel] = [_reference(v) for v in _as_list(vals)]
+        except SejmError as exc:
+            warning = ("Display addresses and titles are unavailable: the Sejm "
+                       "references endpoint failed (%s). Entries carry only the "
+                       "related act's ELI `id`." % exc)
+            for rel, vals in (data.get("references") or {}).items():
+                graph[rel] = [_reference(v) for v in _as_list(vals)]
+        if graph:
+            if relation and relation not in graph:
+                raise SejmError("No relation %r for this act. Available: %s"
+                                % (relation, ", ".join(sorted(graph))))
+            limit = max(0, int(references_limit))
+            start = max(0, int(references_offset)) if relation else 0
+            names = [relation] if relation else list(graph)
+            out["references"] = {rel: graph[rel][start: start + limit] for rel in names}
+            out["references_total"] = {rel: len(graph[rel]) for rel in graph}
+            if any(len(graph[rel]) > len(out["references"][rel]) for rel in names):
+                out["references_truncated"] = (
+                    "Showing %d per relation (references_limit) of the totals in "
+                    "`references_total`. Page one relation with relation=<name> "
+                    "and references_offset." % limit)
             out["references_note"] = (
                 "`references` is the amendment graph. Check it before treating "
-                "this text as current: an act can be `obowiązujący` and still "
-                "have been amended many times."
+                "this text as current: an act can be in force and still have "
+                "been amended many times. `date` on an amending act is when its "
+                "change takes effect, and may lie in the future."
             )
+            if warning:
+                out["references_warning"] = warning
         if data.get("directives"):
             out["eu_directives"] = data["directives"]
         if data.get("previousTitle"):
@@ -402,7 +459,7 @@ class SejmClient:
         """
         if fmt not in ("html", "pdf"):
             raise SejmError("fmt must be 'html' or 'pdf'")
-        meta = self.get_act(publisher, year, pos)
+        meta = self._act_meta(publisher, year, pos)
         if fmt == "html" and not meta["has_html"]:
             raise SejmError(
                 "%s has no HTML text (textHTML=false); only PDF is published. "
