@@ -83,14 +83,27 @@ class SemanticOnlyTests(unittest.TestCase):
         args.update({"query": query})
         return self.server._t_search(args)
 
-    def test_unrelated_query_is_flagged_and_noise_dropped(self):
+    def test_unrelated_query_is_flagged_and_its_noise_marked(self):
         out = self.search("vahingonkorvauslaki", limit=3)
         self.assertEqual(out["retrieval"]["channels_used"].get("lexical"), 0)
         self.assertIn("warning", out)
         self.assertIn("2024-2025", out["warning"])
         self.assertIn("meaning", out["warning"])
-        self.assertEqual(out["results"], [])
-        self.assertGreater(out["semantic_filter"]["dropped"], 0)
+        self.assertIn("probably outside the index", out["warning"])
+        self.assertTrue(out["results"])
+        self.assertTrue(all(r.get("likely_unrelated") for r in out["results"]))
+        self.assertEqual(out["semantic_filter"]["likely_unrelated"], len(out["results"]))
+
+    def test_semantic_mode_is_never_flagged(self):
+        # 1.1.0 treated every mode="semantic" call as "no word occurs" (the keyword
+        # channels are not asked in that mode) and dropped right answers below the
+        # floor: fi-02 and fi-04 came back empty in the 2026-10-09 measurement.
+        out = self.search("horse welfare", limit=3, mode="semantic")
+        self.assertEqual(out["results"][0]["title"], "Hevosten hyvinvointi")
+        self.assertNotIn("warning", out)
+        self.assertNotIn("semantic_filter", out)
+        self.assertEqual(len(out["results"]), 3)
+        self.assertTrue(all("match" not in r for r in out["results"]))
 
     def test_related_query_found_by_meaning_is_kept_and_labelled(self):
         out = self.search("horse welfare", limit=3)
@@ -99,7 +112,9 @@ class SemanticOnlyTests(unittest.TestCase):
         self.assertEqual(top["title"], "Hevosten hyvinvointi")
         self.assertEqual(top["match"], "semantic only")
         self.assertGreater(top["similarity_z"], 3.4)
+        self.assertNotIn("likely_unrelated", top)
         self.assertIn("warning", out)
+        self.assertNotIn("probably outside the index", out["warning"])
         self.assertTrue(all(r["match"] == "semantic only" for r in out["results"]))
 
     def test_keyword_matches_are_left_alone(self):

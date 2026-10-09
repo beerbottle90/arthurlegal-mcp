@@ -21,17 +21,18 @@ from finlex import ACT_TYPES, FinlexClient, FinlexError
 from mcpcore import McpError, Tool, run
 from retrieval import Index, embeddings_status
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 _client = FinlexClient()
 _index = Index()
 
-# A result found by meaning alone is kept only when its similarity to the query
-# stands this many standard deviations above the query's similarity to the
-# whole index. The top of a few hundred unrelated documents sits at ~2.3-3.2 sd;
-# related acts reached across languages sat at 3.45-4.3 sd (bge-m3, the 250-act
-# index, 2026-10-09). The scale is relative, so it carries across models better
-# than a raw cosine does; re-check it after changing model or corpus size.
+# A result found by meaning alone counts as related only when its similarity to
+# the query stands this many standard deviations above the query's similarity to
+# the whole index. The top of a few hundred unrelated documents sits at ~2.3-3.2
+# sd; related acts reached across languages sat at 3.45-4.3 sd (bge-m3, the
+# 250-act index, 2026-10-09). On voyage-4-lite right answers fell below it, so
+# results under the floor are marked, never removed; re-check it after changing
+# model or corpus size.
 SEMANTIC_MIN_Z = float(os.environ.get("FI_SEMANTIC_MIN_Z", "3.4"))
 
 INSTRUCTIONS = """Finnish legislation from Finlex, the Ministry of Justice's
@@ -59,7 +60,8 @@ exist — the index holds only the years that were crawled.
 MEANING-ONLY MATCHES. When no word of the query occurs in the index, results
 carry `match: "semantic only"` and the response a `warning`: they are leads,
 not answers, and the act asked about may be outside the index. Results no more
-similar than unrelated text are dropped (`semantic_filter`)."""
+similar than unrelated text are marked `likely_unrelated` (`semantic_filter`).
+`mode: "semantic"` asks for meaning matches on purpose and is not flagged."""
 
 
 def _t_search(args: Dict[str, Any]) -> Any:
@@ -86,54 +88,61 @@ def _t_search(args: Dict[str, Any]) -> Any:
     out["language_note"] = ("Finnish and Swedish expressions are both indexed and "
                             "both authoritative; see each result's `lang`.")
     channels = out.get("retrieval", {}).get("channels_used", {})
-    if out["results"] and not channels.get("lexical") and not channels.get("fuzzy"):
+    # Only when the keyword channels were asked and found nothing. In mode
+    # "semantic" they are never asked, and every result is a meaning match by
+    # request, not a sign that the query's words are missing from the index.
+    if out["results"] and "lexical" in channels and not channels["lexical"] and not channels.get("fuzzy"):
         _semantic_only(query, out, coverage)
     return out
 
 
 def _semantic_only(query: str, out: Dict[str, Any], coverage: str) -> None:
-    """Flag a result set that no word of the query reached, and drop its noise.
+    """Flag a result set that no word of the query reached, and mark its noise.
 
     The semantic channel always returns its nearest neighbours, related or
     not. With no keyword or substring match behind them, each result is marked
     as a meaning-only match with its similarity, and results that stand no
-    higher above the index than chance would put them are removed.
+    higher above the index than chance would put them are marked
+    ``likely_unrelated``. They are not removed: the floor was set on bge-m3,
+    and on voyage-4-lite acts that were the right answer sat below it
+    (two of twelve questions in the 2026-10-09 known-item measurement).
     """
-    out["warning"] = (
+    scores = _similarity(query)
+    for result in out["results"]:
+        result["match"] = "semantic only"
+    warning = (
         "No word of %r occurs in the index (coverage: %s, %d documents). These "
         "results match by meaning only and may be unrelated — the act you want may "
         "simply be outside the index. For a known act use get_act with its year "
         "and number; browse_year lists a year." % (query, coverage, _index.count()))
-    scores = _similarity(query)
-    for result in out["results"]:
-        result["match"] = "semantic only"
     if scores is None:
+        out["warning"] = warning
         out["semantic_filter"] = {"applied": False,
-                                  "note": "Similarity could not be computed; nothing was dropped."}
+                                  "note": "Similarity could not be computed; nothing was marked."}
         return
     sims, mean, sd = scores
-    kept, dropped = [], 0
+    marked = 0
     for result in out["results"]:
         sim = sims.get(result["ref"])
         if sim is None:
-            kept.append(result)
             continue
         z = (sim - mean) / sd if sd else 0.0
         result["similarity"] = round(sim, 4)
         result["similarity_z"] = round(z, 2)
-        if z >= SEMANTIC_MIN_Z:
-            kept.append(result)
-        else:
-            dropped += 1
-    out["results"] = kept
-    out["total"] = len(kept)
+        if z < SEMANTIC_MIN_Z:
+            result["likely_unrelated"] = True
+            marked += 1
+    if marked and marked == len(out["results"]):
+        warning += (" None of them stands above the noise floor (similarity_z %.1f): treat "
+                    "the act as probably outside the index." % SEMANTIC_MIN_Z)
+    out["warning"] = warning
     out["semantic_filter"] = {
         "applied": True,
         "min_z": SEMANTIC_MIN_Z,
-        "dropped": dropped,
+        "likely_unrelated": marked,
         "note": "similarity_z = standard deviations above the query's mean similarity "
-                "to all %d indexed documents; results below min_z were dropped as "
-                "indistinguishable from unrelated text." % len(sims),
+                "to all %d indexed documents; results below min_z are marked "
+                "likely_unrelated, not removed." % len(sims),
     }
 
 
