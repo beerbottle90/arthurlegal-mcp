@@ -61,6 +61,9 @@ FILES = {
         '<item><title>Einführungsgesetz zum Bürgerlichen Gesetzbuche</title><link>http://www.gesetze-im-internet.de/bgbeg/xml.zip</link></item>'
         '<item><title>Grundgesetz für die Bundesrepublik Deutschland</title><link>http://www.gesetze-im-internet.de/gg/xml.zip</link></item>'
         '<item><title>Abgabenordnung</title><link>http://www.gesetze-im-internet.de/ao_1977/xml.zip</link></item>'
+        '<item><title>Strafgesetzbuch</title><link>http://www.gesetze-im-internet.de/stgb/xml.zip</link></item>'
+        '<item><title>Baugesetzbuch</title><link>http://www.gesetze-im-internet.de/bbaug/xml.zip</link></item>'
+        '<item><title>Handelsgesetzbuch</title><link>http://www.gesetze-im-internet.de/hgb/xml.zip</link></item>'
         '</items>').encode("utf-8"),
     gii.BASE + "/bgb/xml.zip": zipped(act_xml("BGB", "Bürgerliches Gesetzbuch",
                                                [("§ 823", "Schadensersatzpflicht", BGB_823),
@@ -149,9 +152,11 @@ class GiiTest(unittest.TestCase):
             gii.norm("XYZG", "1")
         self.assertEqual(ctx.exception.status, 404)
 
-    def test_title_search_prefers_the_shorter_title(self) -> None:
+    def test_title_search_prefers_a_whole_word_then_the_shorter_title(self) -> None:
+        # Live TOC, 2026-10-09: StGB, BauGB and HGB were ranked above the BGB.
         hits = gii.search_laws("Gesetzbuch")
         self.assertEqual(hits[0]["slug"], "bgb")
+        self.assertEqual({h["slug"] for h in hits[1:4]} & {"stgb", "bbaug", "hgb"}, {"stgb", "bbaug", "hgb"})
         self.assertEqual(hits[0]["url"], "https://www.gesetze-im-internet.de/bgb/index.html")
 
     def test_tool_answers_an_unreachable_site_with_the_warning_line(self) -> None:
