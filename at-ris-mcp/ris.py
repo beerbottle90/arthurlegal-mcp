@@ -67,6 +67,16 @@ DOCKETS_SHOWN = 3
 NOTE_CHARS = 200
 
 
+def _keywords(value: Any) -> str:
+    """RIS Schlagworte as one comma list; RIS often repeats the whole list twice."""
+    seen: List[str] = []
+    for word in re.split(r"[,\r\n]+", str(value or "")):
+        word = word.strip()
+        if word and word not in seen:
+            seen.append(word)
+    return ", ".join(seen)
+
+
 def _clip(text: str, limit: int) -> str:
     # RIS notes carry inline <br/> between Beisätze.
     text = " ".join(re.sub(r"<[^>]+>", " ", str(text or "")).split())
@@ -278,21 +288,35 @@ class RisClient:
         sub = law.get("BrKons") or law.get("LrKons") or law.get("BgblAuth") or {}
         eli = law.get("Eli") or gen.get("DokumentUrl") or ""
         short = law.get("Kurztitel") or ""
+        # Each consolidated hit is ONE provision in ONE version: "§ 1295",
+        # "Art. 8", "Anl. 1". Dokumenttyp "Norm" is the act-level entry RIS
+        # numbers "§ 0" — the act itself, not a paragraph to cite.
+        doc_type = sub.get("Dokumenttyp", "")
+        section = "" if doc_type == "Norm" else (sub.get("ArtikelParagraphAnlage") or "").strip()
+        # A gazette issue (BgblAuth) is identified by its BGBl number instead.
+        gazette = (sub.get("Kundmachungsorgan") or sub.get("Bgblnummer") or "").strip()
         return {
             "id": tech.get("ID", ""),
             "title": short,
+            "section": section,
+            "doc_type": doc_type,
+            # Validity of this version; empty valid_to means still in force.
+            "valid_from": sub.get("Inkrafttretensdatum", ""),
+            "valid_to": sub.get("Ausserkrafttretensdatum", ""),
+            "keywords": _keywords(sub.get("Schlagworte")),
             # RIS embeds <br/> and the enacting history in the long title.
             "long_title": (law.get("Titel") or "").replace("<br/>", " · "),
             "eli": eli,
             "url": gen.get("DokumentUrl") or eli,
-            "gazette": sub.get("Kundmachungsorgan", ""),
+            "gazette": gazette,
             "type": sub.get("Typ", ""),
             "changed": gen.get("Geaendert", ""),
             "formats": _content_urls(data),
             # Built from fields RIS returned, never invented.
-            "citation": "%s%s (RIS %s)" % (
+            "citation": "%s%s%s (RIS %s)" % (
                 short or "(untitled)",
-                ", " + sub["Kundmachungsorgan"] if sub.get("Kundmachungsorgan") else "",
+                " " + section if section else "",
+                ", " + gazette if gazette else "",
                 tech.get("ID", ""),
             ),
         }

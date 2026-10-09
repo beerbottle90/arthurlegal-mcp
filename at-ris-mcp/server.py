@@ -69,7 +69,10 @@ def _t_search_legislation(args: Dict[str, Any]) -> Any:
         )
     except RisError as exc:
         raise McpError(str(exc)) from exc
-    ranked = semantic_rerank(query, raw["results"], fields=("title", "long_title"))
+    # The act title is the same for every paragraph of one act, so ranking on
+    # it alone tied them all; the provision and its keywords tell them apart.
+    ranked = semantic_rerank(query, raw["results"],
+                             fields=("title", "section", "keywords", "long_title"))
     results = _limited(ranked["results"], args)
     return {
         "total_upstream": raw["total"],
@@ -162,8 +165,11 @@ TOOLS = [
     Tool(
         "search_legislation",
         "Search Austrian legislation. Use `title` for a known act name (precise) "
-        "and `terms` for full-text search across the body (broad). Results are "
-        "reranked locally by relevance because RIS returns them alphabetically. "
+        "and `terms` for full-text search across the body (broad). Each result "
+        "is one provision (`section`: '§ 1295', 'Art. 8'; empty for the act-level "
+        "entry) in one version (`valid_from`/`valid_to`, empty = in force). "
+        "Results are reranked locally by relevance because RIS returns them "
+        "alphabetically. "
         "`as_of` (YYYY-MM-DD) gives the point-in-time version — use it whenever "
         "the question concerns a past transaction. Applications: "
         + _apps_doc(LEGISLATION_APPS),
