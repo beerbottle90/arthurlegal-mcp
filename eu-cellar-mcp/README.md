@@ -21,7 +21,7 @@ Full text takes three steps, none skippable:
 
 | Tool | Purpose |
 |---|---|
-| `search_eu_law` | Title search across legislation and CJEU case law |
+| `search_eu_law` | Title search (every word must match) across legislation and CJEU case law, one entry per CELEX, legislation and judgments first |
 | `get_metadata` | Title, date, ELI, in-force flag for one CELEX |
 | `get_document_text` | Authentic full text, paginated (GDPR ≈ 350,000 chars) |
 | `sparql` | SELECT escape hatch for the CELLAR graph |

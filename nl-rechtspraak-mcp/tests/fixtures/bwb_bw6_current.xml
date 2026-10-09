@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<searchRetrieveResponse xmlns="http://www.loc.gov/zing/srw/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xsi:schemaLocation="http://www.loc.gov/zing/srw/ http://www.loc.gov/standards/sru/xmlFiles/srw-types.xsd">
+   <version>1.2</version>
+   <numberOfRecords>33</numberOfRecords>
+   <records>
+      <record>
+         <recordSchema>http://standaarden.overheid.nl/sru/</recordSchema>
+         <recordPacking>xml</recordPacking>
+         <recordData>
+            <gzd xmlns="http://standaarden.overheid.nl/sru"
+                 xmlns:dcterms="http://purl.org/dc/terms/"
+                 xmlns:overheid="http://standaarden.overheid.nl/owms/terms/"
+                 xmlns:overheidbwb="http://standaarden.overheid.nl/bwb/terms/"
+                 xsi:schemaLocation="http://standaarden.overheid.nl/sru https://standaarden.overheid.nl/sru/gzd.xsd">
+               <originalData>
+                  <overheidbwb:meta>
+                     <owmskern>
+                        <dcterms:identifier>BWBR0005289</dcterms:identifier>
+                        <dcterms:title>Burgerlijk Wetboek Boek 6</dcterms:title>
+                        <dcterms:type>wet</dcterms:type>
+                        <dcterms:language>nl</dcterms:language>
+                        <overheid:authority>Veiligheid en Justitie</overheid:authority>
+                        <dcterms:creator>Ministerie van Binnenlandse Zaken en Koninkrijksrelaties</dcterms:creator>
+                        <dcterms:modified>2026-07-18</dcterms:modified>
+                     </owmskern>
+                     <owmsmantel>
+                        <dcterms:created>2026-07-18</dcterms:created>
+                     </owmsmantel>
+                     <bwbipm>
+                        <overheidbwb:toestand>http://wetten.overheid.nl/id/BWBR0005289/2026-07-16/0</overheidbwb:toestand>
+                        <overheidbwb:rechtsgebied>Contracten, schade en aansprakelijkheid</overheidbwb:rechtsgebied>
+                        <overheidbwb:rechtsgebied>Verbintenissenrecht</overheidbwb:rechtsgebied>
+                        <overheidbwb:overheidsdomein>Economie en ondernemen</overheidbwb:overheidsdomein>
+                        <overheidbwb:geldigheidsperiode_startdatum>2026-07-16</overheidbwb:geldigheidsperiode_startdatum>
+                        <overheidbwb:geldigheidsperiode_einddatum>9999-12-31</overheidbwb:geldigheidsperiode_einddatum>
+                        <overheidbwb:zichtperiode_startdatum>2026-07-16</overheidbwb:zichtperiode_startdatum>
+                        <overheidbwb:zichtperiode_einddatum>9999-12-31</overheidbwb:zichtperiode_einddatum>
+                     </bwbipm>
+                  </overheidbwb:meta>
+               </originalData>
+               <enrichedData>
+                  <overheidbwb:locatie_toestand>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0005289/2026-07-16_0/xml/BWBR0005289_2026-07-16_0.xml</overheidbwb:locatie_toestand>
+                  <overheidbwb:locatie_wti>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0005289/BWBR0005289.WTI</overheidbwb:locatie_wti>
+                  <overheidbwb:locatie_manifest>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0005289/manifest.xml</overheidbwb:locatie_manifest>
+               </enrichedData>
+            </gzd>
+         </recordData>
+         <recordPosition>1</recordPosition>
+      </record>
+      <record>
+         <recordSchema>http://standaarden.overheid.nl/sru/</recordSchema>
+         <recordPacking>xml</recordPacking>
+         <recordData>
+            <gzd xmlns="http://standaarden.overheid.nl/sru"
+                 xmlns:dcterms="http://purl.org/dc/terms/"
+                 xmlns:overheid="http://standaarden.overheid.nl/owms/terms/"
+                 xmlns:overheidbwb="http://standaarden.overheid.nl/bwb/terms/"
+                 xsi:schemaLocation="http://standaarden.overheid.nl/sru https://standaarden.overheid.nl/sru/gzd.xsd">
+               <originalData>
+                  <overheidbwb:meta>
+                     <owmskern>
+                        <dcterms:identifier>BWBR0028749</dcterms:identifier>
+                        <dcterms:title>Burgerlijk Wetboek BES Boek 6</dcterms:title>
+                        <dcterms:type>wet-BES</dcterms:type>
+                        <dcterms:language>nl</dcterms:language>
+                        <overheid:authority>Veiligheid en Justitie</overheid:authority>
+                        <dcterms:creator>Ministerie van Binnenlandse Zaken en Koninkrijksrelaties</dcterms:creator>
+                        <dcterms:modified>2017-10-27</dcterms:modified>
+                     </owmskern>
+                     <owmsmantel>
+                        <dcterms:created>2015-07-02</dcterms:created>
+                     </owmsmantel>
+                     <bwbipm>
+                        <overheidbwb:toestand>http://wetten.overheid.nl/id/BWBR0028749/2010-10-10/0</overheidbwb:toestand>
+                        <overheidbwb:rechtsgebied>Contracten, schade en aansprakelijkheid</overheidbwb:rechtsgebied>
+                        <overheidbwb:rechtsgebied>Verbintenissenrecht</overheidbwb:rechtsgebied>
+                        <overheidbwb:overheidsdomein>Economie en ondernemen</overheidbwb:overheidsdomein>
+                        <overheidbwb:geldigheidsperiode_startdatum>2010-10-10</overheidbwb:geldigheidsperiode_startdatum>
+                        <overheidbwb:geldigheidsperiode_einddatum>9999-12-31</overheidbwb:geldigheidsperiode_einddatum>
+                        <overheidbwb:zichtperiode_startdatum>2010-10-10</overheidbwb:zichtperiode_startdatum>
+                        <overheidbwb:zichtperiode_einddatum>9999-12-31</overheidbwb:zichtperiode_einddatum>
+                     </bwbipm>
+                  </overheidbwb:meta>
+               </originalData>
+               <enrichedData>
+                  <overheidbwb:locatie_toestand>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0028749/2010-10-10_0/xml/BWBR0028749_2010-10-10_0.xml</overheidbwb:locatie_toestand>
+                  <overheidbwb:locatie_wti>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0028749/BWBR0028749.WTI</overheidbwb:locatie_wti>
+                  <overheidbwb:locatie_manifest>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0028749/manifest.xml</overheidbwb:locatie_manifest>
+               </enrichedData>
+            </gzd>
+         </recordData>
+         <recordPosition>2</recordPosition>
+      </record>
+      <record>
+         <recordSchema>http://standaarden.overheid.nl/sru/</recordSchema>
+         <recordPacking>xml</recordPacking>
+         <recordData>
+            <gzd xmlns="http://standaarden.overheid.nl/sru"
+                 xmlns:dcterms="http://purl.org/dc/terms/"
+                 xmlns:overheid="http://standaarden.overheid.nl/owms/terms/"
+                 xmlns:overheidbwb="http://standaarden.overheid.nl/bwb/terms/"
+                 xsi:schemaLocation="http://standaarden.overheid.nl/sru https://standaarden.overheid.nl/sru/gzd.xsd">
+               <originalData>
+                  <overheidbwb:meta>
+                     <owmskern>
+                        <dcterms:identifier>BWBR0039501</dcterms:identifier>
+                        <dcterms:title>Wijzigingswet Burgerlijk Wetboek Boek 6 (tegengaan onredelijk lange betaaltermijnen)</dcterms:title>
+                        <dcterms:type>wet</dcterms:type>
+                        <dcterms:language>nl</dcterms:language>
+                        <overheid:authority>Veiligheid en Justitie</overheid:authority>
+                        <dcterms:creator>Ministerie van Binnenlandse Zaken en Koninkrijksrelaties</dcterms:creator>
+                        <dcterms:modified>2018-10-16</dcterms:modified>
+                     </owmskern>
+                     <owmsmantel>
+                        <dcterms:created>2017-07-01</dcterms:created>
+                     </owmsmantel>
+                     <bwbipm>
+                        <overheidbwb:toestand>http://wetten.overheid.nl/id/BWBR0039501/2017-07-01/0</overheidbwb:toestand>
+                        <overheidbwb:rechtsgebied>Contracten, schade en aansprakelijkheid</overheidbwb:rechtsgebied>
+                        <overheidbwb:rechtsgebied>Verbintenissenrecht</overheidbwb:rechtsgebied>
+                        <overheidbwb:overheidsdomein>Economie en ondernemen</overheidbwb:overheidsdomein>
+                        <overheidbwb:geldigheidsperiode_startdatum>2017-07-01</overheidbwb:geldigheidsperiode_startdatum>
+                        <overheidbwb:geldigheidsperiode_einddatum>9999-12-31</overheidbwb:geldigheidsperiode_einddatum>
+                        <overheidbwb:zichtperiode_startdatum>2017-07-01</overheidbwb:zichtperiode_startdatum>
+                        <overheidbwb:zichtperiode_einddatum>9999-12-31</overheidbwb:zichtperiode_einddatum>
+                     </bwbipm>
+                  </overheidbwb:meta>
+               </originalData>
+               <enrichedData>
+                  <overheidbwb:locatie_toestand>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0039501/2017-07-01_0/xml/BWBR0039501_2017-07-01_0.xml</overheidbwb:locatie_toestand>
+                  <overheidbwb:locatie_wti>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0039501/BWBR0039501.WTI</overheidbwb:locatie_wti>
+                  <overheidbwb:locatie_manifest>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0039501/manifest.xml</overheidbwb:locatie_manifest>
+               </enrichedData>
+            </gzd>
+         </recordData>
+         <recordPosition>3</recordPosition>
+      </record>
+      <record>
+         <recordSchema>http://standaarden.overheid.nl/sru/</recordSchema>
+         <recordPacking>xml</recordPacking>
+         <recordData>
+            <gzd xmlns="http://standaarden.overheid.nl/sru"
+                 xmlns:dcterms="http://purl.org/dc/terms/"
+                 xmlns:overheid="http://standaarden.overheid.nl/owms/terms/"
+                 xmlns:overheidbwb="http://standaarden.overheid.nl/bwb/terms/"
+                 xsi:schemaLocation="http://standaarden.overheid.nl/sru https://standaarden.overheid.nl/sru/gzd.xsd">
+               <originalData>
+                  <overheidbwb:meta>
+                     <owmskern>
+                        <dcterms:identifier>BWBR0046553</dcterms:identifier>
+                        <dcterms:title>Wijzigingswet Burgerlijk Wetboek Boek 6 en Overgangswet nieuw Burgerlijk Wetboek (verkorten wettelijke betaaltermijn tot 30 dagen)</dcterms:title>
+                        <dcterms:type>wet</dcterms:type>
+                        <dcterms:language>nl</dcterms:language>
+                        <overheid:authority>Economische Zaken en Klimaat</overheid:authority>
+                        <dcterms:creator>Ministerie van Binnenlandse Zaken en Koninkrijksrelaties</dcterms:creator>
+                        <dcterms:modified>2022-07-01</dcterms:modified>
+                     </owmskern>
+                     <owmsmantel>
+                        <dcterms:created>2022-07-01</dcterms:created>
+                     </owmsmantel>
+                     <bwbipm>
+                        <overheidbwb:toestand>http://wetten.overheid.nl/id/BWBR0046553/2022-07-01/0</overheidbwb:toestand>
+                        <overheidbwb:rechtsgebied>Contracten, schade en aansprakelijkheid</overheidbwb:rechtsgebied>
+                        <overheidbwb:rechtsgebied>Verbintenissenrecht</overheidbwb:rechtsgebied>
+                        <overheidbwb:overheidsdomein>Economie en ondernemen</overheidbwb:overheidsdomein>
+                        <overheidbwb:geldigheidsperiode_startdatum>2022-07-01</overheidbwb:geldigheidsperiode_startdatum>
+                        <overheidbwb:geldigheidsperiode_einddatum>9999-12-31</overheidbwb:geldigheidsperiode_einddatum>
+                        <overheidbwb:zichtperiode_startdatum>2022-07-01</overheidbwb:zichtperiode_startdatum>
+                        <overheidbwb:zichtperiode_einddatum>9999-12-31</overheidbwb:zichtperiode_einddatum>
+                     </bwbipm>
+                  </overheidbwb:meta>
+               </originalData>
+               <enrichedData>
+                  <overheidbwb:locatie_toestand>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0046553/2022-07-01_0/xml/BWBR0046553_2022-07-01_0.xml</overheidbwb:locatie_toestand>
+                  <overheidbwb:locatie_wti>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0046553/BWBR0046553.WTI</overheidbwb:locatie_wti>
+                  <overheidbwb:locatie_manifest>https://repository.officiele-overheidspublicaties.nl/bwb/BWBR0046553/manifest.xml</overheidbwb:locatie_manifest>
+               </enrichedData>
+            </gzd>
+         </recordData>
+         <recordPosition>4</recordPosition>
+      </record>
+   </records>
+   <nextRecordPosition>5</nextRecordPosition>
+</searchRetrieveResponse>
+

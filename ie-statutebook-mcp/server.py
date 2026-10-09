@@ -15,9 +15,9 @@ from typing import Any, Dict
 
 from mcpcore import McpError, Tool, run
 from retrieval import Index, embeddings_status
-from statutebook import IeError, StatuteBookClient
+from statutebook import IeError, StatuteBookClient, date_from_text
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 _client = StatuteBookClient()
 _index = Index()
@@ -32,8 +32,9 @@ version it is. Never present an "as enacted" text as the current law without
 saying so.
 
 SECTION, NOT ACT. Irish Acts are long — the Companies Act 2014 has 1,448
-sections and 106,000 characters. Use `get_section` when the question is about a
-provision; `get_act` only when you genuinely need the whole instrument.
+sections and 2.76 million characters. Use `get_section` when the question is
+about a provision; `get_act` when you need the whole instrument — it returns the
+text in windows (`next_offset`) and a section index to pick sections from.
 
 SEARCH IS LOCAL. The Statute Book publishes no search endpoint (`/search` 404s),
 so `search_acts` runs against a local index whose coverage is whatever was
@@ -66,9 +67,37 @@ def _t_search(args: Dict[str, Any]) -> Any:
         limit=int(args.get("limit", 20)),
         filters=filters,
     )
-    out["index_coverage"] = _index.get_state("coverage") or "unknown — call server_status"
+    for result in out["results"]:
+        _enactment_date(result)
+    coverage = _index.get_state("coverage") or ""
+    out["index_coverage"] = coverage or "unknown — call server_status"
     out["version_note"] = "Indexed texts are AS ENACTED — amendments not applied."
+    if coverage and "full text" not in coverage:
+        out["index_note"] = (
+            "This index was built from each Act's contents page: titles, the long "
+            "title and section headings are searchable, section text is not. A "
+            "re-crawl with crawl.py indexes the full text.")
     return out
+
+
+def _enactment_date(result: Dict[str, Any]) -> None:
+    """Give a search result its enactment date, never a placeholder.
+
+    Rows crawled before dates were recorded carry "<year>-01-01" for every Act
+    and no ``date_source``. For those the date is read from the long title kept
+    in the row's text ("[12th November, 2024]"); failing that it is blanked.
+    A re-crawl writes the date from the Act's page metadata.
+    """
+    doc = _index.get(result["ref"]) or {}
+    meta = doc.get("meta") or {}
+    if "date_source" not in meta:
+        result["date"] = date_from_text(doc.get("body") or "")
+        if result["date"]:
+            result["date_source"] = "long title in the indexed text"
+    if not result.get("date"):
+        result["date"] = ""
+        result["date_note"] = ("Enactment date not recorded in the index; get_act "
+                               "reads it from the Statute Book.")
 
 
 def _t_get_act(args: Dict[str, Any]) -> Any:
@@ -77,6 +106,7 @@ def _t_get_act(args: Dict[str, Any]) -> Any:
             int(args["year"]), int(args["number"]),
             version=args.get("version", "enacted"),
             max_chars=int(args.get("max_chars", 60000)),
+            offset=int(args.get("offset", 0)),
         )
     except (IeError, KeyError, ValueError) as exc:
         raise McpError(str(exc)) from exc
@@ -137,7 +167,8 @@ TOOLS = [
         "(BM25 + fuzzy, plus dense vectors when EMBEDDINGS_URL is set). Unlike "
         "Spain, whole Act bodies are indexed here, so a phrase inside a section "
         "IS findable. Check `index_coverage` — the index holds the crawled year "
-        "range, not all of Irish law.",
+        "range, not all of Irish law. `date` is the enactment date; it is empty "
+        "(with `date_note`) when the source does not state one, never guessed.",
         {
             "type": "object",
             "properties": {
@@ -169,12 +200,19 @@ TOOLS = [
     ),
     Tool(
         "get_act",
-        "The whole Act. Long instruments are truncated with an explicit marker — "
-        "the Companies Act 2014 alone is ~106,000 characters — so prefer "
-        "get_section unless you really need the entire text.",
+        "The whole Act as enacted: its full text (the Statute Book's print view, "
+        "without the site menu), the enactment date, and an index of its "
+        "sections by number and heading. Long Acts come in windows of max_chars; "
+        "`next_offset` gives where the next one starts. Prefer get_section for a "
+        "single provision.",
         {
             "type": "object",
-            "properties": {**_LOC, "max_chars": {"type": "integer", "default": 60000}},
+            "properties": {
+                **_LOC,
+                "max_chars": {"type": "integer", "default": 60000},
+                "offset": {"type": "integer", "default": 0,
+                           "description": "Character offset to start from; use next_offset."},
+            },
             "required": ["year", "number"],
         },
         _t_get_act,

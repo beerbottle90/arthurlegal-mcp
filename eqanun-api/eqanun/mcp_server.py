@@ -22,9 +22,11 @@ import functools
 import json
 import os
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._gate import CACHE, GATE
 from .client import EqanunClient, EqanunError, __version__
 from .retrieval import embeddings_status, semantic_rerank
 
@@ -169,9 +171,29 @@ _SCOPE = {"type": "string", "enum": ["title", "text"], "default": "title"}
 _STATUS = {"type": "string", "enum": ["in_force", "cancelled", "all"], "default": "in_force"}
 
 
+WARNING = "UYARI: veri çekilemedi, teyidiniz gerekli: https://e-qanun.az/"
+
+# The status probe gets its own short-fused client: status is called when
+# something looks wrong, and must answer before the caller gives up. It skips the
+# cache, since a cached answer says nothing about whether e-qanun answers now,
+# but it still goes through the shared gate.
+_probe_client = EqanunClient(timeout=8.0, retries=0, cache=False)
+
+
+def _guard(fn: Callable[[Dict[str, Any]], Any]) -> Callable[[Dict[str, Any]], Any]:
+    """Answer an unreachable upstream with its reason and the warning line, not a raw exception."""
+    @functools.wraps(fn)
+    def wrapper(args: Dict[str, Any]) -> Any:
+        try:
+            return fn(args)
+        except EqanunError as exc:
+            return {"error": str(exc), "warning": WARNING}
+    return wrapper
+
+
 def _t_server_status(args: Dict[str, Any]) -> Any:
-    """What this server is, and whether semantic ranking is actually live."""
-    return {
+    """What this server is, whether e-qanun answers now, and whether ranking is live."""
+    out: Dict[str, Any] = {
         "server": "eqanun-api",
         "source": "e-qanun.az (Azerbaijan Ministry of Justice) - public, no auth",
         "mode": "passthrough + local reranking (no local corpus)",
@@ -180,8 +202,28 @@ def _t_server_status(args: Dict[str, Any]) -> Any:
             'Type filtering is the strongest lever: types=[107] (Mecelleler) narrows those 623 rows to 2, the Civil Code first. Types 31 and 32 are the presidential/cabinet decrees that make up most of the noise.',
             'status defaults to in_force, which EXCLUDES repealed acts.',
         ],
-        **embeddings_status(),
     }
+    gate = GATE.state()
+    out["gate"] = gate
+    out["cache"] = CACHE.state()
+    if gate["paused"]:
+        # Probing a paused upstream would be exactly the knocking the pause prevents.
+        out["upstream_reachable"] = False
+        out["error"] = "not probed: requests are paused for %d s (%s)" % (
+            gate["paused_for_s"], gate["pause_reason"])
+        out["warning"] = WARNING
+    else:
+        started = time.time()
+        try:
+            _probe_client.search("qanun", scope="title", length=1)
+            out["upstream_reachable"] = True
+            out["probe_seconds"] = round(time.time() - started, 2)
+        except Exception as exc:  # noqa: BLE001 - unreachable is a reportable state
+            out["upstream_reachable"] = False
+            out["error"] = "%s (after %.1f s)" % (exc, time.time() - started)
+            out["warning"] = WARNING
+    out.update(embeddings_status())
+    return out
 
 
 TOOLS: List[Dict[str, Any]] = [
@@ -244,7 +286,7 @@ TOOLS: List[Dict[str, Any]] = [
             },
             "required": ["query"],
         },
-        "handler": _t_search_acts,
+        "handler": _guard(_t_search_acts),
     },
     {
         "name": "count_acts",
@@ -265,7 +307,7 @@ TOOLS: List[Dict[str, Any]] = [
             },
             "required": ["query"],
         },
-        "handler": _t_count_acts,
+        "handler": _guard(_t_count_acts),
     },
     {
         "name": "get_act",
@@ -282,7 +324,7 @@ TOOLS: List[Dict[str, Any]] = [
             "properties": {"act_id": {"type": "integer"}},
             "required": ["act_id"],
         },
-        "handler": _t_get_act,
+        "handler": _guard(_t_get_act),
     },
     {
         "name": "get_act_fulltext",
@@ -300,19 +342,19 @@ TOOLS: List[Dict[str, Any]] = [
             },
             "required": ["act_id"],
         },
-        "handler": _t_get_act_fulltext,
+        "handler": _guard(_t_get_act_fulltext),
     },
     {
         "name": "list_types",
         "description": "Return the act-type taxonomy tree (id, name with counts, parentId).",
         "inputSchema": {"type": "object", "properties": {}},
-        "handler": _t_list_types,
+        "handler": _guard(_t_list_types),
     },
     {
         "name": "list_sections",
         "description": "Return the four top-level act sections.",
         "inputSchema": {"type": "object", "properties": {}},
-        "handler": _t_list_sections,
+        "handler": _guard(_t_list_sections),
     },
     {
         "name": "server_status",

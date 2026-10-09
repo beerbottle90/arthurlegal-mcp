@@ -1,0 +1,364 @@
+{
+ "OgdSearchResult": {
+  "OgdDocumentResults": {
+   "Hits": {
+    "@pageNumber": "1",
+    "@pageSize": "10",
+    "#text": "1479"
+   },
+   "OgdDocumentReference": [
+    {
+     "Data": {
+      "Metadaten": {
+       "Technisch": {
+        "ID": "NOR12024891",
+        "Applikation": "BrKons",
+        "Organ": "BKA (Bundeskanzleramt)",
+        "ImportTimestamp": {
+         "@xsi:nil": "true",
+         "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+        }
+       },
+       "Allgemein": {
+        "DokumentUrl": "https://ogd.ris.bka.gv.at/eli/drgbl/i/1938/1999/A8/NOR12024891"
+       },
+       "Bundesrecht": {
+        "Kurztitel": "4. Einführungsverordnung zum Handelsgesetzbuch",
+        "Eli": "https://www.ris.bka.gv.at/eli/drgbl/i/1938/1999/A8/NOR12024891",
+        "BrKons": {
+         "Kundmachungsorgan": "dRGBl. I S 1999/1938 zuletzt geändert durch BGBl. Nr. 140/1979 ",
+         "Typ": "BG",
+         "Dokumenttyp": "Paragraph",
+         "ArtikelParagraphAnlage": "Art. 8",
+         "Artikelnummer": "8",
+         "StammnormPublikationsorgan": "dRGBl. I S",
+         "StammnormBgblnummer": "1999/1938",
+         "NovellenPublikationsorgan": "BGBl. Nr.",
+         "NovellenBgblnummer": "140/1979",
+         "NovellenBeziehung": "zuletzt geändert durch",
+         "Inkrafttretensdatum": "1979-10-01",
+         "Ausserkrafttretensdatum": "1998-12-31",
+         "Indizes": {
+          "item": "21/01 Handelsrecht"
+         },
+         "Beachte": "Das Dritte Buch des HGB, dRGBl. S 219/1897, ist nach Art. I Z 11<br/>RLG, BGBl. Nr. 475/1990, nun das Vierte Buch.",
+         "Aenderung": "",
+         "Anmerkung": "1. Zu Z 8 siehe Schillinggesetz, StGBl. Nr. 231/1945.<br/>2. Zu Z 26 siehe EKHG, BGBl. Nr. 48/1959.",
+         "Schlagworte": "Solidarschuld, Eisenbahn- und Kraftfahrzeughaftpflichtgesetz,\r\nKonventionalstrafe, Pönale, laesio enormis, Erfüllungsinteresse,\r\nVertrauensschaden, positives Interesse, negatives Interesse,\r\nfalsus procurator, Kraftloserklärung, Amortisation, ABGB\r\nSolidarschuld, Eisenbahn- und Kraftfahrzeughaftpflichtgesetz,\r\nKonventionalstrafe, Pönale, laesio enormis, Erfüllungsinteresse,\r\nVertrauensschaden, positives Interesse, negatives Interesse,\r\nfalsus procurator, Kraftloserklärung, Amortisation, ABGB",
+         "Gesetzesnummer": "10001869",
+         "AlteDokumentnummer": "N2193815984T",
+         "GesamteRechtsvorschriftUrl": "https://ogd.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10001869"
+        }
+       }
+      },
+      "Dokumentliste": {
+       "ContentReference": {
+        "ContentType": "MainDocument",
+        "Name": "Hauptdokument",
+        "Urls": {
+         "ContentUrl": [
+          {
+           "DataType": "Xml",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12024891/NOR12024891.xml"
+          },
+          {
+           "DataType": "Html",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12024891/NOR12024891.html"
+          },
+          {
+           "DataType": "Rtf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12024891/NOR12024891.rtf"
+          },
+          {
+           "DataType": "Pdf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12024891/NOR12024891.pdf"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "Data": {
+      "Metadaten": {
+       "Technisch": {
+        "ID": "NOR12040507",
+        "Applikation": "BrKons",
+        "Organ": "BKA (Bundeskanzleramt)",
+        "ImportTimestamp": {
+         "@xsi:nil": "true",
+         "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+        }
+       },
+       "Allgemein": {
+        "DokumentUrl": "https://ogd.ris.bka.gv.at/eli/drgbl/i/1938/1999/A8/NOR12040507"
+       },
+       "Bundesrecht": {
+        "Kurztitel": "4. Einführungsverordnung zum Handelsgesetzbuch",
+        "Eli": "https://www.ris.bka.gv.at/eli/drgbl/i/1938/1999/A8/NOR12040507",
+        "BrKons": {
+         "Kundmachungsorgan": "dRGBl. I S 1999/1938 zuletzt geändert durch BGBl. I Nr. 125/1998 ",
+         "Typ": "BG",
+         "Dokumenttyp": "Paragraph",
+         "ArtikelParagraphAnlage": "Art. 8",
+         "Artikelnummer": "8",
+         "StammnormPublikationsorgan": "dRGBl. I S",
+         "StammnormBgblnummer": "1999/1938",
+         "NovellenPublikationsorgan": "BGBl. I Nr.",
+         "NovellenBgblnummer": "125/1998",
+         "NovellenBeziehung": "zuletzt geändert durch",
+         "Inkrafttretensdatum": "1999-01-01",
+         "Ausserkrafttretensdatum": "2002-07-31",
+         "Indizes": {
+          "item": "21/01 Handelsrecht"
+         },
+         "Beachte": "Das Dritte Buch des HGB, dRGBl. S 219/1897, ist nach Art. I Z 11<br/>RLG, BGBl. Nr. 475/1990, nun das Vierte Buch.",
+         "Aenderung": "",
+         "Anmerkung": "1. Zu Z 8 siehe Schillinggesetz, StGBl. Nr. 231/1945.<br/>2. Zu Z 26 siehe EKHG, BGBl. Nr. 48/1959.",
+         "Schlagworte": "Solidarschuld, Eisenbahn- und Kraftfahrzeughaftpflichtgesetz,\r\nKonventionalstrafe, Pönale, laesio enormis, Erfüllungsinteresse,\r\nVertrauensschaden, positives Interesse, negatives Interesse,\r\nfalsus procurator, Kraftloserklärung, Amortisation, ABGB",
+         "Gesetzesnummer": "10001869",
+         "AlteDokumentnummer": "N2199853165L",
+         "GesamteRechtsvorschriftUrl": "https://ogd.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10001869"
+        }
+       }
+      },
+      "Dokumentliste": {
+       "ContentReference": {
+        "ContentType": "MainDocument",
+        "Name": "Hauptdokument",
+        "Urls": {
+         "ContentUrl": [
+          {
+           "DataType": "Xml",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12040507/NOR12040507.xml"
+          },
+          {
+           "DataType": "Html",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12040507/NOR12040507.html"
+          },
+          {
+           "DataType": "Rtf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12040507/NOR12040507.rtf"
+          },
+          {
+           "DataType": "Pdf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12040507/NOR12040507.pdf"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "Data": {
+      "Metadaten": {
+       "Technisch": {
+        "ID": "NOR40034184",
+        "Applikation": "BrKons",
+        "Organ": "BKA (Bundeskanzleramt)",
+        "ImportTimestamp": {
+         "@xsi:nil": "true",
+         "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+        }
+       },
+       "Allgemein": {
+        "DokumentUrl": "https://ogd.ris.bka.gv.at/eli/drgbl/i/1938/1999/A8/NOR40034184"
+       },
+       "Bundesrecht": {
+        "Kurztitel": "4. Einführungsverordnung zum Handelsgesetzbuch",
+        "Eli": "https://www.ris.bka.gv.at/eli/drgbl/i/1938/1999/A8/NOR40034184",
+        "BrKons": {
+         "Kundmachungsorgan": "dRGBl. I S 1999/1938 aufgehoben durch BGBl. I Nr. 120/2005 ",
+         "Typ": "BG",
+         "Dokumenttyp": "Paragraph",
+         "ArtikelParagraphAnlage": "Art. 8",
+         "Artikelnummer": "8",
+         "StammnormPublikationsorgan": "dRGBl. I S",
+         "StammnormBgblnummer": "1999/1938",
+         "NovellenPublikationsorgan": "BGBl. I Nr.",
+         "NovellenBgblnummer": "120/2005",
+         "NovellenBeziehung": "aufgehoben durch",
+         "Inkrafttretensdatum": "2002-08-01",
+         "Ausserkrafttretensdatum": "2006-12-31",
+         "Indizes": {
+          "item": "21/01 Handelsrecht"
+         },
+         "Beachte": "Das Dritte Buch des HGB, dRGBl. S 219/1897, ist nach Art. I Z 11<br/>RLG, BGBl. Nr. 475/1990, nun das Vierte Buch.<br/><br/>Ist, sofern in den §§ 906 und 907 UGB nichts anderes bestimmt ist, <br/>jedoch auf Sachverhalte, die sich vor dem 1.1.2007 ereignet haben, <br/>weiter anzuwenden (vgl. Art. XXIX, BGBl. I Nr. 120/2005).",
+         "Aenderung": "",
+         "Anmerkung": "1. Zu Z 8 siehe Schillinggesetz, StGBl. Nr. 231/1945.<br/>2. Zu Z 26 siehe EKHG, BGBl. Nr. 48/1959.",
+         "Schlagworte": "Solidarschuld, Eisenbahn- und Kraftfahrzeughaftpflichtgesetz,\r\nKonventionalstrafe, Pönale, laesio enormis, Erfüllungsinteresse,\r\nVertrauensschaden, positives Interesse, negatives Interesse,\r\nfalsus procurator, Kraftloserklärung, Amortisation, ABGB",
+         "Gesetzesnummer": "10001869",
+         "GesamteRechtsvorschriftUrl": "https://ogd.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10001869"
+        }
+       }
+      },
+      "Dokumentliste": {
+       "ContentReference": {
+        "ContentType": "MainDocument",
+        "Name": "Hauptdokument",
+        "Urls": {
+         "ContentUrl": [
+          {
+           "DataType": "Xml",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR40034184/NOR40034184.xml"
+          },
+          {
+           "DataType": "Html",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR40034184/NOR40034184.html"
+          },
+          {
+           "DataType": "Rtf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR40034184/NOR40034184.rtf"
+          },
+          {
+           "DataType": "Pdf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR40034184/NOR40034184.pdf"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "Data": {
+      "Metadaten": {
+       "Technisch": {
+        "ID": "NOR12005821",
+        "Applikation": "BrKons",
+        "Organ": "BKA (Bundeskanzleramt)",
+        "ImportTimestamp": {
+         "@xsi:nil": "true",
+         "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+        }
+       },
+       "Allgemein": {
+        "Geaendert": "2025-03-26",
+        "DokumentUrl": "https://ogd.ris.bka.gv.at/eli/bgbl/1958/16/P5/NOR12005821"
+       },
+       "Bundesrecht": {
+        "Kurztitel": "5. Staatsvertragsdurchführungsgesetz",
+        "Eli": "https://ris.bka.gv.at/eli/bgbl/1958/16/P5/NOR12005821",
+        "BrKons": {
+         "Kundmachungsorgan": "BGBl. Nr. 16/1958",
+         "Typ": "BG",
+         "Dokumenttyp": "Paragraph",
+         "ArtikelParagraphAnlage": "§ 5",
+         "Paragraphnummer": "5",
+         "StammnormPublikationsorgan": "BGBl. Nr.",
+         "StammnormBgblnummer": "16/1958",
+         "Inkrafttretensdatum": "1958-02-07",
+         "Ausserkrafttretensdatum": "1990-12-31",
+         "Indizes": {
+          "item": "13/01 Staatsvertragsdurchführung"
+         },
+         "Aenderung": "",
+         "Gesetzesnummer": "10000310",
+         "AlteDokumentnummer": "N11958125840",
+         "GesamteRechtsvorschriftUrl": "https://ogd.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10000310"
+        }
+       }
+      },
+      "Dokumentliste": {
+       "ContentReference": {
+        "ContentType": "MainDocument",
+        "Name": "Hauptdokument",
+        "Urls": {
+         "ContentUrl": [
+          {
+           "DataType": "Xml",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12005821/NOR12005821.xml"
+          },
+          {
+           "DataType": "Html",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12005821/NOR12005821.html"
+          },
+          {
+           "DataType": "Rtf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12005821/NOR12005821.rtf"
+          },
+          {
+           "DataType": "Pdf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12005821/NOR12005821.pdf"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "Data": {
+      "Metadaten": {
+       "Technisch": {
+        "ID": "NOR12013408",
+        "Applikation": "BrKons",
+        "Organ": "BKA (Bundeskanzleramt)",
+        "ImportTimestamp": {
+         "@xsi:nil": "true",
+         "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+        }
+       },
+       "Allgemein": {
+        "Geaendert": "2025-03-26",
+        "DokumentUrl": "https://ogd.ris.bka.gv.at/eli/bgbl/1958/16/P5/NOR12013408"
+       },
+       "Bundesrecht": {
+        "Kurztitel": "5. Staatsvertragsdurchführungsgesetz",
+        "Eli": "https://ris.bka.gv.at/eli/bgbl/1958/16/P5/NOR12013408",
+        "BrKons": {
+         "Kundmachungsorgan": "BGBl. Nr. 16/1958 zuletzt geändert durch BGBl. Nr. 10/1991 ",
+         "Typ": "BG",
+         "Dokumenttyp": "Paragraph",
+         "ArtikelParagraphAnlage": "§ 5",
+         "Paragraphnummer": "5",
+         "StammnormPublikationsorgan": "BGBl. Nr.",
+         "StammnormBgblnummer": "16/1958",
+         "NovellenPublikationsorgan": "BGBl. Nr.",
+         "NovellenBgblnummer": "10/1991",
+         "NovellenBeziehung": "zuletzt geändert durch",
+         "Inkrafttretensdatum": "1991-01-01",
+         "Indizes": {
+          "item": "13/01 Staatsvertragsdurchführung"
+         },
+         "Aenderung": "",
+         "Gesetzesnummer": "10000310",
+         "AlteDokumentnummer": "N1199110375L",
+         "GesamteRechtsvorschriftUrl": "https://ogd.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10000310"
+        }
+       }
+      },
+      "Dokumentliste": {
+       "ContentReference": {
+        "ContentType": "MainDocument",
+        "Name": "Hauptdokument",
+        "Urls": {
+         "ContentUrl": [
+          {
+           "DataType": "Xml",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12013408/NOR12013408.xml"
+          },
+          {
+           "DataType": "Html",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12013408/NOR12013408.html"
+          },
+          {
+           "DataType": "Rtf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12013408/NOR12013408.rtf"
+          },
+          {
+           "DataType": "Pdf",
+           "Url": "https://ogd.ris.bka.gv.at/Dokumente/Bundesnormen/NOR12013408/NOR12013408.pdf"
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}

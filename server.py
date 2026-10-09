@@ -37,7 +37,9 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -46,7 +48,7 @@ from typing import Any, Callable, Dict, List, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcpcore import McpError, Tool, run  # noqa: E402
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Deployed bundle: every backend sits next to this file.
@@ -82,6 +84,11 @@ STDLIB_BACKENDS = [
     # file paths.
     ("tkgm", os.path.join(ROOT, "tkgm-mcp"), "srv_tkgm",
      "🇹🇷 Tapu-kadastro — canlı parsel (TKGM Parsel Sorgu, dakikada en çok 30 istek), rapor, kroki"),
+    # German statute text from gesetze-im-internet.de. NeuRIS, behind the proxied
+    # de-eli tools, lacks the core codes in its test phase (BGB, HGB, StGB, ZPO ...),
+    # so the text of a norm comes from here: same de_ prefix, different tool names.
+    ("de", os.path.join(ROOT, "de-gii-mcp"), "srv_de_gii",
+     "🇩🇪 Almanya — kanun metni (gesetze-im-internet.de)"),
 ]
 
 # The three older servers expose TOOLS as dicts with a "handler" key rather than
@@ -191,12 +198,20 @@ class _DeEliProxy:
     FastMCP hands out a session id on initialize that later calls must echo, and
     answers in SSE frames. Both are handled here so the rest of the aggregator
     does not have to know de-eli is different.
+
+    A session does not outlive the de-eli process. The MCP Streamable HTTP spec
+    answers a request carrying an unknown session id with HTTP 404, after which
+    the client must initialize again. Before this was handled, one de-eli restart
+    left all fifteen de_ tools failing with "Not Found" until the aggregator itself
+    restarted (observed live on 2026-10-09).
     """
 
     def __init__(self, url: str) -> None:
         self.url = url
         self.session: Optional[str] = None
         self.tools: List[Dict[str, Any]] = []
+        self.renewals = 0
+        self._lock = threading.Lock()
 
     def _post(self, payload: dict, timeout: float = 90.0):
         body = json.dumps(payload).encode("utf-8")
@@ -228,7 +243,38 @@ class _DeEliProxy:
         raw, _ = self._post({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}, timeout)
         self.tools = self._unwrap(raw).get("result", {}).get("tools", []) or []
 
+    def _renewing(self, attempt: Callable[[], Any]) -> Any:
+        """Run ``attempt``; on an unknown session (404) open a new one and retry once.
+
+        The lock makes concurrent callers that all hit the 404 share one new
+        session instead of each opening their own. Anything other than a 404 --
+        a refused connection, a timeout, a 5xx -- is not a session problem and is
+        raised unchanged.
+        """
+        stale = self.session
+        try:
+            return attempt()
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+        with self._lock:
+            if self.session == stale:
+                self.session = None
+                self.connect()
+                self.renewals += 1
+        return attempt()
+
+    def ping(self, timeout: float = 10.0) -> int:
+        """A tools/list round trip through the current session; returns the tool count."""
+        def attempt() -> int:
+            raw, _ = self._post({"jsonrpc": "2.0", "id": 4, "method": "tools/list"}, timeout)
+            return len(self._unwrap(raw).get("result", {}).get("tools", []) or [])
+        return self._renewing(attempt)
+
     def call(self, name: str, arguments: dict) -> Any:
+        return self._renewing(lambda: self._call_once(name, arguments))
+
+    def _call_once(self, name: str, arguments: dict) -> Any:
         raw, _ = self._post({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
                              "params": {"name": name, "arguments": arguments}})
         result = self._unwrap(raw).get("result", {})
@@ -243,7 +289,192 @@ class _DeEliProxy:
             return text
 
 
+# --------------------------------------------------------------------------- #
+# de-eli result shaping
+# --------------------------------------------------------------------------- #
+# Search tools whose candidates are reordered by meaning, with the fields that
+# describe a candidate. NeuRIS returns matches in its own order, not by
+# relevance, so the pool is widened first: reranking only the first page would
+# put the best of the wrong five on top.
+_DE_RERANK = {
+    "de_search": ("name", "abbreviation", "alternateName"),
+    "de_case_search": ("headline", "titleLine", "courtName", "otherLongText"),
+    "de_oldp_case_search": ("_snippets", "court_name", "decision_type"),
+}
+_DE_POOL = 50
+_DIP_KEEP = 10
+_DIP_FIELD_CHARS = 2000
+_DE_DATED = re.compile(r"\d{2}\.\d{2}\.\d{4}")
+_RII_STALE = (
+    "unlike NeuRIS's `/v1/rechtsprechung`, which is a small beta slice",
+    "unlike NeuRIS's `/v1/case-law`, which is a small beta slice",
+)
+_RII_CURRENT = (
+    "like NeuRIS's `/v1/rechtsprechung` (de_case_search), which since 2026 carries the same "
+    "courts from 2010 with full-text search (84,474 decisions on 2026-10-09)")
+
+
+def _de_call(proxy: _DeEliProxy, name: str, args: Dict[str, Any]) -> Any:
+    """Call a de-eli tool and correct what de-eli 0.5.4 gets wrong or leaves raw."""
+    if name == "de_recent_changes":
+        return _de_recent_changes(proxy, args)
+    if name in _DE_RERANK:
+        return _de_reranked(proxy, name, args)
+    out = proxy.call(name, args)
+    if name == "de_dip_search":
+        return _de_compact_dip(out)
+    if name in ("de_get_decision", "de_get_decision_text"):
+        return _de_decision_citation(proxy, name, args, out)
+    return out
+
+
+def _de_reranked(proxy: _DeEliProxy, name: str, args: Dict[str, Any]) -> Any:
+    args = json.loads(json.dumps(args or {}))
+    query = args.get("query") or {}
+    text = (query.get("searchTerm") or query.get("text") or "").strip()
+    want = None
+    if text and name != "de_oldp_case_search":   # OLDP pages are fixed at ten
+        want = int(query.get("size") or 20)
+        query["size"] = max(want, _DE_POOL)
+        args["query"] = query
+    out = proxy.call(name, args)
+    if not isinstance(out, dict) or not text:
+        return out
+    items = out.get("items") or []
+    if name == "de_oldp_case_search":
+        for item in items:
+            item["_snippets"] = re.sub(r"<[^>]+>", "", " ".join(item.get("snippets") or []))
+    try:
+        import retrieval  # the copy the bundled backends share; holds the embeddings client
+        ranked = retrieval.semantic_rerank(text, items, fields=_DE_RERANK[name], limit=want or 0)
+        out["items"] = ranked["results"]
+        out["ranking"] = {k: v for k, v in ranked.items() if k != "results"}
+    except Exception as exc:  # noqa: BLE001 - ranking is a bonus; the hits are not
+        out["items"] = items[:want] if want else items
+        out["ranking"] = {"method": "none", "warning": "reranking failed (%s: %s); upstream order kept."
+                          % (type(exc).__name__, exc)}
+    for item in out["items"]:
+        item.pop("_snippets", None)
+    if want and len(items) > want:
+        out["ranking"]["pool"] = len(items)
+    if name == "de_search":
+        _de_missing_act_hint(text, out)
+    return out
+
+
+def _de_missing_act_hint(term: str, out: Dict[str, Any]) -> None:
+    """Say so when an abbreviation is not in NeuRIS, instead of letting unrelated acts stand in.
+
+    NeuRIS's test-phase dataset (about 5,500 acts) lacks the core codes: BGB,
+    HGB, StGB, ZPO, StPO, AO, UrhG, GWB and InsO all return 0 for
+    /v1/legislation?abbreviation= (checked 2026-10-09).
+    """
+    # Only abbreviation-shaped terms (BGB, StGB, InsO, GmbHG): a title word such as
+    # "Aktiengesetz" is no claim that an act by that abbreviation exists.
+    if " " in term or len(term) > 12 or sum(ch.isupper() for ch in term) < 2:
+        return
+    for item in out.get("items") or []:
+        names = (item.get("abbreviation"), item.get("name"), item.get("alternateName"))
+        if any((n or "").casefold() == term.casefold() for n in names):
+            return
+    out["not_in_neuris"] = (
+        "No act abbreviated %r in these NeuRIS results. NeuRIS is in its test phase and lacks core "
+        "codes (BGB, HGB, StGB, ZPO, StPO, AO, UrhG, GWB, InsO). Get the consolidated text from "
+        "gesetze-im-internet.de: de_norm_getir(kanun=%r, norm=...)." % (term, term))
+
+
+def _de_recent_changes(proxy: _DeEliProxy, args: Dict[str, Any]) -> Any:
+    """Newest first, as the tool promises.
+
+    de-eli asks NeuRIS for sort=date, which is ascending, and cuts to `limit`, so
+    it returned the OLDEST acts since the date. Fetch the 300 NeuRIS allows, order
+    by publication date, then cut.
+    """
+    want = max(1, min(int((args or {}).get("limit") or 50), 300))
+    out = proxy.call("de_recent_changes", dict(args or {}, limit=300))
+    items = out.get("result") if isinstance(out, dict) else out
+    if not isinstance(items, list):
+        return out
+    items.sort(key=lambda item: ((item.get("exampleOfWork") or {}).get("datePublished") or ""),
+               reverse=True)
+    shaped: Dict[str, Any] = {"result": items[:want], "order": "newest first, by datePublished"}
+    if len(items) >= 300:
+        shaped["warning"] = ("300 acts since since_iso, which is NeuRIS's cap: newer acts beyond "
+                             "them may be missing. Use a later since_iso.")
+    return shaped
+
+
+def _de_compact_dip(out: Any) -> Any:
+    """DIP has no page size: one `vorgang` search returned 48 full records (63,846 characters).
+
+    Keep the first ten whole, list the rest by id, title and date so the cursor
+    still lines up, and clip long text fields.
+    """
+    if not isinstance(out, dict):
+        return out
+    items = out.get("items") or []
+    for item in items:
+        for key, value in list(item.items()):
+            if isinstance(value, str) and len(value) > _DIP_FIELD_CHARS:
+                item[key] = value[:_DIP_FIELD_CHARS] + " …[truncated]"
+    if len(items) > _DIP_KEEP:
+        out["items"] = items[:_DIP_KEEP]
+        out["more_items"] = [
+            {k: item.get(k) for k in ("id", "titel", "datum", "dokumentnummer", "dokumentart",
+                                      "vorgangstyp") if item.get(k) is not None}
+            for item in items[_DIP_KEEP:]]
+        out["compacted"] = ("First %d records in full, the other %d by id, title and date; "
+                            "open any of them with de_dip_get_document."
+                            % (_DIP_KEEP, len(items) - _DIP_KEEP))
+    return out
+
+
+def _de_decision_citation(proxy: _DeEliProxy, name: str, args: Dict[str, Any], out: Any) -> Any:
+    """Rebuild the citation that NeuRIS's renamed fields broke.
+
+    /v1/rechtsprechung/{nr} answers a single decision with German keys
+    (gericht, dokumenttyp, datum, aktenzeichen). de-eli 0.5.4 reads the English
+    ones, finds them empty and cites a Federal Court of Justice judgment as just
+    "BGH" (observed 2026-10-09 on JURE110015859).
+    """
+    if not isinstance(out, dict) or _DE_DATED.search(out.get("human_readable_citation") or ""):
+        return out
+    meta = out
+    if name == "de_get_decision_text":
+        try:
+            meta = proxy.call("de_get_decision", {"document_number": (args or {}).get("document_number")})
+        except Exception:  # noqa: BLE001 - keep the text, without a better citation
+            return out
+        if not isinstance(meta, dict):
+            return out
+    court = meta.get("courtName") or meta.get("gericht") or ""
+    kind = meta.get("documentType") or meta.get("dokumenttyp") or "Entscheidung"
+    day = meta.get("decisionDate") or meta.get("datum") or ""
+    files = (meta.get("fileNumbers") or meta.get("aktenzeichenListe")
+             or ([meta["aktenzeichen"]] if meta.get("aktenzeichen") else []))
+    if not (court and day):
+        return out
+    if re.match(r"\d{4}-\d{2}-\d{2}$", day):
+        day = "%s.%s.%s" % (day[8:10], day[5:7], day[:4])
+    citation = "%s, %s vom %s" % (court, kind, day)
+    if files:
+        citation += " - " + ", ".join(files)
+    out["human_readable_citation"] = citation
+    for key, value in (("documentNumber", meta.get("dokumentNummer")), ("decisionDate", meta.get("datum")),
+                       ("fileNumbers", files), ("documentType", meta.get("dokumenttyp"))):
+        if not out.get(key) and value:
+            out[key] = value
+    out["citation_note"] = ("Citation rebuilt from NeuRIS's German fields (gericht, dokumenttyp, datum, "
+                            "aktenzeichen); de-eli 0.5.4 reads English ones that single decisions no "
+                            "longer fill.")
+    return out
+
+
+_de_proxy: Optional[_DeEliProxy] = None
+
+
 def _load_de_eli(url: str) -> None:
+    global _de_proxy
     label = "🇩🇪 Almanya — mevzuat + içtihat"
     proxy = _DeEliProxy(url)
     try:
@@ -253,6 +484,7 @@ def _load_de_eli(url: str) -> None:
                         "error": "proxy unreachable at %s (%s)" % (url, exc),
                         "hint": "de-eli is a separate process; start it or set DE_ELI_URL."})
         return
+    _de_proxy = proxy
 
     count = 0
     for spec in proxy.tools:
@@ -264,13 +496,16 @@ def _load_de_eli(url: str) -> None:
         def make(tool_name: str) -> Callable[[Dict[str, Any]], Any]:
             def handler(args: Dict[str, Any]) -> Any:
                 try:
-                    return proxy.call(tool_name, args)
+                    return _de_call(proxy, tool_name, args)
                 except urllib.error.URLError as exc:
                     raise McpError(
                         "de-eli backend unreachable (%s). The other jurisdictions "
                         "are unaffected." % exc.reason) from exc
             return handler
-        _tools.append(Tool(name, "[%s] %s" % (label, spec.get("description", "")),
+        description = spec.get("description", "")
+        for stale in _RII_STALE:
+            description = description.replace(stale, _RII_CURRENT)
+        _tools.append(Tool(name, "[%s] %s" % (label, description),
                            spec.get("inputSchema", {"type": "object", "properties": {}}),
                            make(name)))
         count += 1
@@ -311,6 +546,17 @@ def _t_status(args: Dict[str, Any]) -> Any:
                 detail[entry["prefix"]] = {"error": str(exc)}
     if detail:
         out["backend_status"] = detail
+    # de-eli is a separate process, so "loaded at boot" says nothing about now.
+    # Probe it live: a dead or wedged German backend must show up here instead of
+    # as fifteen tools that each fail on their own.
+    if _de_proxy is not None:
+        try:
+            out["de_live"] = {"reachable": True, "tools": _de_proxy.ping(),
+                              "session_renewals": _de_proxy.renewals}
+        except Exception as exc:  # noqa: BLE001
+            out["de_live"] = {"reachable": False, "error": "%s: %s" % (type(exc).__name__, exc)}
+            out["warning"] = (out.get("warning", "") + " The German backend is loaded but "
+                              "not answering: every de_ tool will fail until it is back.").strip()
     return out
 
 

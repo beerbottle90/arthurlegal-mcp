@@ -12,6 +12,14 @@ Full text takes three steps, none of which can be skipped:
   1. https://publications.europa.eu/resource/celex/{CELEX}  -> 303 to a UUID
   2. SPARQL: which manifestations exist for that work in the wanted language
   3. {manifestation}/DOC_1                                   -> the text
+
+Title search uses CELLAR's free-text index (``bif:contains``): every query word
+must appear in the title as a word, which is what a title search means, and it
+answers in under a second where a ``CONTAINS`` scan over every title took
+7-18 s. The old query kept the ten newest substring matches of the whole query
+as one string, so an undated "general data protection regulation" never
+reached the 2016 GDPR and "... repealing Directive 95/46/EC" matched nothing
+(verified 2026-10-09).
 """
 from __future__ import annotations
 
@@ -37,9 +45,61 @@ LANGS = {
 
 CELEX_RE = re.compile(r"^[0-9][0-9]{4}[A-Z]{1,2}[0-9]{4}(-[0-9]{8})?$|^[0-9A-Z()\-]{6,}$")
 
+# Matches one search may pull. Fetched unordered, so even "regulation" answers
+# in about a second; the ranking is done locally instead of keeping the newest.
+POOL_CAP = 1000
+
+# Ranking prior for search candidates, best first: binding acts (treaties,
+# agreements, legislation), the Courts' own documents (judgments, opinions,
+# orders), consolidated texts, then everything else — preparatory acts, OJ
+# notices about cases, parliamentary questions, national material and derived
+# records such as 62018CJ0311_RES.
+GROUPS = ("legislation", "case_law", "consolidated", "other")
+
+# Sector-6 document types that are Official Journal notices *about* a case
+# (new case, judgment, order), not the Court's document itself.
+_CASE_NOTICES = {"CN", "CA", "CB", "TN", "TA", "TB", "FN", "FA", "FB"}
+
 
 class CellarError(RuntimeError):
     pass
+
+
+def group(celex: str) -> str:
+    """Which of GROUPS a CELEX number belongs to."""
+    if "_" in celex:
+        return "other"
+    sector = celex[:1]
+    if sector in ("1", "2", "3", "4"):
+        return "legislation"
+    if sector == "6":
+        return "other" if celex[5:7] in _CASE_NOTICES else "case_law"
+    if sector == "0":
+        return "consolidated"
+    return "other"
+
+
+def _words(query: str) -> List[str]:
+    """Title words for the free-text index, safe to place inside its expression.
+
+    Anything but letters, digits and the joiners of legal identifiers (- / .)
+    separates words, so "95/46/EC" and "C-362/14" stay whole while quotes,
+    brackets and commas cannot break the expression. Words under three letters
+    are dropped unless they carry a digit: as required words "v", "of", "EU" or
+    "EC" only cost recall — "Regulation (EU) No 1/2003" would miss a title that
+    says "(EC)".
+    """
+    out: List[str] = []
+    for word in re.sub(r"[^\w\-/.]+", " ", query.lower()).split():
+        word = word.strip("-/._")
+        if (len(word) >= 3 or any(c.isdigit() for c in word)) and word not in out:
+            out.append(word)
+    return out
+
+
+def _phrase(text: str) -> str:
+    """Lower-case words joined by single spaces, padded for whole-word containment."""
+    return " %s " % " ".join(re.findall(r"\w+", text.lower()))
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -85,10 +145,21 @@ def _esc(text: str) -> str:
 class CellarClient:
     # ---------------------------------------------------------------- search
     def search(self, query: str, lang: str = "en", date_from: str = "",
-               date_to: str = "", limit: int = 10) -> Dict[str, Any]:
-        if not (query or "").strip():
-            raise CellarError("query is required")
-        filters = ['FILTER(CONTAINS(LCASE(STR(?title)), "%s"))' % _esc(query.lower())]
+               date_to: str = "", limit: int = 200) -> Dict[str, Any]:
+        """Search candidates, best first by a coarse prior — not yet by relevance.
+
+        Every title word must match. Up to POOL_CAP matches come back unordered
+        and are ordered here: by GROUPS, then titles holding the whole query as
+        a phrase, then newest first. ``limit`` is how many candidates the
+        caller gets to rerank (server.py ranks by relevance within this prior).
+        """
+        words = _words(query or "")
+        if not words:
+            raise CellarError("query has no searchable words (letters or digits)")
+        # _words leaves only word characters and - / . — nothing that can end
+        # the quoted words or the single-quoted literal around them.
+        expression = " AND ".join('"%s"' % w for w in words)
+        filters = []
         if date_from:
             filters.append('FILTER(?date >= "%s"^^<http://www.w3.org/2001/XMLSchema#date>)'
                            % _esc(date_from))
@@ -97,29 +168,44 @@ class CellarClient:
                            % _esc(date_to))
         q = """PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
 SELECT DISTINCT ?celex ?title ?date WHERE {
+  ?expr cdm:expression_title ?title .
+  ?title bif:contains '%s' .
+  ?expr cdm:expression_uses_language <%s> .
+  ?expr cdm:expression_belongs_to_work ?work .
   ?work cdm:resource_legal_id_celex ?celex .
   ?work cdm:work_date_document ?date .
-  ?expr cdm:expression_belongs_to_work ?work .
-  ?expr cdm:expression_uses_language <%s> .
-  ?expr cdm:expression_title ?title .
   %s
-} ORDER BY DESC(?date) LIMIT %d""" % (_lang_uri(lang), "\n  ".join(filters),
-                                      max(1, min(int(limit), 100)))
+} LIMIT %d""" % (expression, _lang_uri(lang), "\n  ".join(filters), POOL_CAP)
         rows = _rows(_sparql(q))
+        phrase = _phrase(query)
         results = []
+        seen = set()
         for r in rows:
             celex = r.get("celex", "")
+            # One CELEX can sit on two Cellar works with different titles
+            # (62014CJ0362 does), which DISTINCT cannot fold.
+            if not celex or celex in seen:
+                continue
+            seen.add(celex)
+            title = r.get("title", "")
+            kind = group(celex)
             results.append({
                 "celex": celex,
-                "title": r.get("title", ""),
+                "title": title,
                 "date": r.get("date", ""),
+                "group": kind,
                 "consolidated": "-" in celex and celex.startswith("0"),
                 "source_url": "https://eur-lex.europa.eu/legal-content/%s/TXT/?uri=CELEX:%s"
                               % (lang.upper(), celex),
-                "citation": "%s (CELEX %s)" % (r.get("title", "")[:120], celex),
+                "citation": "%s (CELEX %s)" % (title[:120], celex),
+                # Ranking prior, for the caller's final ordering; not output.
+                "_tier": (GROUPS.index(kind), phrase not in _phrase(title)),
             })
-        return {"query": query, "language": lang, "returned": len(results),
-                "results": results}
+        results.sort(key=lambda d: d["date"], reverse=True)
+        results.sort(key=lambda d: d["_tier"])
+        return {"query": query, "language": lang, "words": words,
+                "matched": len(results), "truncated": len(rows) >= POOL_CAP,
+                "results": results[:max(1, int(limit))]}
 
     # -------------------------------------------------------------- metadata
     def metadata(self, celex: str, lang: str = "en") -> Dict[str, Any]:
