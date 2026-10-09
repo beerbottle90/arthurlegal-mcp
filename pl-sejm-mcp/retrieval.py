@@ -14,11 +14,29 @@ Three retrieval channels, fused with Reciprocal Rank Fusion:
                  Turkish-keyboard query still matches ``Kündigung``.
 2. ``fuzzy``     FTS5 ``trigram`` — substring and misspelling tolerance
                  (``nergiew`` finds ``energiewet``). Only consulted when the
-                 lexical channel is thin.
+                 lexical channel found nothing, or found little and no
+                 semantic channel stands in for it.
 3. ``semantic``  Dense vectors, **only when an embeddings backend is configured**
                  (see below). Finds conceptually related text that shares no
                  keywords — the actual point of asking a question in Turkish
                  about a Dutch judgment.
+
+How ``hybrid`` fuses them
+-------------------------
+The lexical channel is a ladder: every word, then every word as a prefix, then
+any word. A question asked in plain words falls to the last rung, whose matches
+share a word or two with the question and little else; ranked next to the
+semantic channel they push the meaning matches down. So the lexical channel is
+ranked only when every word matched; after an any-word match it only fills a
+list the semantic channel left short. A query that is a document's ``ref`` (an
+ECLI, a BOE id) puts that document first. Replayed on the channel lists of a
+120-query known-item measurement over the six local indexes (2026-10-09):
+questions in plain words found their document first 82% of the time instead of
+19%, and keyword and number queries stayed at 100%.
+
+The semantic scan reads the vectors in chunks and scores each chunk with numpy
+when it is installed (16,545 vectors: 1.3 s -> 0.2 s on one machine); without
+numpy the standard library gives the same ranking, more slowly.
 
 Honest limitation
 -----------------
@@ -42,16 +60,25 @@ choice, not something this module can detect.
 
 from __future__ import annotations
 
+import heapq
+import itertools
 import json
 import math
+import operator
 import os
 import re
 import sqlite3
 import struct
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+try:
+    import numpy as _np  # optional: speeds up the semantic scan, see the module docstring
+except ImportError:  # pragma: no cover - the standard-library path is the reference
+    _np = None
 
 __all__ = ["Index", "rerank", "semantic_rerank", "embeddings_available",
            "embeddings_status"]
@@ -117,10 +144,68 @@ def _fts_query(raw: str, prefix: bool = False, join: str = "AND") -> str:
     phrases = re.findall(r'"([^"]+)"', raw)
     rest = re.sub(r'"[^"]+"', " ", raw)
     words = [w for w in _FTS_UNSAFE.sub(" ", rest).split() if len(w) > 1]
-    parts = ['"%s"' % p.replace('"', "") for p in phrases if p.strip()]
+    parts = []
+    for p in phrases:
+        p = p.replace('"', "")
+        if not p.strip():
+            continue
+        # A quoted phrase needs the dotless-ı OR group too (see _phrase_variants).
+        # Measured 2026-09-30 on 3,897 Rekabet texts: "karşı oy gerekçesi" matched
+        # 26 decisions as typed and 480 once the capitalised heading was searched.
+        variants = _phrase_variants(p)
+        parts.append('"%s"' % p if len(variants) == 1 else
+                     "(" + " OR ".join('"%s"' % v for v in variants) + ")")
     # A prefix token must sit outside the quotes: "kartel"* is the valid form.
-    parts += ['"%s"%s' % (w, "*" if prefix else "") for w in words]
+    star = "*" if prefix else ""
+    for w in words:
+        variants = _dotless_variants(w)
+        if len(variants) == 1:
+            parts.append('"%s"%s' % (w, star))
+        else:
+            parts.append("(" + " OR ".join('"%s"%s' % (v, star) for v in variants) + ")")
     return (" %s " % join).join(parts)
+
+
+def _dotless_variants(word: str):
+    """Turkish dotless ı is not a diacritic to unicode61, so ``aydinlatma`` never
+    matches ``aydınlatma`` (ş, ğ, ü, ö, ç all fold fine). Search the word as
+    typed plus its all-ı and all-i spellings; that covers the keyboard-less
+    query and the mixed-dot Turkish word in one OR group."""
+    low = word.lower()
+    if "i" not in low and "ı" not in low and "İ" not in word and "I" not in word:
+        return [word]
+    low = low.replace("İ".lower(), "i")
+    return list(dict.fromkeys([word, low.replace("i", "ı"), low.replace("ı", "i")]))
+
+
+def _fold(word: str) -> str:
+    """What unicode61 remove_diacritics 2 makes of a word, closely enough to tell
+    spellings apart: lower case, no combining marks, ı still distinct from i."""
+    return "".join(ch for ch in unicodedata.normalize("NFD", word.lower()) if not unicodedata.combining(ch))
+
+
+def _phrase_variants(phrase: str, cap: int = 16) -> List[str]:
+    """Spellings of a quoted phrase that unicode61 tokenises differently.
+
+    Each word has at most two searchable forms, its ı-spelling and its i-spelling.
+    A heading in capitals ("KARŞI OY GEREKÇESİ") folds to "karsi … gerekcesi" and
+    running text to "karsı … gerekcesi": the forms mix within one phrase, so no
+    whole-phrase respelling reaches both. Every combination is searched up to
+    ``cap`` (four words with an i or ı); a longer phrase falls back to the
+    whole-phrase respellings of :func:`_dotless_variants`.
+    """
+    forms = []
+    for w in phrase.split():
+        seen: Dict[str, str] = {}
+        for v in _dotless_variants(w):
+            seen.setdefault(_fold(v), v)
+        forms.append(list(seen.values()))
+    total = 1
+    for f in forms:
+        total *= len(f)
+    if total <= cap:
+        return [" ".join(c) for c in itertools.product(*forms)]
+    return _dotless_variants(phrase)
 
 
 # --------------------------------------------------------------------------- #
@@ -148,14 +233,27 @@ def embeddings_model() -> str:
     return os.environ.get("EMBEDDINGS_MODEL") or _DEFAULT_MODEL
 
 
+_PROBE_FAIL_TTL = 10.0
+
+
 def _probe(force: bool = False) -> bool:
     now = time.time()
-    if not force and now - _probe_cache["at"] < _PROBE_TTL:
+    # A success is trusted for a minute; a failure only for ten seconds. A single
+    # 429 or hiccup used to switch every search on the machine to keyword-only
+    # for a full minute, which read as "semantic unavailable" to the model.
+    ttl = _PROBE_TTL if _probe_cache["ok"] else _PROBE_FAIL_TTL
+    if not force and now - _probe_cache["at"] < ttl:
         return bool(_probe_cache["ok"])
     try:
         _embed(["ping"], timeout=20)
         _probe_cache.update(at=now, ok=True, error="")
-    except urllib.error.HTTPError as exc:
+    except Exception as exc:  # noqa: BLE001 - unreachable is a reportable state
+        _probe_cache.update(at=now, ok=False, error=_describe_failure(exc))
+    return bool(_probe_cache["ok"])
+
+
+def _describe_failure(exc: BaseException) -> str:
+    if isinstance(exc, urllib.error.HTTPError):
         # The status code alone hides the cause: Voyage answers 401 for a missing
         # or invalid key but 403 for a key it recognises and refuses (quota,
         # billing, revoked). Surface the provider's own message so `status`
@@ -164,13 +262,8 @@ def _probe(force: bool = False) -> bool:
             body = exc.read(600).decode("utf-8", "replace").strip()
         except Exception:  # noqa: BLE001
             body = ""
-        _probe_cache.update(at=now, ok=False,
-                            error="HTTP %s %s%s" % (exc.code, exc.reason,
-                                                    (": " + body) if body else ""))
-    except Exception as exc:  # noqa: BLE001 - unreachable is a reportable state
-        _probe_cache.update(at=now, ok=False,
-                            error="%s: %s" % (type(exc).__name__, exc))
-    return bool(_probe_cache["ok"])
+        return "HTTP %s %s%s" % (exc.code, exc.reason, (": " + body) if body else "")
+    return "%s: %s" % (type(exc).__name__, exc)
 
 
 def embeddings_available() -> bool:
@@ -190,9 +283,16 @@ def _repair_hint() -> str:
             "(key status, quota, billing)." % url)
 
 
-def embeddings_status() -> Dict[str, Any]:
+def _scan_engine() -> str:
+    return "numpy %s" % _np.__version__ if _np is not None else "python"
+
+
+def embeddings_status(refresh: bool = True) -> Dict[str, Any]:
+    """The semantic channel's state. ``refresh=False`` reports the last known
+    state instead of pinging the backend, for answers that did not use it."""
     source = "env" if os.environ.get("EMBEDDINGS_URL") else "default (local Ollama)"
-    if not _probe():
+    up = _probe() if refresh or not _probe_cache["at"] else bool(_probe_cache["ok"])
+    if not up:
         return {
             "semantic": "off",
             "endpoint": embeddings_url(),
@@ -207,6 +307,7 @@ def embeddings_status() -> Dict[str, Any]:
         "model": embeddings_model(),
         "endpoint": embeddings_url(),
         "endpoint_source": source,
+        "scan": _scan_engine(),
         "note": "Cross-language retrieval only works if this model is multilingual.",
     }
 
@@ -243,8 +344,17 @@ def _embed(texts: Sequence[str], timeout: int = 60,
     key = os.environ.get("EMBEDDINGS_API_KEY")
     if key:
         req.add_header("Authorization", "Bearer %s" % key)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        # Rate limits are momentary; one short wait and retry keeps a burst of
+        # queries from reporting the semantic channel as unavailable.
+        if exc.code != 429:
+            raise
+        time.sleep(1.5)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
     items = data.get("data") or []
     out = [it["embedding"] for it in items]
     if len(out) != len(texts):
@@ -265,6 +375,35 @@ def _unpack(blob: bytes, dim: int) -> Tuple[float, ...]:
 def _normalise(vec: Sequence[float]) -> List[float]:
     norm = math.sqrt(sum(x * x for x in vec)) or 1.0
     return [x / norm for x in vec]
+
+
+def _query_vector(query: str) -> Optional[List[float]]:
+    """The query's unit vector, or None when the embeddings backend is down.
+
+    The embedding call is its own liveness probe. Asking ``_probe`` first sent a
+    "ping" ahead of every query that came after a minute of quiet, a second
+    round trip to the backend on most real searches. A failure seen in the last
+    ``_PROBE_FAIL_TTL`` seconds is trusted, as ``_probe`` trusts it.
+    """
+    now = time.time()
+    if not _probe_cache["ok"] and _probe_cache["at"] and now - _probe_cache["at"] < _PROBE_FAIL_TTL:
+        return None
+    try:
+        vec = _embed([query], input_type="query")[0]
+    except Exception as exc:  # noqa: BLE001 - an unreachable backend degrades, it does not fail
+        _probe_cache.update(at=now, ok=False, error=_describe_failure(exc))
+        return None
+    _probe_cache.update(at=now, ok=True, error="")
+    return _normalise(vec)
+
+
+# The cosine of two unit vectors without a Python loop per element: math.sumprod
+# runs in C from Python 3.12; map + operator.mul is the next best thing before it.
+_dot = getattr(math, "sumprod", None) or (lambda a, b: sum(map(operator.mul, a, b)))
+
+# Vectors read per step of the semantic scan. Bounds what one query holds in
+# memory (2,048 x 1,024 float32 = 8 MB) instead of every vector of the index.
+_SCAN_CHUNK = 2048
 
 
 # --------------------------------------------------------------------------- #
@@ -321,6 +460,16 @@ class Index:
             values + [meta],
         )
         return int(cur.lastrowid)
+
+    def has_ref(self, ref: str) -> bool:
+        """True when a document with this ``ref`` is already indexed."""
+        return self.db.execute("SELECT 1 FROM docs WHERE ref = ? LIMIT 1", (ref,)).fetchone() is not None
+
+    def has_prefix(self, prefix: str) -> bool:
+        """True when any indexed ``ref`` starts with ``prefix`` (one bülten, one dergi sayısı)."""
+        like = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        return self.db.execute("SELECT 1 FROM docs WHERE ref LIKE ? ESCAPE '\\' LIMIT 1",
+                               (like,)).fetchone() is not None
 
     def reindex_fts(self) -> None:
         """Rebuild both FTS tables from ``docs``.
@@ -430,21 +579,62 @@ class Index:
             return []
         return [r["id"] for r in rows]
 
-    def _lexical(self, query: str, filters: Dict[str, Any], k: int) -> List[int]:
+    def _fts_exists(self, expr: str, filters: Dict[str, Any]) -> bool:
+        if not expr:
+            return False
+        where, params = self._where(filters)
+        try:
+            return self.db.execute(
+                "SELECT 1 FROM docs_fts f JOIN docs d ON d.id = f.rowid WHERE docs_fts MATCH ?"
+                + where + " LIMIT 1", [expr] + params).fetchone() is not None
+        except sqlite3.OperationalError:
+            return False
+
+    def _lexical_ladder(self, query: str, filters: Dict[str, Any], k: int,
+                        rank_any_word: bool = True) -> Tuple[str, List[int]]:
         """Strict AND first, then progressively looser, stopping as soon as it bites.
 
         Legal corpora punish a single strategy: an exact multi-term AND is right
         when the user knows the terminology and empty when they are one compound
         boundary off. The ladder keeps precision when precision is available and
         degrades to recall only when the stricter rung returned nothing.
+
+        Returns the rung that answered with its ids. The rung says what kind of
+        query this was: in the 2026-10-09 measurement all 72 questions in plain
+        words fell to "some words", and 47 of 48 keyword queries matched on
+        "all words" or "all words as prefixes". With ``rank_any_word=False`` the
+        last rung is only checked for a match, not ranked: on full-text Rekabet
+        decisions the ranked any-word query alone took 180-320 ms.
         """
-        ids = self._run_fts(_fts_query(query), filters, k)
-        if ids:
-            return ids
-        ids = self._run_fts(_fts_query(query, prefix=True), filters, k)
-        if ids:
-            return ids
-        return self._run_fts(_fts_query(query, prefix=True, join="OR"), filters, k)
+        for rung, expr in (("all words", _fts_query(query)),
+                           ("all words as prefixes", _fts_query(query, prefix=True))):
+            ids = self._run_fts(expr, filters, k)
+            if ids:
+                return rung, ids
+        expr = _fts_query(query, prefix=True, join="OR")
+        if not rank_any_word:
+            return ("some words" if self._fts_exists(expr, filters) else "none"), []
+        ids = self._run_fts(expr, filters, k)
+        return ("some words" if ids else "none"), ids
+
+    def _lexical(self, query: str, filters: Dict[str, Any], k: int) -> List[int]:
+        return self._lexical_ladder(query, filters, k)[1]
+
+    def _exact_ref(self, query: str, filters: Dict[str, Any]) -> Optional[int]:
+        """The document whose ``ref`` the query is (an ECLI, a BOE id), if any.
+
+        Meaning has no grip on an identifier: the semantic channel found none of
+        three ECLIs asked for, and the keyword match it outvoted was the answer.
+        """
+        q = query.strip()
+        if len(q) < 6 or any(ch.isspace() for ch in q):
+            return None
+        where, params = self._where(filters)
+        row = self.db.execute(
+            "SELECT d.id FROM docs d WHERE d.ref IN (?, ?, ?)" + where + " LIMIT 1",
+            [q, q.upper(), q.lower()] + params,
+        ).fetchone()
+        return row["id"] if row else None
 
     def _fuzzy(self, query: str, filters: Dict[str, Any], k: int) -> List[int]:
         # trigram needs a contiguous string of >= 3 chars; use the longest word.
@@ -464,28 +654,33 @@ class Index:
         return [r["id"] for r in rows]
 
     def _semantic(self, query: str, filters: Dict[str, Any], k: int, scan_max: int) -> List[int]:
-        if not embeddings_available():
-            return []
-        try:
-            qvec = _normalise(_embed([query], input_type="query")[0])
-        except (urllib.error.URLError, RuntimeError, KeyError, ValueError):
+        qvec = _query_vector(query)
+        if qvec is None:
             return []
         where, params = self._where(filters)
-        rows = self.db.execute(
+        cursor = self.db.execute(
             "SELECT v.doc_id AS id, v.dim, v.vec FROM vecs v JOIN docs d ON d.id = v.doc_id "
             "WHERE v.model = ?" + where + " LIMIT ?",
             [embeddings_model()] + params + [scan_max],
-        ).fetchall()
-        scored = []
-        qlen = len(qvec)
-        for r in rows:
-            if r["dim"] != qlen:
+        )
+        dim = len(qvec)
+        qarr = _np.asarray(qvec, dtype=_np.float32) if _np is not None else None
+        scored: List[Tuple[float, int]] = []
+        while True:
+            chunk = cursor.fetchmany(_SCAN_CHUNK)
+            if not chunk:
+                break
+            rows = [r for r in chunk if r["dim"] == dim]
+            if not rows:
                 continue
-            vec = _unpack(r["vec"], r["dim"])
             # Both sides are unit vectors, so the dot product is the cosine.
-            scored.append((sum(a * b for a, b in zip(qvec, vec)), r["id"]))
-        scored.sort(reverse=True)
-        return [doc_id for _, doc_id in scored[:k]]
+            if qarr is not None:
+                matrix = _np.frombuffer(b"".join(r["vec"] for r in rows), dtype="<f4")
+                sims = (matrix.reshape(len(rows), dim) @ qarr).tolist()
+            else:
+                sims = [_dot(qvec, _unpack(r["vec"], dim)) for r in rows]
+            scored.extend(zip(sims, [r["id"] for r in rows]))
+        return [doc_id for _, doc_id in heapq.nlargest(k, scored)]
 
     def search(
         self,
@@ -500,12 +695,26 @@ class Index:
         pool = max(limit * 5, 50)
         scan_max = int(os.environ.get("SEMANTIC_SCAN_MAX", "50000"))
 
-        channels: Dict[str, List[int]] = {}
+        semantic = self._semantic(query, filters, pool, scan_max) if mode in ("hybrid", "semantic") else None
+        by_meaning = bool(semantic)
+        rung, lexical, filler, by_meaning_only = "", None, [], False
         if mode in ("hybrid", "lexical"):
-            channels["lexical"] = self._lexical(query, filters, pool)
-        if mode in ("hybrid", "semantic"):
-            channels["semantic"] = self._semantic(query, filters, pool, scan_max)
-        if mode == "fuzzy" or (mode == "hybrid" and len(channels.get("lexical") or []) < limit):
+            # An any-word match is ranked only when nothing else ranks; next to the
+            # semantic channel it only fills a short list (module docstring).
+            demoted = mode == "hybrid" and by_meaning
+            rung, lexical = self._lexical_ladder(query, filters, pool,
+                                                 rank_any_word=not demoted or len(semantic) < limit)
+            if demoted and rung == "some words":
+                filler, lexical, by_meaning_only = lexical, None, True
+
+        # Insertion order breaks ties: a keyword match before a meaning match.
+        channels: Dict[str, List[int]] = {}
+        if lexical is not None:
+            channels["lexical"] = lexical
+        if semantic is not None:
+            channels["semantic"] = semantic
+        if mode == "fuzzy" or (mode == "hybrid" and lexical is not None and (
+                not lexical or (not by_meaning and len(lexical) < limit))):
             channels["fuzzy"] = self._fuzzy(query, filters, pool)
 
         # Reciprocal Rank Fusion: rank-based, so channels with incomparable score
@@ -517,8 +726,13 @@ class Index:
             w = weights.get(channel, 1.0)
             for rank, doc_id in enumerate(ids):
                 fused[doc_id] = fused.get(doc_id, 0.0) + w / (rrf_k + rank + 1)
+        exact = self._exact_ref(query, filters) if mode in ("hybrid", "lexical") else None
+        if exact is not None:
+            fused[exact] = max(fused.values(), default=0.0) + 1.0
 
-        ordered = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:limit]
+        ordered = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)
+        ordered += [(doc_id, 0.0) for doc_id in filler if doc_id not in fused]
+        ordered = ordered[:limit]
         results = []
         for doc_id, score in ordered:
             row = self.db.execute(
@@ -550,8 +764,17 @@ class Index:
             "channels_used": {k: len(v) for k, v in channels.items()},
             "indexed_documents": self.count(),
             "vectorised_documents": vectors,
-            **embeddings_status(),
+            # Lexical-only answers report the last known state, not a fresh ping.
+            **embeddings_status(refresh=mode in ("hybrid", "semantic")),
         }
+        if rung:
+            retrieval["keyword_match"] = rung
+        if by_meaning_only:
+            retrieval["ranking"] = ("by meaning: the keyword channel matched only some of the "
+                                    "query's words" + ("; its matches follow the meaning matches"
+                                                       if filler else ""))
+        if exact is not None:
+            retrieval["exact_ref"] = "a document's ref equals the query; it is listed first"
         if mode in ("hybrid", "semantic") and embeddings_available() and vectors == 0:
             retrieval["warning"] = (
                 "Semantic search is configured but NO documents are vectorised "

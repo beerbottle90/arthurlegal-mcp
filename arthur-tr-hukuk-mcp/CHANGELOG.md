@@ -2,6 +2,20 @@
 
 ## Yayımlanmamış
 
+- `retrieval.py` (bütün arka uçların paylaştığı kopya, artık 11 dizinde birebir aynı; `tests/test_retrieval.py`
+  denetler). 09.10.2026 ölçümü (6 yerel indeks, 120 bilinen-belge sorusu): varsayılan `hybrid`, düz cümleyle sorulan sorularda `semantic`ten kötüydü (hedef 1. sırada %19'a karşı %79).
+  Sebep: kelime merdiveni bu soruların 72'sinde de "kelimelerden biri" basamağına düşüp 50 gürültü aday getiriyordu.
+  Artık kelime kanalı yalnız bütün kelimeler (ya da önekleri) eşleştiğinde sıralamaya girer; aksi hâlde anlam
+  sonuçlarının arkasına dolgu olarak eklenir. Anlam kanalı yoksa (anahtar, vektör) eski davranış sürer. Sorgu bir
+  belgenin `ref`'i ise (ECLI, BOE kimliği) o belge 1. sıraya konur. Aynı kanal listeleriyle yeniden oynatma: düz cümle
+  sorularında 1. sıra %19 → %82, ilk 10 %83 → %94; kelime ve numara sorularında %96 → %100. Yanıtta
+  `retrieval.keyword_match`, `ranking`, `exact_ref`.
+- Anlam taraması parça parça okur (2.048 vektör) ve numpy kuruluysa onunla puanlar: 16.545 vektörde 1.304 → 217 ms
+  (aynı makine; numpy'siz 3.12'de `math.sumprod` ile 682 ms). Sıralama değişmez. Sorgunun embedding çağrısı canlılık
+  denetimi yerine geçer: bir dakikalık sessizlikten sonraki her aramada ayrıca "ping" atılmaz; yalnız kelime araması
+  hiç ping atmaz.
+- Ortak kopyadan alınanlar: sağlayıcının hata mesajı `status`'ta görünür (Voyage 401/403 ayrımı), onarım ipucu
+  sağlayıcıya göre, istekte adlandırılmış `User-Agent`.
 - İçtihat araması (`ictihat_ara`): Bedesten çıplak kelimeleri VEYA ile birleştiriyor (kaynak notu "VE" diyordu).
   09.10.2026 ölçümü, Yargıtay + Danıştay: "kira tespit davası" tırnaksız 2.514.700 karar (ilk sonuç mera davası),
   her kelime zorunlu (+) 53.830, tırnaklı 2.127 (3. Hukuk Dairesi kira kararları). Tırnak ve işleç içermeyen çok
