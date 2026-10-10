@@ -2,6 +2,19 @@
 
 ## Yayımlanmamış
 
+- KVKK: karar metni yanlış adresten isteniyordu (`/Icerik/<id>/x`). Site bu adresi `/error`'a yönlendiriyor, o sayfanın
+  menüsü 291 kararın hepsine gövde olarak yazılmıştı (4.672 karakter, hepsi aynı); `kurum_karari_getir(kurum="kvkk")`
+  de karar yerine menüyü döndürüyordu. Adres artık karar numarasını taşır (`/Icerik/8887/2026-1183`; arama sonucundaki
+  `id` de böyle). Yalnız numara verilirse adres önce yerel indeksten, sonra son liste sayfalarından bulunur. Metin
+  yalnız karar bölümünden (`news__detail-article`) okunur. Karar bölümü olmayan sayfa metin sayılmaz, açık hata döner.
+  Taramada başlık kararın konu özeti olur ("… hakkında (KVKK Kurul Kararı 2026/1183)"). Karar tarihi ve atıf
+  sayfadan tamamlanır. İstek sınırı saniyede bir.
+- Rekabet: vektörler artık başlık + metnin ilk 8.000 karakterinden (öteki kurumlar gibi). 30.09'da tam metin eklenirken
+  başlık vektörleri geri konmuştu (saklanan vektör, başlığın tek başına vektörüyle 0,993, başlık + metinle 0,774
+  benzerdi). Başlıkta çoğu zaman yalnız taraf adları vardı; içerikle sorulan soru ıskalıyordu. 10.10.2026 ölçüm
+  setinde (12 anlam sorusu, Rekabet + EPDK + BTK + BDDK) hybrid ilk 10 %83 -> %92, MRR 0,57 -> 0,61; ilk 50'de bile
+  olmayan bir karar 1. sıraya çıktı, bir usul kararı (sözlü savunmaya katılma talebi) 1. sıradan 4.'ye indi; kelime
+  soruları değişmedi. Veri değişikliği: dağıtıma giden dizinde.
 - `retrieval.py` (bütün arka uçların paylaştığı kopya, artık 11 dizinde birebir aynı; `tests/test_retrieval.py`
   denetler). 09.10.2026 ölçümü (6 yerel indeks, 120 bilinen-belge sorusu): varsayılan `hybrid`, düz cümleyle sorulan sorularda `semantic`ten kötüydü (hedef 1. sırada %19'a karşı %79).
   Sebep: kelime merdiveni bu soruların 72'sinde de "kelimelerden biri" basamağına düşüp 50 gürültü aday getiriyordu.

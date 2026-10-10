@@ -110,7 +110,25 @@ def t_kurum_getir(args: Dict[str, Any]) -> Any:
     src = _kurum(args)
     if not src.get:
         raise McpError("%s için belge getirme yok (kaynak canlı değil)." % src.key)
+    if src.key == "kvkk":
+        args = _kvkk_adresi(args)
     return src.get(args)
+
+
+def _kvkk_adresi(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Yalnız numarasıyla (8887) istenen KVKK kararına indeksteki adresi verir.
+
+    Sayfa adresi karar numarasını da taşımak zorunda (/Icerik/8887/2026-1183);
+    indekste yoksa kaynak kendi liste sayfalarına bakar.
+    """
+    kimlik = str(args.get("id") or "").strip()
+    if not kimlik.isdigit():
+        return args
+    try:
+        doc = index().get("kvkk:%s" % kimlik)
+    except Exception:  # noqa: BLE001 - indeks yoksa kaynak kendi listesine bakar
+        doc = None
+    return dict(args, id=doc["url"]) if doc and doc.get("url") else args
 
 
 def t_kurum_listesi(args: Dict[str, Any]) -> Any:

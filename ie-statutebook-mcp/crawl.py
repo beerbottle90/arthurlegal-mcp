@@ -26,11 +26,12 @@ from statutebook import StatuteBookClient
 
 
 def crawl(index: Index, year_from: int, year_to: int, probe_limit: int = 80,
-          pause: float = 0.2) -> int:
+          pause: float = 0.2, pace: float = 1.0) -> int:
     client = StatuteBookClient()
     total = 0
     for year in range(int(year_from), int(year_to) + 1):
-        acts = client.list_year(year, probe_limit=probe_limit, full_text=True)
+        # One request per Act number: at most one a second unless asked otherwise.
+        acts = client.list_year(year, probe_limit=probe_limit, full_text=True, pace=pace)
         for act in acts:
             # The enactment date the page states. It used to be "<year>-01-01"
             # for every Act; an unknown date now stays empty instead.
@@ -69,12 +70,14 @@ def main() -> None:
     ap.add_argument("--to", dest="year_to", type=int, default=2026)
     ap.add_argument("--probe-limit", type=int, default=80,
                     help="highest Act number to probe per year")
+    ap.add_argument("--pace", type=float, default=1.0,
+                    help="seconds between requests to irishstatutebook.ie (default 1)")
     ap.add_argument("--embed", action="store_true")
     ap.add_argument("--index", default=None)
     args = ap.parse_args()
 
     index = Index(args.index)
-    n = crawl(index, args.year_from, args.year_to, probe_limit=args.probe_limit)
+    n = crawl(index, args.year_from, args.year_to, probe_limit=args.probe_limit, pace=args.pace)
     sys.stderr.write("indexed %d Acts\n" % n)
     if args.embed:
         if not embeddings_available():

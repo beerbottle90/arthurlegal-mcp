@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import html
 import re
+import time
 import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional, Tuple
@@ -307,7 +308,8 @@ class StatuteBookClient:
         return out
 
     def list_year(self, year: int, probe_limit: int = 80,
-                  miss_streak: int = 8, full_text: bool = False) -> List[Dict[str, Any]]:
+                  miss_streak: int = 8, full_text: bool = False,
+                  pace: float = 0.0) -> List[Dict[str, Any]]:
         """Enumerate an Act year by walking numbers until the misses run on.
 
         The Statute Book has no year-index API — ``/eli/{year}/act/`` renders a
@@ -317,12 +319,15 @@ class StatuteBookClient:
 
         ``full_text`` probes the print view, so ``text`` is the Act itself (what
         the crawler indexes); otherwise the lighter contents page is probed and
-        ``text`` is the contents and long title.
+        ``text`` is the contents and long title. ``pace`` is the pause between
+        requests, in seconds: a crawl asks for one page per Act number.
         """
         found: List[Dict[str, Any]] = []
         misses = 0
         url_for = self.print_url if full_text else self.act_url
         for no in range(1, int(probe_limit) + 1):
+            if pace and no > 1:
+                time.sleep(pace)
             try:
                 page = _fetch(url_for(year, no))
             except IeError:
