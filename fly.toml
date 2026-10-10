@@ -14,9 +14,11 @@ primary_region = "ams"
   # e-qanun.az does not answer from Amsterdam (10 s timeouts, 2026-10-09); the az_ tools
   # tunnel through az-relay in Frankfurt over the private network (az-relay/README.md).
   EQANUN_PROXY = "http://arthurlegal-az-relay.internal:8080"
-  # Vectors kept in memory as float16 (retrieval.py): all six indexes take ~141 MB
-  # (2026-10-10); the 512 MB machine had ~275 MB free before. status shows the size.
-  SEMANTIC_RESIDENT_MB = "160"
+  # Vectors kept in memory as float16 (retrieval.py) need RAM the 512 MB machine
+  # does not have to spare: with 141 MB of them, free memory fell to 77-117 MB, the
+  # SQLite files dropped out of the page cache, and Turkish and Polish searches went
+  # from ~1.2 s to 7-8 s, keyword searches included (2026-10-10). Off on this size.
+  SEMANTIC_RESIDENT_MB = "0"
 
 [http_service]
   internal_port = 8080

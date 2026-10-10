@@ -150,7 +150,7 @@ times faster; without it the ranking is the same.
 | `EMBEDDINGS_MODEL` | env | `voyage-4-lite` -- multilingual, 1024-dim |
 | `DE_ELI_URL` | env | German backend; `off` to disable |
 | `EQANUN_PROXY` | env | Azerbaijan: e-qanun.az is reached through `az-relay` (Frankfurt, private network only), because it does not answer from Amsterdam |
-| `SEMANTIC_RESIDENT_MB` | env | memory budget for vectors kept as float16 (all indexes together; `0` or unset = read from SQLite per query). Hosted: `160` |
+| `SEMANTIC_RESIDENT_MB` | env | memory budget for vectors kept as float16 (all indexes together; `0` or unset = read from SQLite per query). Hosted: `0` -- on the 512 MB machines the SQLite page cache needs that memory more (with 141 MB of vectors, Turkish and Polish searches slowed from ~1.2 s to 7-8 s) |
 
 A document holds exactly one vector (`vecs.doc_id` is the primary key), so
 changing `EMBEDDINGS_MODEL` does not add a second vector -- the next embedding
