@@ -136,7 +136,8 @@ def _t_status(args: Dict[str, Any]) -> Any:
     }
 
 
-_ID = {"type": "string", "description": "BOE identifier, e.g. BOE-A-2010-10544"}
+_ID = {"type": "string", "description": "BOE identifier, e.g. BOE-A-2010-10544 (an act from a regional "
+                                        "gazette keeps its own, e.g. DOGC-f-1997-90001)"}
 
 TOOLS = [
     Tool(

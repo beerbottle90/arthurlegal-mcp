@@ -50,6 +50,21 @@ UA = "arthurlegal-es-boe-mcp/%s (+https://github.com/beerbottle90/arthurlegal-mc
 # The BOE ids this server accepts. Anything else is a caller mistake, and
 # validating here keeps a malformed id from becoming a confusing upstream 404.
 BOE_ID = re.compile(r"^BOE-[A-Z]-\d{4}-\d+$")
+# A consolidated act keeps the id of the gazette that first published it. BOE's own
+# are BOE-A-...; an act from a regional gazette carries that gazette's prefix and a
+# lower-case series letter, DOGC-f-1997-90001, and the API rejects DOGC-F-...: 245
+# of the 12,376 consolidated acts (2026-10-10), which get_act could not open.
+_CONSOLIDATED_ID = re.compile(r"^([A-Za-z]{2,5})-([A-Za-z])-(\d{4})-(\d+)$")
+
+
+def consolidated_id(raw: str) -> str:
+    """The id as the API spells it, or "" when it is not a consolidated-act id."""
+    m = _CONSOLIDATED_ID.match((raw or "").strip())
+    if not m:
+        return ""
+    prefix = m.group(1).upper()
+    letter = m.group(2).upper() if prefix == "BOE" else m.group(2).lower()
+    return "%s-%s-%s-%s" % (prefix, letter, m.group(3), m.group(4))
 
 
 class BoeError(Exception):
@@ -211,9 +226,11 @@ class BoeClient:
 
     def _part(self, boe_id: str, part: str) -> ET.Element:
         """``GET /legislacion-consolidada/id/{id}/{part}`` -> its ``<data>``."""
-        boe_id = (boe_id or "").strip().upper()
-        if not BOE_ID.match(boe_id):
-            raise BoeError("Malformed BOE id %r — expected e.g. BOE-A-2010-10544" % boe_id)
+        ident = consolidated_id(boe_id)
+        if not ident:
+            raise BoeError("Malformed BOE id %r — expected e.g. BOE-A-2010-10544 "
+                           "(or a regional gazette's, e.g. DOGC-f-1997-90001)" % boe_id)
+        boe_id = ident
         if part not in ("metadatos", "analisis", "texto"):
             raise BoeError("part must be one of: metadatos, analisis, texto")
         url = "%s/legislacion-consolidada/id/%s/%s" % (API, boe_id, part)
@@ -224,7 +241,7 @@ class BoeClient:
 
     def metadata(self, boe_id: str) -> Dict[str, Any]:
         """``/metadatos`` — the act's header and BOE's own status flags."""
-        boe_id = (boe_id or "").strip().upper()
+        boe_id = consolidated_id(boe_id) or (boe_id or "").strip()
         data = self._part(boe_id, "metadatos")
         meta = data.find("metadatos") if data.find("metadatos") is not None else data
         title = _text(meta.find("titulo"))
