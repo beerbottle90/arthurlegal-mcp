@@ -514,6 +514,42 @@ def _load_de_eli(url: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+def _warm_resident() -> Optional[threading.Thread]:
+    """Build the resident vector copies in the background after boot.
+
+    The first semantic query on each index used to build its copy itself: 10-22 s
+    for the first callers after the 2026-10-10 deploy, while the files were still
+    cold. Warming is an optimisation; a failure only means a query builds it later.
+    """
+    import retrieval  # the copy every bundled backend shares
+    if retrieval._np is None or retrieval._resident_budget() <= 0:
+        return None
+    model = retrieval.embeddings_model()
+    scan_max = int(os.environ.get("SEMANTIC_SCAN_MAX", "50000"))
+
+    def warm() -> None:
+        for entry in list(_loaded):
+            mod = sys.modules.get(entry.get("module", ""))
+            idx = getattr(mod, "_index", None) if mod is not None else None
+            if idx is None and mod is not None and callable(getattr(mod, "index", None)):
+                try:
+                    idx = mod.index()
+                except Exception:  # noqa: BLE001
+                    idx = None
+            if not isinstance(idx, retrieval.Index):
+                continue
+            try:
+                row = idx.db.execute("SELECT dim FROM vecs WHERE model = ? LIMIT 1", (model,)).fetchone()
+                if row:
+                    idx._resident_for(model, int(row[0]), scan_max)
+            except Exception as exc:  # noqa: BLE001
+                sys.stderr.write("resident warm-up %s: %s\n" % (entry.get("prefix"), exc))
+
+    thread = threading.Thread(target=warm, name="resident-warmup", daemon=True)
+    thread.start()
+    return thread
+
+
 def _runtime() -> Dict[str, Any]:
     """Which build answered and how much memory it holds.
 
@@ -643,6 +679,7 @@ hukukun doğru alıntılanması için gereken disiplinlerdir.
 
 if __name__ == "__main__":
     build()
+    _warm_resident()
     text = INSTRUCTIONS_HEADER + "\n\n" + "\n\n".join(_instructions)
     sys.stderr.write("arthurlegal-mcp: %d backend, %d araç"
                      % (len(_loaded), len(_tools)))

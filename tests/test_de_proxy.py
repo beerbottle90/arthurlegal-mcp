@@ -13,8 +13,11 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import threading
+import types
 import unittest
+from unittest import mock
 import urllib.error
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -259,6 +262,38 @@ class ShapingTest(unittest.TestCase):
             fixed = fixed.replace(old, server._RII_CURRENT)
         self.assertNotIn("small beta slice", fixed)
         self.assertIn("84,474", fixed)
+
+
+class WarmResidentTest(unittest.TestCase):
+    """After boot the resident vector copies are built in the background (1.3.0)."""
+
+    def test_boot_builds_the_resident_copies(self) -> None:
+        sys.path.insert(0, os.path.join(ROOT, "arthur-tr-hukuk-mcp"))
+        import retrieval  # the copy the aggregator's backends share
+        if retrieval._np is None:
+            self.skipTest("numpy is not installed here")
+        idx = retrieval.Index(os.path.join(tempfile.mkdtemp(), "index.db"))
+        doc_id = idx.upsert({"ref": "a", "title": "t", "body": "b"})
+        idx.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?,?,?,?)",
+                       (doc_id, 4, retrieval._pack([1.0, 0.0, 0.0, 0.0]), retrieval.embeddings_model()))
+        idx.db.commit()
+        fake = types.ModuleType("warm_fake_backend")
+        fake._index = idx
+        sys.modules["warm_fake_backend"] = fake
+        entry = {"prefix": "warm", "module": "warm_fake_backend"}
+        server._loaded.append(entry)
+        try:
+            with mock.patch.dict(os.environ, {"SEMANTIC_RESIDENT_MB": "1"}):
+                thread = server._warm_resident()
+                thread.join(10)
+            self.assertIsNotNone(getattr(idx, "_resident", None))
+            with mock.patch.dict(os.environ, {"SEMANTIC_RESIDENT_MB": "0"}):
+                self.assertIsNone(server._warm_resident())
+        finally:
+            server._loaded.remove(entry)
+            del sys.modules["warm_fake_backend"]
+            idx._drop_resident()
+            idx.db.close()
 
 
 if __name__ == "__main__":
