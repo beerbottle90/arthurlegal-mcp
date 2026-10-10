@@ -116,5 +116,49 @@ class InForceOnlyTests(unittest.TestCase):
         self.assertEqual(doc["meta"]["in_force_api"], "IN_FORCE")
 
 
+class InForceOrderTests(unittest.TestCase):
+    """2015-2026 indexed: a question about a regulation met its repealed 2018 version
+    first, because a meaning search ranks the two as the same subject."""
+
+    def setUp(self):
+        tmp = tempfile.mkdtemp()
+        self.server = pl_fakes.load_module("pl_server_lift", "server.py", os.path.join(tmp, "index.db"))
+        idx = self.server._index
+        model = retrieval.embeddings_model()
+        rows = [
+            ("WDU20180002367", "Rozporządzenie Ministra Zdrowia z dnia 15 grudnia 2018 r. w sprawie "
+             "funkcjonowania podmiotów leczniczych", False, [1.0, 0.0, 0.0, 0.0]),
+            ("WDU20230002830", "Rozporządzenie Ministra Zdrowia z dnia 29 grudnia 2023 r. w sprawie "
+             "funkcjonowania podmiotów leczniczych", True, [0.98, 0.2, 0.0, 0.0]),
+            ("WDU20240000001", "Rozporządzenie w innej sprawie", True, [0.0, 0.0, 1.0, 0.0]),
+        ]
+        for ref, title, in_force, vec in rows:
+            doc_id = idx.upsert({"ref": ref, "title": title, "body": "Rozporządzenie", "status": "x",
+                                 "meta": {"in_force": in_force,
+                                          "in_force_api": "IN_FORCE" if in_force else "NOT_IN_FORCE"}})
+            idx.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?,?,?,?)",
+                           (doc_id, 4, retrieval._pack(retrieval._normalise(vec)), model))
+        idx.db.commit()
+        idx.reindex_fts()
+        retrieval._probe_cache.update(at=0.0, ok=False, error="")
+        patcher = mock.patch.object(retrieval, "_embed",
+                                    lambda texts, timeout=60, input_type=None: [[1.0, 0.05, 0.0, 0.0] for _ in texts])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_the_act_in_force_goes_ahead_of_its_repealed_predecessor(self):
+        out = self.server._t_search_indexed({"query": "zasady działania szpitali", "limit": 3})
+        refs = [r["ref"] for r in out["results"]]
+        self.assertEqual(refs[0], "WDU20230002830")
+        self.assertIn("WDU20180002367", refs)          # still listed, marked as not in force
+        self.assertIs({r["ref"]: r["in_force"] for r in out["results"]}["WDU20180002367"], False)
+        self.assertIn("in_force_order", out)
+
+    def test_a_repealed_act_named_by_its_title_still_leads(self):
+        out = self.server._t_search_indexed({"query": "funkcjonowania podmiotów leczniczych 15 grudnia 2018",
+                                             "limit": 3})
+        self.assertEqual(out["results"][0]["ref"], "WDU20180002367")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -135,6 +135,18 @@ def _indexed_in_force(doc: Optional[Dict[str, Any]]) -> Optional[bool]:
     return in_force_from_status(doc.get("status") or "")
 
 
+# An act in force goes ahead of the repealed acts ranked just above it. With
+# 2015-2026 indexed, a question about a regulation met the 2018 version it replaced,
+# that version's amendments and the consolidated-text notice, which a meaning search
+# rightly ranks as the same subject. On the 2026-10-10 measurement set: rank-1
+# answers 50% -> 83% for questions in plain words, keyword queries unchanged, and a
+# lift of 1.1, 1.2 or 1.5 gave the same order. Fusion scores sit close together at
+# the top (rank 1 and rank 3 differ by 3%), so x1.1 moves an act in force up past
+# repealed acts ranked up to about six places above it; a repealed act that matches
+# both by keyword and by meaning still leads.
+IN_FORCE_LIFT = 1.1
+
+
 def _t_search_indexed(args: Dict[str, Any]) -> Any:
     query = (args.get("query") or "").strip()
     if not query:
@@ -156,7 +168,7 @@ def _t_search_indexed(args: Dict[str, Any]) -> Any:
     out = _index.search(
         query,
         mode=args.get("mode", "hybrid"),
-        limit=limit * 5 if in_force_only else limit,
+        limit=limit * 5 if in_force_only else limit * 3,
         filters=filters,
     )
     kept, dropped_unknown, dropped_repealed = [], 0, 0
@@ -170,6 +182,13 @@ def _t_search_indexed(args: Dict[str, Any]) -> Any:
                 dropped_repealed += 1
             continue
         kept.append(result)
+    if not in_force_only:
+        order = sorted(enumerate(kept), key=lambda p: (
+            -p[1]["score"] * (IN_FORCE_LIFT if p[1]["in_force"] is True else 1.0), p[0]))
+        kept = [r for _, r in order]
+        out["in_force_order"] = ("Acts in force go ahead of repealed acts ranked up to about six places "
+                                 "above them (score x%.1f); each result's `in_force` says which it is."
+                                 % IN_FORCE_LIFT)
     out["results"] = kept[:limit]
     out["total"] = len(out["results"])
     if in_force_only:
