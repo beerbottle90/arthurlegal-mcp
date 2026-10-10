@@ -520,6 +520,92 @@ def test_mevzuat_semasi_konuyu_ve_olculmus_sinirini_duyurur():
     assert k["mevzuat"]["gorulmemis"]["enerji"] == {"pozitif": 3, "yakalanan": 0}
 
 
+_KVKK_SAYFA = (
+    '<div class="d-flex justify-content-between align-items-center">Anasayfa Kurumsal</div>'
+    '<div class="news__detail-article-title">Başlık</div>'
+    '<div class="news__detail-article "><p>"İZİNSİZ SMS HAKKINDA" KARAR ÖZETİ</p>'
+    '<table><tr><td>Karar Tarihi</td><td></td><td>:</td><td></td><td>10/06/2026</td></tr>'
+    '<tr><td>Karar No</td><td></td><td>:</td><td></td><td>2026/1183</td></tr>'
+    '<tr><td>Konu Özeti</td><td></td><td>:</td><td></td><td>İzinsiz SMS gönderilmesi hakkında</td></tr></table>'
+    '<p>Kuruma intikal eden şikâyet dilekçesinde özetle...</p></div>'
+    '<div class="sidebar-widget sidebar-widget-events">Etkinlikler Podcast Kanalımız</div>')
+
+
+def test_kvkk_karar_metni_yalniz_karar_bolumunden_okunur():
+    d = kvkk._parse(_KVKK_SAYFA)
+    assert d["date"] == "10/06/2026" and d["no"] == "2026/1183"
+    assert d["konu"] == "İzinsiz SMS gönderilmesi hakkında"
+    assert "şikâyet dilekçesinde" in d["text"]
+    assert "Podcast" not in d["text"] and "Anasayfa" not in d["text"]
+
+
+def test_kvkk_hata_sayfasi_karar_metni_sayilmaz():
+    """/Icerik/8887/x -> /error: 291 kararın gövdesine bu sayfanın menüsü yazılmıştı (10.10.2026)."""
+    assert kvkk._parse('<div class="d-flex justify-content-between">Anasayfa</div><footer>x</footer>') is None
+
+    class _Sahte:
+        @staticmethod
+        def get_text(url, **k):
+            return '<div class="d-flex justify-content-between">Anasayfa Kurumsal</div>'
+
+    eski = kvkk._http
+    kvkk._http = _Sahte()
+    try:
+        out = kvkk.get({"id": "8887/2026-1183"})
+    finally:
+        kvkk._http = eski
+    assert "error" in out and "text" not in out
+    assert out["source_url"] == "https://www.kvkk.gov.tr/Icerik/8887/2026-1183"
+
+
+def test_kvkk_adresi_karar_numarasini_tasir():
+    assert kvkk._url("8887/2026-1183") == "https://www.kvkk.gov.tr/Icerik/8887/2026-1183"
+    assert kvkk._url("https://www.kvkk.gov.tr/Icerik/8887/2026-1183").endswith("/8887/2026-1183")
+    eski = kvkk._listing
+    kvkk._listing = lambda p: ([{"id": "8887", "slug": "2026-1183",
+                                 "source_url": "https://www.kvkk.gov.tr/Icerik/8887/2026-1183"}] if p == 1 else [])
+    try:
+        assert kvkk._url("8887") == "https://www.kvkk.gov.tr/Icerik/8887/2026-1183"
+        assert kvkk._url("1") is None
+    finally:
+        kvkk._listing = eski
+
+
+def test_kvkk_taramasi_konuyu_basliga_tarihi_atfa_yazar():
+    idx = retrieval.Index(os.path.join(tempfile.mkdtemp(), "t.db"))
+    eski_liste, eski_getir = kvkk._listing, kvkk.get
+    kvkk._listing = lambda p: ([{"id": "8887", "slug": "2026-1183", "decision_no": "2026/1183", "date": "",
+                                 "summary": "liste özeti",
+                                 "source_url": "https://www.kvkk.gov.tr/Icerik/8887/2026-1183"}] if p == 1 else [])
+    kvkk.get = lambda a: {"text": "karar metni " * 50, "karar_tarihi": "10/06/2026",
+                          "konu": "İzinsiz SMS gönderilmesi hakkında"}
+    try:
+        out = kvkk.crawl(idx, max_pages=3, log=lambda m: None)
+    finally:
+        kvkk._listing, kvkk.get = eski_liste, eski_getir
+    r = idx.db.execute("SELECT title, body, date, citation FROM docs WHERE ref = 'kvkk:8887'").fetchone()
+    assert r["title"] == "İzinsiz SMS gönderilmesi hakkında (KVKK Kurul Kararı 2026/1183)"
+    assert r["date"] == "2026-06-10"
+    assert r["citation"] == "KVK Kurulu, 10.06.2026 tarih ve 2026/1183 sayılı karar özeti"
+    assert r["body"].startswith("karar metni") and out == {"indexed": 1, "metinsiz": 0}
+
+
+def test_kvkk_numarayla_istenen_karar_indeksteki_adrese_gider():
+    import server
+    idx = retrieval.Index(os.path.join(tempfile.mkdtemp(), "t.db"))
+    idx.upsert({"ref": "kvkk:8887", "title": "t", "body": "b", "subject": "kvkk",
+                "url": "https://www.kvkk.gov.tr/Icerik/8887/2026-1183"})
+    idx.db.commit()
+    eski = server.index
+    server.index = lambda: idx
+    try:
+        assert server._kvkk_adresi({"id": "8887"})["id"] == "https://www.kvkk.gov.tr/Icerik/8887/2026-1183"
+        assert server._kvkk_adresi({"id": "9999"}) == {"id": "9999"}
+        assert server._kvkk_adresi({"id": "8887/2026-1183"}) == {"id": "8887/2026-1183"}
+    finally:
+        server.index = eski
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0
