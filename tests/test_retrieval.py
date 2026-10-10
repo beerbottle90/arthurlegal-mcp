@@ -188,6 +188,60 @@ class ScanTests(Corpus):
             self.assertEqual(self.scan(), with_numpy)
 
 
+class ResidentTests(ScanTests):
+    """SEMANTIC_RESIDENT_MB: the vectors stay in memory as float16."""
+
+    def setUp(self):
+        super().setUp()
+        if R._np is None:
+            self.skipTest("numpy is not installed here")
+        self.addCleanup(self.idx._drop_resident)
+        for i in range(5):
+            self.add("tr:epdk-%d" % i, "EPDK kararı %d" % i, "metin")
+        self.idx.db.execute("UPDATE docs SET subject = 'epdk' WHERE ref LIKE 'tr:epdk-%'")
+        self.idx.db.commit()
+
+    def resident(self, mb="50"):
+        return mock.patch.dict(os.environ, {"SEMANTIC_RESIDENT_MB": mb})
+
+    def test_resident_vectors_rank_like_the_scan(self):
+        streamed = self.scan()
+        with self.resident():
+            self.assertEqual(self.scan(), streamed)
+            self.assertIsNotNone(getattr(self.idx, "_resident", None))
+            out = self.idx.search("ev sahibi kirayı ne kadar yükseltebilir", mode="semantic", limit=3)
+            self.assertIn("resident", out["retrieval"]["scan"])
+
+    def test_resident_vectors_respect_filters(self):
+        q = "ev sahibi kirayı ne kadar yükseltebilir"
+        streamed = self.idx._semantic(q, {"subject": "epdk"}, 10, 50000)
+        with self.resident():
+            self.assertEqual(self.idx._semantic(q, {"subject": "epdk"}, 10, 50000), streamed)
+            self.assertEqual(len(streamed), 5)
+            self.assertEqual(self.idx._semantic(q, {"subject": "yok"}, 10, 50000), [])
+
+    def test_a_vector_written_by_another_connection_is_seen(self):
+        q = "ev sahibi kirayı ne kadar yükseltebilir"
+        with self.resident():
+            before = self.idx._semantic(q, {}, 3, 50000)
+            other = R.Index(self.idx.path)          # the boot-time embedder is another process
+            doc_id = other.upsert({"ref": "tr:new", "title": "Yeni", "body": "metin", "subject": "rekabet"})
+            vec = self.queries[q]                   # the query itself: the nearest possible vector
+            other.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?,?,?,?)",
+                             (doc_id, DIM, struct.pack("<%df" % DIM, *vec), R.embeddings_model()))
+            other.db.commit()
+            other.db.close()
+            after = self.idx._semantic(q, {}, 3, 50000)
+        self.assertNotEqual(before[0], doc_id)
+        self.assertEqual(after[0], doc_id)
+
+    def test_a_budget_that_is_too_small_falls_back_to_the_scan(self):
+        streamed = self.scan()
+        with self.resident("0.001"):
+            self.assertEqual(self.scan(), streamed)
+            self.assertIsNone(getattr(self.idx, "_resident", None))
+
+
 class ProbeTests(Corpus):
     def test_a_search_after_a_quiet_minute_makes_one_embedding_call(self):
         self.idx.search("ev sahibi kirayı ne kadar yükseltebilir", mode="semantic", limit=3)

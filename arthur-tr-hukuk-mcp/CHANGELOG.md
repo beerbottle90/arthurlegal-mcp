@@ -2,6 +2,11 @@
 
 ## Yayımlanmamış
 
+- `retrieval.py`: `SEMANTIC_RESIDENT_MB` ile vektörler bellekte float16 tutulur (bütün indeksler için ortak bütçe;
+  yoksa eskisi gibi SQLite'tan okunur). Sorgu başına 4 KB'lık vektör okumak taramanın çoğuydu. v21 indekslerinde,
+  iki ölçüm setinin 480 sonuç listesinin 474'ü birebir aynı (kalan 6'sında ilk 3 aynı, fark puanı eşit alt sıralarda).
+  Sunucu tarafı hybrid medyanı (yerel): PL 536 → 204 ms, ES 238 → 100, NL 144 → 57, TR 395 → 292. Altı indeks
+  ~141 MB. Başka bir bağlantı yazınca (`PRAGMA data_version`) ya da bu bağlantı vektör yazınca kopya yenilenir.
 - KVKK: karar metni yanlış adresten isteniyordu (`/Icerik/<id>/x`). Site bu adresi `/error`'a yönlendiriyor, o sayfanın
   menüsü 291 kararın hepsine gövde olarak yazılmıştı (4.672 karakter, hepsi aynı); `kurum_karari_getir(kurum="kvkk")`
   de karar yerine menüyü döndürüyordu. Adres artık karar numarasını taşır (`/Icerik/8887/2026-1183`; arama sonucundaki

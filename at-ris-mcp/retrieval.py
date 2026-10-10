@@ -69,6 +69,7 @@ import os
 import re
 import sqlite3
 import struct
+import threading
 import time
 import unicodedata
 import urllib.error
@@ -307,7 +308,7 @@ def embeddings_status(refresh: bool = True) -> Dict[str, Any]:
         "model": embeddings_model(),
         "endpoint": embeddings_url(),
         "endpoint_source": source,
-        "scan": _scan_engine(),
+        "scan": _scan_engine() + (", resident %.0f MB" % (_resident_bytes[0] / 1e6) if _resident_bytes[0] else ""),
         "note": "Cross-language retrieval only works if this model is multilingual.",
     }
 
@@ -405,6 +406,43 @@ _dot = getattr(math, "sumprod", None) or (lambda a, b: sum(map(operator.mul, a, 
 # memory (2,048 x 1,024 float32 = 8 MB) instead of every vector of the index.
 _SCAN_CHUNK = 2048
 
+# Resident vectors. With SEMANTIC_RESIDENT_MB set (and numpy installed) an index
+# keeps a float16 copy of its vectors in memory and scores a query against it,
+# instead of reading 4 KB per vector from SQLite on every query: the reading was
+# most of the scan (Poland's 28,150 vectors: 247 of ~300 ms, 2026-10-10), and
+# float16 left the top 10 unchanged on four real indexes. The budget is shared by
+# every index in the process; an index that does not fit is scanned as before.
+_RESIDENT_LOCK = threading.Lock()
+_resident_bytes = [0]
+
+
+def _resident_budget() -> int:
+    try:
+        return int(float(os.environ.get("SEMANTIC_RESIDENT_MB", "0") or 0) * 1e6)
+    except ValueError:
+        return 0
+
+
+class _Resident:
+    """One index's vectors for one model and dimension, as a float16 matrix."""
+
+    def __init__(self, key: Tuple[str, int, int], ids: Any, matrix: Any) -> None:
+        self.key, self.ids, self.matrix = key, ids, matrix
+        self.nbytes = int(ids.nbytes + matrix.nbytes)
+
+    def top(self, qvec: Sequence[float], k: int, allowed: Any = None) -> List[int]:
+        q = _np.asarray(qvec, dtype=_np.float32)
+        sims = _np.empty(len(self.ids), dtype=_np.float32)
+        # Upcast a slice at a time: 2,048 rows x 1,024 float32 = 8 MB per query, not the matrix.
+        for i in range(0, len(self.ids), _SCAN_CHUNK):
+            sims[i:i + _SCAN_CHUNK] = self.matrix[i:i + _SCAN_CHUNK].astype(_np.float32) @ q
+        rows = _np.arange(len(self.ids)) if allowed is None else _np.nonzero(_np.isin(self.ids, allowed))[0]
+        if len(rows) > k + 64:
+            rows = rows[_np.argpartition(-sims[rows], k + 63)[:k + 64]]
+        # The scan's order: higher cosine first, then the higher doc id.
+        order = _np.lexsort((-self.ids[rows], -sims[rows]))[:k]
+        return [int(i) for i in self.ids[rows[order]]]
+
 
 # --------------------------------------------------------------------------- #
 # Index                                                                        #
@@ -453,6 +491,7 @@ class Index:
             # The stored vector described the old body; drop it so embed_missing
             # recomputes one rather than leaving a stale embedding behind.
             self.db.execute("DELETE FROM vecs WHERE doc_id = ?", (doc_id,))
+            self._drop_resident()
             return doc_id
         cur = self.db.execute(
             "INSERT INTO docs(ref,title,body,url,lang,date,status,court,subject,citation,meta) "
@@ -522,6 +561,8 @@ class Index:
                 )
             self.db.commit()
             done += len(chunk)
+        if done:
+            self._drop_resident()
         return {"embedded": done, **embeddings_status()}
 
     def set_state(self, key: str, value: str) -> None:
@@ -653,10 +694,69 @@ class Index:
             return []
         return [r["id"] for r in rows]
 
+    def _drop_resident(self) -> None:
+        cached = getattr(self, "_resident", None)
+        if cached is not None:
+            with _RESIDENT_LOCK:
+                if getattr(self, "_resident", None) is cached:
+                    self._resident = None
+                    _resident_bytes[0] -= cached.nbytes
+
+    def _resident_for(self, model: str, dim: int, scan_max: int) -> Optional["_Resident"]:
+        """The resident copy of this index's vectors, (re)built if the file changed.
+
+        ``PRAGMA data_version`` moves when another connection commits (the boot-time
+        embedder is another process); this connection's own writes drop the copy.
+        None when resident vectors are off, numpy is missing or the budget is spent.
+        """
+        budget = _resident_budget()
+        if _np is None or budget <= 0:
+            return None
+        key = (model, dim, int(self.db.execute("PRAGMA data_version").fetchone()[0]))
+        cached = getattr(self, "_resident", None)
+        if cached is not None and cached.key == key:
+            return cached
+        with _RESIDENT_LOCK:
+            cached = getattr(self, "_resident", None)
+            if cached is not None and cached.key == key:
+                return cached
+            count = int(self.db.execute("SELECT COUNT(*) FROM vecs WHERE model = ? AND dim = ?",
+                                        (model, dim)).fetchone()[0])
+            freed = cached.nbytes if cached is not None else 0
+            if not count or count > scan_max or _resident_bytes[0] - freed + count * (dim * 2 + 8) > budget:
+                return None
+            ids = _np.empty(count, dtype=_np.int64)
+            matrix = _np.empty((count, dim), dtype=_np.float16)
+            cursor = self.db.execute("SELECT doc_id, vec FROM vecs WHERE model = ? AND dim = ?", (model, dim))
+            filled = 0
+            while filled < count:
+                chunk = cursor.fetchmany(_SCAN_CHUNK)[: count - filled]
+                if not chunk:
+                    break
+                n = len(chunk)
+                ids[filled:filled + n] = [r[0] for r in chunk]
+                matrix[filled:filled + n] = _np.frombuffer(b"".join(r[1] for r in chunk),
+                                                           dtype="<f4").reshape(n, dim)
+                filled += n
+            resident = _Resident(key, ids[:filled], matrix[:filled])
+            self._resident = resident
+            _resident_bytes[0] += resident.nbytes - freed
+            return resident
+
+    def _allowed_ids(self, filters: Dict[str, Any]) -> Any:
+        where, params = self._where(filters)
+        if not where:
+            return None
+        rows = self.db.execute("SELECT d.id FROM docs d WHERE 1 = 1" + where, params).fetchall()
+        return _np.fromiter((r[0] for r in rows), dtype=_np.int64, count=len(rows))
+
     def _semantic(self, query: str, filters: Dict[str, Any], k: int, scan_max: int) -> List[int]:
         qvec = _query_vector(query)
         if qvec is None:
             return []
+        resident = self._resident_for(embeddings_model(), len(qvec), scan_max)
+        if resident is not None:
+            return resident.top(qvec, k, self._allowed_ids(filters))
         where, params = self._where(filters)
         cursor = self.db.execute(
             "SELECT v.doc_id AS id, v.dim, v.vec FROM vecs v JOIN docs d ON d.id = v.doc_id "
