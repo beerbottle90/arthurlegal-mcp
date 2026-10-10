@@ -182,7 +182,10 @@ def _t_search_indexed(args: Dict[str, Any]) -> Any:
                 dropped_repealed += 1
             continue
         kept.append(result)
-    if not in_force_only:
+    # A date range asks about the law of a period, not of today: no lift then
+    # (the second 2026-10-10 set, weighted to 2015-2021, lost a repealed target to it).
+    historical = bool(filters.get("date_from") or filters.get("date_to"))
+    if not in_force_only and not historical:
         order = sorted(enumerate(kept), key=lambda p: (
             -p[1]["score"] * (IN_FORCE_LIFT if p[1]["in_force"] is True else 1.0), p[0]))
         kept = [r for _, r in order]

@@ -49,8 +49,19 @@ CITATIONS. Copy the `citation` field verbatim. Never construct a BOE id or an
 official number yourself.
 
 SEARCH SCOPE. The index holds titles, official numbers, issuing departments and
-dates — not article text. A phrase inside article 348 bis will not be found by
-searching for it; find the act, then read its text."""
+dates, and (when built with crawl.py --backfill-text) the first 8,000 characters
+of each act's text in force: the preamble and the opening articles. Not the rest
+of the text: a phrase inside article 348 bis will not be found by searching for
+it; find the act, then read its text. `index_scope` in each response says which."""
+
+
+def _scope() -> str:
+    """What the index holds, as the crawl recorded it."""
+    corpus = _index.get_state("corpus") or ""
+    if "first" in corpus:
+        return ("act metadata (title, number, department, dates) and the first 8,000 "
+                "characters of each act's text in force, not the rest of the text")
+    return "act metadata (title, number, department, dates), not article text"
 
 
 def _t_search(args: Dict[str, Any]) -> Any:
@@ -75,8 +86,7 @@ def _t_search(args: Dict[str, Any]) -> Any:
         filters=filters,
     )
     result["scope_note"] = (
-        "Searches act metadata (title, number, department, dates), not article "
-        "text. Use get_act_text once you have identified the act."
+        "Searches %s. Use get_act_text once you have identified the act." % _scope()
     )
     return result
 
@@ -121,12 +131,13 @@ def _t_status(args: Dict[str, Any]) -> Any:
         "source": "BOE datos abiertos (www.boe.es) — public, no auth",
         "indexed_documents": _index.count(),
         "last_crawl": _index.get_state("last_crawl") or "never — run crawl.py",
-        "index_scope": "consolidated-legislation metadata (not article text)",
+        "index_scope": "consolidated legislation: " + _scope(),
         **embeddings_status(),
     }
 
 
-_ID = {"type": "string", "description": "BOE identifier, e.g. BOE-A-2010-10544"}
+_ID = {"type": "string", "description": "BOE identifier, e.g. BOE-A-2010-10544 (an act from a regional "
+                                        "gazette keeps its own, e.g. DOGC-f-1997-90001)"}
 
 TOOLS = [
     Tool(

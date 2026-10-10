@@ -14,6 +14,12 @@ primary_region = "ams"
   # e-qanun.az does not answer from Amsterdam (10 s timeouts, 2026-10-09); the az_ tools
   # tunnel through az-relay in Frankfurt over the private network (az-relay/README.md).
   EQANUN_PROXY = "http://arthurlegal-az-relay.internal:8080"
+  # Vectors kept in memory as float16 (retrieval.py), ~141 MB for all six indexes.
+  # At 512 MB they starved the page cache of the SQLite files: Turkish and Polish
+  # searches went from ~1.2 s to 7-8 s, keyword searches included. At 1 GB (below)
+  # meaning searches got faster instead, hybrid median NL 1,054 -> 522 ms, PL
+  # 1,283 -> 725, TR 1,198 -> 877, with ~530 MB left free (2026-10-10).
+  SEMANTIC_RESIDENT_MB = "160"
 
 [http_service]
   internal_port = 8080
@@ -33,7 +39,7 @@ primary_region = "ams"
 
 [[vm]]
   size = "shared-cpu-1x"
-  # Measured: 18 MB resident after five searches across five jurisdictions.
-  # The Turkish index adds ~10k documents whose vectors are scanned per
-  # semantic query; 512mb leaves that comfortable.
-  memory = "512mb"
+  # The process holds ~80 MB; the rest is the page cache for ~2 GB of SQLite
+  # files, which the Turkish and Polish searches lean on: at 512 MB, 141 MB of
+  # resident vectors starved it and those searches took 7-8 s (2026-10-10).
+  memory = "1gb"
