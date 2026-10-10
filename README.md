@@ -94,6 +94,8 @@ search is live. A backend that fails to load is announced there rather than
 quietly returning nothing -- "no results" and "not searched" are different
 answers. The German backend runs as a separate process, so `status` also probes
 it live (`de_live`); Azerbaijan's probe reports whether e-qanun.az answers now.
+On the hosted endpoint it also names the image that answered (`build`) and the
+memory in use (`memory`).
 
 ## Germany (`de_`)
 
@@ -126,6 +128,18 @@ the databases in means a machine is never healthy-but-empty, and the corpus can
 never drift away from the code that was tested against it. `start.sh` still
 falls back to crawling when no baked index is present, and says which it used:
 `indexes present: N/5`.
+
+`hybrid`, the default search mode, ranks keyword and meaning matches together,
+but not blindly. When the keyword channel found every word of the query, both
+count; when it matched only some of the words -- the usual case for a question
+asked in plain words -- the ranking is by meaning and the keyword matches only
+fill a short list. A query that is a document's identifier (an ECLI, a BOE id)
+lists that document first. Each response says which happened
+(`retrieval.keyword_match`, `retrieval.ranking`, `retrieval.exact_ref`). The rule
+comes from a 120-query known-item measurement over the six local indexes
+(2026-10-09). `mode: "lexical"` and `mode: "semantic"` still give either channel
+alone. With numpy installed (the image has it) the semantic scan is about six
+times faster; without it the ranking is the same.
 
 ## Configuration
 
