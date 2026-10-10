@@ -154,6 +154,12 @@ class InForceOrderTests(unittest.TestCase):
         self.assertIs({r["ref"]: r["in_force"] for r in out["results"]}["WDU20180002367"], False)
         self.assertIn("in_force_order", out)
 
+    def test_a_date_range_turns_the_lift_off(self):
+        out = self.server._t_search_indexed({"query": "zasady działania szpitali", "limit": 3,
+                                             "date_to": "2030-12-31"})
+        self.assertEqual(out["results"][0]["ref"], "WDU20180002367")
+        self.assertNotIn("in_force_order", out)
+
     def test_a_repealed_act_named_by_its_title_still_leads(self):
         out = self.server._t_search_indexed({"query": "funkcjonowania podmiotów leczniczych 15 grudnia 2018",
                                              "limit": 3})
