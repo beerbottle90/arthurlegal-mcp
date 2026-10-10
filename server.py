@@ -48,7 +48,7 @@ from typing import Any, Callable, Dict, List, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcpcore import McpError, Tool, run  # noqa: E402
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Deployed bundle: every backend sits next to this file.
