@@ -606,6 +606,73 @@ def test_kvkk_numarayla_istenen_karar_indeksteki_adrese_gider():
         server.index = eski
 
 
+
+def test_iso_tarih_tek_haneli_gun_ve_ayi_tanir():
+    """Rekabet listesi '28.6.2005' yazar; iki hane bekleyen çözümleyici 8.529 kararı tarihsiz bıraktı."""
+    assert textx.iso_tarih("4.8.1999") == "1999-08-04"
+    assert textx.iso_tarih("Rekabet Kurulu, 28.6.2005 tarih ve 05-41/578-146 sayılı karar") == "2005-06-28"
+    assert textx.iso_tarih("13/01/2012 tarih ve K- 2011/ 52 sayılı Hakem Heyeti Kararı") == "2012-01-13"
+    assert textx.iso_tarih("16.10.2025") == "2025-10-16"
+    assert textx.iso_tarih("31.13.2020") == "" and textx.iso_tarih("") == "" and textx.iso_tarih("K-2011/268") == ""
+
+
+def test_bddk_basligi_kapanistan_once_bosluk_olsa_da_cozulur():
+    hm = bddk._HEAD.match("(13.12.2018 - 8149 ) Odea Bank A.Ş.’ye izin")
+    assert hm and hm.groups() == ("13.12.2018", "8149", "Odea Bank A.Ş.’ye izin")
+    assert bddk._HEAD.match("(26/07/2007 - 2248) Merrill Lynch").group(1) == "26/07/2007"
+
+
+def test_rekabet_karar_tarihi_karar_sayisinin_yiliyla_denetlenir():
+    # Liste yanlış yazmış (2029); kararın kendi tarihi karar sayısının yılıyla uyuşuyor.
+    assert rekabet.karar_tarihi("17.8.2029", "23-39/726-249",
+                                "Karar Sayısı : 23-39/726-249 Karar Tarihi : 17.08.2023") == \
+        ("2023-08-17", "17.08.2023", "karar metni")
+    # Karar metninde yazım hatası; liste karar sayısının yılıyla uyuşuyor.
+    assert rekabet.karar_tarihi("18.4.2024", "24-17/400-160", "Karar Tarihi : 18.04.2023") == \
+        ("2024-04-18", "18.4.2024", "liste")
+    assert rekabet.karar_tarihi("4.8.1999", "99-37/376-241", "") == ("1999-08-04", "4.8.1999", "liste")
+
+
+def test_tarih_onar_bos_tarihi_doldurur_atifi_duzeltir_vektore_dokunmaz():
+    import crawl
+    idx = retrieval.Index(os.path.join(tempfile.mkdtemp(), "t.db"))
+    idx.upsert({"ref": "rekabet:a", "subject": "rekabet", "title": "Devralma", "body": "Karar Tarihi : 28.06.2005 metin",
+                "citation": "Rekabet Kurulu, 28.6.2005 tarih ve 05-41/578-146 sayılı karar",
+                "meta": {"decision_number": "05-41/578-146"}})
+    idx.upsert({"ref": "rekabet:b", "subject": "rekabet", "title": "Devralma", "date": "2029-08-17",
+                "body": "Karar Sayısı : 23-39/726-249 Karar Tarihi : 17.08.2023 metin",
+                "citation": "Rekabet Kurulu, 17.8.2029 tarih ve 23-39/726-249 sayılı karar",
+                "meta": {"decision_number": "23-39/726-249"}})
+    idx.upsert({"ref": "bddk:393", "subject": "bddk", "title": "(13.12.2018 - 8149 ) Odea Bank", "body": "b",
+                "citation": "BDDK, ? tarih ve ? sayılı Kurul Kararı"})
+    idx.upsert({"ref": "stk:9:x", "subject": "sigorta_tahkim", "title": "t", "body": "b",
+                "citation": "Sigorta Tahkim Komisyonu, 13/01/2012 tarih ve K- 2011/ 52 sayılı Hakem Heyeti Kararı"})
+    idx.upsert({"ref": "kvkk:7538", "subject": "kvkk", "title": "t", "body": "b",
+                "citation": "KVK Kurulu, ? tarih ve 2023/134 sayılı karar özeti"})
+    for (i,) in idx.db.execute("SELECT id FROM docs").fetchall():
+        idx.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?, ?, ?, ?)", (i, 2, b"\x00" * 8, "m"))
+    idx.reindex_fts()
+
+    ozet = crawl._tarih_onar(idx, [], lambda m: None)
+    r = {x["ref"]: x for x in idx.db.execute("SELECT ref, date, citation, meta FROM docs")}
+    assert r["rekabet:a"]["date"] == "2005-06-28"
+    assert r["rekabet:a"]["citation"] == "Rekabet Kurulu, 28.6.2005 tarih ve 05-41/578-146 sayılı karar"
+    assert r["rekabet:b"]["date"] == "2023-08-17"
+    assert r["rekabet:b"]["citation"] == "Rekabet Kurulu, 17.08.2023 tarih ve 23-39/726-249 sayılı karar"
+    assert json.loads(r["rekabet:b"]["meta"])["liste_tarihi"] == "17.8.2029"
+    assert r["bddk:393"]["date"] == "2018-12-13"
+    assert r["bddk:393"]["citation"] == "BDDK, 13.12.2018 tarih ve 8149 sayılı Kurul Kararı"
+    assert r["stk:9:x"]["date"] == "2012-01-13" and r["kvkk:7538"]["date"] == ""
+    assert ozet["rekabet"] == {"tarih_yazildi": 2, "atif_duzeltildi": 1, "tarihsiz_kalan": 0}
+    assert ozet["kvkk"] == {"tarih_yazildi": 0, "atif_duzeltildi": 0, "tarihsiz_kalan": 1}
+    assert idx.db.execute("SELECT count(*) FROM vecs").fetchone()[0] == 5, "tarih onarımı vektör silmemeli"
+    idx.db.execute("INSERT INTO docs_fts(docs_fts, rank) VALUES('integrity-check', 1)")
+    bul = lambda q: [x[0] for x in idx.db.execute(  # noqa: E731
+        "SELECT d.ref FROM docs_fts f JOIN docs d ON d.id = f.rowid WHERE docs_fts MATCH ?", (q,))]
+    assert bul('citation:"17 08 2023"') == ["rekabet:b"] and bul("citation:2029") == []
+    assert crawl._tarih_onar(idx, [], lambda m: None)["rekabet"]["atif_duzeltildi"] == 0, "ikinci çalıştırma boş geçmeli"
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

@@ -2,6 +2,16 @@
 
 ## Yayımlanmamış
 
+- Tarihler: kurum çözümleyicileri yalnız iki haneli gün ve ayı tanıyordu; "28.6.2005" boş kalıyordu. 11.10.2026'da
+  tarihi boş olan: Rekabet'te 10.445 kararın 8.529'u, Sigorta Tahkim'de 77, BDDK'da 17 karar. Tarih süzgeci onları
+  görmüyordu: `date_from` verilince düşüyor, yalnız `date_to` verilince yılına bakılmadan giriyordu. Ortak
+  `textx.iso_tarih` tek haneyi ve eğik çizgiyi tanır; BDDK başlığında numaradan sonra boşluk ve eğik çizgili tarih
+  de çözülür. Rekabet'in liste sayfası 41 kararda kararın kendi "Karar Tarihi" satırından farklı tarih yazıyor
+  (biri 17.8.2029; karar 17.08.2023). `rekabet.karar_tarihi` karar sayısının yılıyla (23-39/… → 2023) denetler.
+  37 atıf karar metnindeki tarihle yeniden yazıldı, liste tarihi `meta.liste_tarihi`'nde. `crawl.py --tarih-onar`
+  mevcut indeksi vektörlere dokunmadan onarır. Ölçüm (107 kararlık örnek, başlıkla arama, yıl aralığı süzgeci):
+  süzgeçle bulunan %0 → %100, üst sınırın dışındayken yanlışlıkla gelen %100 → %0; iki ölçüm setinin 120 sonuç
+  listesi birebir aynı. Tarihsiz kalan: EPDK 8, KVKK 1 (kaynakta tarih yok). Veri değişikliği: dağıtıma giden dizinde.
 - `retrieval.py`: `SEMANTIC_RESIDENT_MB` ile vektörler bellekte float16 tutulur (bütün indeksler için ortak bütçe;
   yoksa eskisi gibi SQLite'tan okunur). Sorgu başına 4 KB'lık vektör okumak taramanın çoğuydu. v21 indekslerinde,
   iki ölçüm setinin 480 sonuç listesinin 474'ü birebir aynı (kalan 6'sında ilk 3 aynı, fark puanı eşit alt sıralarda).

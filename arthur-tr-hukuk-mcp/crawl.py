@@ -9,6 +9,7 @@
     python crawl.py --only-new --source rekabet --pages 40   # tazeleme: yalnız yeni ref'ler
     python crawl.py --backfill-text --source bddk,btk        # gövdesi başlıktan ibaret belgelere tam metin
     python crawl.py --pack                  # dağıtım öncesi: gövde sonda, FTS yeniden + optimize, VACUUM
+    python crawl.py --tarih-onar            # boş tarihleri atıftan, Rekabet'te karar metninden tamamlar
 
 ``--only-new`` is the refresh mode. ``upsert`` REPLACES a document's body and
 DROPS its vector, so re-crawling a source that was first crawled with
@@ -32,7 +33,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
+import re
 import sys
 import time
 from typing import Any, Dict, List
@@ -148,6 +151,70 @@ def _backfill(idx: "retrieval.Index", keys: List[str], limit: int, log) -> Dict[
 _PACK_ONCE = ("id", "subject", "date", "court", "lang", "status")
 
 
+_TARIH_METNI = re.compile(r"\d{1,2}\s*[./]\s*\d{1,2}\s*[./]\s*\d{4}")
+
+
+def _tarih_onar(idx: "retrieval.Index", keys: List[str], log) -> Dict[str, Any]:
+    """Boş tarih alanlarını atıftan, Rekabet'te kararın kendi metninden tamamlar.
+
+    Neden var: kurum çözümleyicileri yalnız iki haneli gün ve ayı tanıyordu; "28.6.2005"
+    boş kalıyordu. 11.10.2026'da tarihi boş olan: Rekabet'te 10.445 kararın 8.529'u,
+    Sigorta Tahkim'de 77, BDDK'da 17 karar. Tarih süzgeci onları görmüyordu: ``date_from``
+    verilince düşüyor, yalnız ``date_to`` verilince yılına bakılmadan giriyordu. Rekabet'in
+    liste tarihi 41 kararda kararın kendi "Karar Tarihi" satırından farklı; orada
+    ``rekabet.karar_tarihi`` seçer ve atıf da o tarihle yeniden yazılır.
+
+    Vektörlere dokunmaz (tarih vektöre girmez). Atıfı değişen satır ``docs_fts``'te de
+    güncellenir, çünkü atıf orada aranır. Yeniden çalıştırılabilir.
+    """
+    from sources import bddk, rekabet
+    from textx import iso_tarih
+    keys = keys or [r[0] for r in idx.db.execute("SELECT DISTINCT subject FROM docs ORDER BY subject")]
+    ozet: Dict[str, Any] = {}
+    for key in keys:
+        hepsi = key == "rekabet"            # Rekabet'te dolu tarih de karar metniyle denetlenir
+        rows = idx.db.execute(
+            "SELECT id, title, substr(body, 1, 5000) AS bas, date, citation, meta FROM docs WHERE subject = ?"
+            + ("" if hepsi else " AND date = ''"), (key,)).fetchall()
+        tarih_n = atif_n = 0
+        for r in rows:
+            meta = json.loads(r["meta"] or "{}")
+            atif = r["citation"] or ""
+            if key == "rekabet":
+                liste = _TARIH_METNI.search(atif)
+                liste = liste.group(0) if liste else ""
+                no = meta.get("decision_number") or ""
+                tarih, gorunen, kaynak = rekabet.karar_tarihi(liste, no, r["bas"] or "")
+                if kaynak == "karar metni" and tarih != iso_tarih(liste):
+                    atif = "Rekabet Kurulu, %s tarih ve %s sayılı karar" % (gorunen, no)
+                    meta.setdefault("liste_tarihi", liste)
+            elif key == "bddk" and bddk._HEAD.match(r["title"] or ""):
+                hm = bddk._HEAD.match(r["title"])
+                tarih = iso_tarih(hm.group(1))
+                if "?" in atif:
+                    atif = "BDDK, %s tarih ve %s sayılı Kurul Kararı" % (hm.group(1), hm.group(2))
+                    meta.setdefault("decision_no", hm.group(2))
+            else:
+                tarih = iso_tarih(atif)
+            if tarih and tarih != r["date"]:
+                idx.db.execute("UPDATE docs SET date = ? WHERE id = ?", (tarih, r["id"]))
+                tarih_n += 1
+            if atif != (r["citation"] or ""):
+                eski = idx.db.execute("SELECT title, body, citation FROM docs WHERE id = ?", (r["id"],)).fetchone()
+                idx.db.execute("INSERT INTO docs_fts(docs_fts, rowid, title, body, citation) "
+                               "VALUES('delete', ?, ?, ?, ?)", (r["id"], eski[0], eski[1], eski[2]))
+                idx.db.execute("UPDATE docs SET citation = ?, meta = ? WHERE id = ?",
+                               (atif, json.dumps(meta, ensure_ascii=False), r["id"]))
+                idx.db.execute("INSERT INTO docs_fts(rowid, title, body, citation) VALUES(?, ?, ?, ?)",
+                               (r["id"], eski[0], eski[1], atif))
+                atif_n += 1
+        idx.db.commit()
+        kalan = idx.db.execute("SELECT count(*) FROM docs WHERE subject = ? AND date = ''", (key,)).fetchone()[0]
+        ozet[key] = {"tarih_yazildi": tarih_n, "atif_duzeltildi": atif_n, "tarihsiz_kalan": kalan}
+        log("%s: %s" % (key, ozet[key]))
+    return ozet
+
+
 def _parmak_izi(db, cols: List[str]) -> tuple:
     h = hashlib.sha256()
     n = 0
@@ -249,6 +316,9 @@ def main(argv=None) -> int:
     ap.add_argument("--pack", action="store_true",
                     help="no crawl: pack the index for shipping (body column last, FTS rebuilt + optimized, "
                          "VACUUM); content, ids and vectors unchanged")
+    ap.add_argument("--tarih-onar", action="store_true",
+                    help="no crawl: fill empty dates from the citation (Rekabet: checked against the decision's "
+                         "own date line); vectors unchanged; --source limits the kurum")
     ap.add_argument("--limit", type=int, default=0, help="max documents per source (0 = no limit)")
     ap.add_argument("--pages", type=int, default=0, help="max listing pages per source where paged")
     ap.add_argument("--years", default="", help="spk: bülten years, e.g. 2024,2025,2026")
@@ -263,6 +333,9 @@ def main(argv=None) -> int:
 
     if args.pack:
         _pack(idx, log)
+        return 0
+    if args.tarih_onar:
+        _tarih_onar(idx, [k.strip() for k in args.source.split(",") if k.strip()], log)
         return 0
     if args.backfill_text:
         keys = [k.strip() for k in args.source.split(",") if k.strip()] or ["bddk", "btk"]

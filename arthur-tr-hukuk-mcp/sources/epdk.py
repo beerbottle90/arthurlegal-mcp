@@ -25,7 +25,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from net import Http, HttpError
-from textx import html_to_text, paginate, pdf_to_text, strip_tags, count_hits
+from textx import html_to_text, iso_tarih, paginate, pdf_to_text, strip_tags, count_hits
 from sources import Source
 
 BASE = "https://www.epdk.gov.tr"
@@ -223,8 +223,7 @@ def crawl(index, markets: Optional[List[str]] = None, fetch_text: bool = False, 
 
 
 def _iso(d: str) -> str:
-    m = re.match(r"(\d{2})[./](\d{2})[./](\d{4})", d or "")
-    return "%s-%s-%s" % (m.group(3), m.group(2), m.group(1)) if m else ""
+    return iso_tarih(d)
 
 
 SEARCH_SCHEMA = {"type": "object", "properties": {

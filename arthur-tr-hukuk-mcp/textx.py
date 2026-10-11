@@ -23,7 +23,7 @@ except Exception:  # noqa: BLE001
     HAS_PYPDF = False
 
 __all__ = ["html_to_text", "pdf_to_text", "tr_lower", "tr_upper", "tr_fold", "fold_same_len",
-           "paginate", "clean_ws", "strip_tags", "HAS_PYPDF", "excerpt", "count_hits"]
+           "paginate", "clean_ws", "strip_tags", "HAS_PYPDF", "excerpt", "count_hits", "iso_tarih"]
 
 _TR_LOWER = str.maketrans("İIÇĞÖŞÜÂÎÛ", "iıçğöşüâîû")
 _TR_UPPER = str.maketrans("iıçğöşüâîû", "İIÇĞÖŞÜÂÎÛ")
@@ -123,6 +123,25 @@ def html_to_text(html: str, keep_headings: bool = True) -> str:
     lines = [re.sub(r"[ \t\xa0]+", " ", ln).strip(" |") for ln in text.split("\n")]
     text = "\n".join(lines)
     return clean_ws(text)
+
+
+_TARIH = re.compile(r"(\d{1,2})\s*[./]\s*(\d{1,2})\s*[./]\s*(\d{4})")
+
+
+def iso_tarih(text: str) -> str:
+    """Metindeki ilk 'G.A.YYYY' ya da 'GG/AA/YYYY' tarihini ISO'ya çevirir; yoksa ''.
+
+    Gün ve ay tek haneli olabilir: Rekabet'in listesi "4.8.1999" yazar. Kurum
+    çözümleyicileri yalnız iki haneyi tanıyordu ve tarih alanı boş kalıyordu
+    (11.10.2026: Rekabet'te 10.445 kararın 8.529'u); tarih süzgeci o kararları görmüyordu.
+    """
+    m = _TARIH.search(text or "")
+    if not m:
+        return ""
+    gun, ay = int(m.group(1)), int(m.group(2))
+    if not (1 <= gun <= 31 and 1 <= ay <= 12):
+        return ""
+    return "%s-%02d-%02d" % (m.group(3), ay, gun)
 
 
 def pdf_to_text(data: bytes, max_pages: int = 0) -> Tuple[str, int]:
