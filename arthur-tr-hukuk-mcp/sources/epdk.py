@@ -171,6 +171,9 @@ def get(args: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+_KASE = 200     # bundan kısa PDF metni belge değil, sayfadaki kaşe ya da başlıktır
+
+
 def metin_cikar(body: bytes, ctype: str = "", ocr: bool = False) -> Tuple[str, int, str]:
     """Belge baytları → (metin, sayfa, biçim). Biçim: pdf, ocr, docx, doc, html ya da ''.
 
@@ -181,11 +184,14 @@ def metin_cikar(body: bytes, ctype: str = "", ocr: bool = False) -> Tuple[str, i
     """
     if "pdf" in ctype or body.startswith(b"%PDF"):
         text, pages = pdf_to_text(body)
-        if not text and ocr:
+        # Taranmış belgede metin katmanı ya hiç yok ya yalnız kaşe ya da Resmî Gazete başlığı (6 kararda
+        # 33-199 karakter); OCR istenince ikisi de okutulur.
+        if len(text) < _KASE and ocr:
             import ocr as _ocr
             if _ocr.hazir():
-                text, pages = _ocr.pdf_ocr(body)
-                return text, pages, "ocr" if text else ""
+                okunan, pages = _ocr.pdf_ocr(body)
+                if len(okunan) > len(text):
+                    return okunan, pages, "ocr"
         return text, pages, "pdf" if text else ""
     if body[:2] == b"PK":
         import io

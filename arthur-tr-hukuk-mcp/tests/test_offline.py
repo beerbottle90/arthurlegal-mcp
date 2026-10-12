@@ -749,7 +749,7 @@ def test_epdk_canli_metin_cikmazsa_indeksteki_okunmus_metin_gelir():
     idx = retrieval.Index(os.path.join(tempfile.mkdtemp(), "t.db"))
     url = "https://www.epdk.gov.tr/Detay/DownloadDocument?id=Ye3t/BDj37WU="
     idx.upsert({"ref": "epdk:elektrik:33883:Ye3t/BDj37WU=", "subject": "epdk", "title": "t", "url": url,
-                "body": "KARAR ÖRNEĞİ okunmuş metin", "citation": "EPDK, 24.05.2012 tarihli ve 3851 sayılı Kurul Kararı",
+                "body": "KARAR ÖRNEĞİ okunmuş metin " * 10, "citation": "EPDK, 24.05.2012 tarihli ve 3851 sayılı Kurul Kararı",
                 "meta": {"metin": "ocr"}})
     idx.upsert({"ref": "epdk:elektrik:1:z", "subject": "epdk", "title": "t", "body": "kocan",
                 "url": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=z", "meta": {}})
@@ -762,6 +762,8 @@ def test_epdk_canli_metin_cikmazsa_indeksteki_okunmus_metin_gelir():
         assert out["text"].startswith("KARAR ÖRNEĞİ") and "OCR" in out["uyari"] and url in out["uyari"]
         assert out["citation"].startswith("EPDK, 24.05.2012") and out["metin_kaynagi"] == "yerel indeks (ocr)"
         assert server._epdk_arsivden({"id": "epdk:elektrik:33883:Ye3t/BDj37WU="}, canli)["text"]
+        kase = {"text": "KURUL KARARI  EPDK  Hepsi Film  7", "source_url": url}   # yalnız kaşe okunmuş
+        assert server._epdk_arsivden({"id": url}, kase)["text"].startswith("KARAR ÖRNEĞİ")
         assert server._epdk_arsivden({"id": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=z"}, canli) is canli
         assert server._epdk_arsivden({"id": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=yok"}, canli) is canli
     finally:

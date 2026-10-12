@@ -113,13 +113,16 @@ def t_kurum_getir(args: Dict[str, Any]) -> Any:
     if src.key == "kvkk":
         args = _kvkk_adresi(args)
     out = src.get(args)
-    if src.key == "epdk" and isinstance(out, dict) and out.get("error") and not out.get("text"):
+    if src.key == "epdk" and isinstance(out, dict) and len((out.get("text") or "").strip()) < 200:
         out = _epdk_arsivden(args, out)
     return out
 
 
 def _epdk_arsivden(args: Dict[str, Any], canli: Dict[str, Any]) -> Dict[str, Any]:
     """Canlı belgeden metin çıkmadıysa (taranmış PDF, eski Word) metni yerel indeksten verir.
+
+    Taranmış altı kararda canlı PDF yalnız kaşeyi ya da Resmî Gazete başlığını verir (200 karakterden
+    kısa); indeksteki okunmuş metin daha uzunsa o gelir.
 
     Bu kararların metni tarama makinesinde okundu: .doc'lar Word dosyasından, taranmış PDF'ler
     OCR ile. OCR metni rakam ve özel isimde okuma hatası taşıyabilir; cevap bunu söyler.
@@ -137,7 +140,7 @@ def _epdk_arsivden(args: Dict[str, Any], canli: Dict[str, Any]) -> Dict[str, Any
     except Exception:  # noqa: BLE001 - indeks yoksa canlı hata kalır
         doc = None
     meta = json.loads(doc["meta"] or "{}") if doc else {}
-    if not doc or not meta.get("metin"):
+    if not doc or not meta.get("metin") or len(doc["body"] or "") <= len(canli.get("text") or ""):
         return canli
     from textx import paginate
     out = paginate(doc["body"], args.get("page") or 1, int(args.get("page_chars") or 8000))
