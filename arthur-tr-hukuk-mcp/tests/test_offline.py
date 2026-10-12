@@ -15,7 +15,7 @@ sys.path.insert(0, ROOT)
 import retrieval  # noqa: E402
 import textx  # noqa: E402
 from net import decode  # noqa: E402
-from sources import bedesten_ictihat, bddk, kvkk, rekabet, resmi_gazete, sigorta_tahkim, spk  # noqa: E402
+from sources import bedesten_ictihat, bddk, epdk, kvkk, rekabet, resmi_gazete, sigorta_tahkim, spk  # noqa: E402
 
 
 def test_turkish_folding():
@@ -671,6 +671,113 @@ def test_tarih_onar_bos_tarihi_doldurur_atifi_duzeltir_vektore_dokunmaz():
         "SELECT d.ref FROM docs_fts f JOIN docs d ON d.id = f.rowid WHERE docs_fts MATCH ?", (q,))]
     assert bul('citation:"17 08 2023"') == ["rekabet:b"] and bul("citation:2029") == []
     assert crawl._tarih_onar(idx, [], lambda m: None)["rekabet"]["atif_duzeltildi"] == 0, "ikinci çalıştırma boş geçmeli"
+
+
+
+def test_word_alanlari_yalniz_sonucu_birakir():
+    assert textx._doc_fields("Sayfa \x13 PAGE MERGEFORMAT\x143\x15 son") == "Sayfa 3 son"
+    assert textx._doc_fields("a\x13 IF \x13 REF x \x14y\x15 \x14sonuç\x15b") == "asonuçb"
+
+
+def test_doc_eski_word_dosyasindan_okunur():
+    """EPDK'nın 2016 öncesi kararlarının çoğu .doc; 2.019 kararın gövdesi başlıktan ibaretti."""
+    if not textx.HAS_OLEFILE:
+        print("     (olefile yok: .doc testi atlandı)")
+        return
+    data = open(os.path.join(HERE, "fixtures", "epdk_4032.doc"), "rb").read()
+    t = textx.doc_to_text(data)
+    assert t.startswith("Enerji Piyasası Düzenleme Kurumundan:")
+    assert "Karar No: 4032 Karar Tarihi: 20/09/2012" in t and "TEİAŞ" in t and "karar verilmiştir." in t
+    assert epdk.metin_cikar(data)[2] == "doc"
+    assert textx.doc_to_text(b"%PDF-1.4") == "" and textx.doc_to_text(textx.OLE_MAGIC + b"\x00" * 600) == ""
+
+
+def test_epdk_metin_bicimi_dosyanin_kendisinden_anlasilir():
+    import zipfile, io as _io
+    buf = _io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", "<w:document><w:p>Kurul karar verdi.</w:p></w:document>")
+    assert epdk.metin_cikar(buf.getvalue()) == ("Kurul karar verdi.", 0, "docx")
+    arsiv = _io.BytesIO()
+    with zipfile.ZipFile(arsiv, "w") as z:                 # karar ve ekleri tek arşivde
+        z.writestr("1- karar.docx", buf.getvalue())
+        z.writestr("tablo.xlsx", b"PK")
+    assert epdk.metin_cikar(arsiv.getvalue()) == ("Kurul karar verdi.", 0, "zip")
+    assert epdk.metin_cikar(b"<html><body><p>Karar</p></body></html>")[2] == "html"
+    portal = b"\r\n<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<title>EPDK | Enerji Piyasas\xc4\xb1</title><body>Men\xc3\xbc</body>"
+    assert epdk.metin_cikar(portal) == ("", 0, ""), "portal sayfasının menüsü karar metni sayılmaz"
+    assert epdk.metin_cikar(b"{\rtf1 bilinmeyen") == ("", 0, "")
+    # Metni olmayan PDF: OCR istenmedikçe boş; istenip araçlar yoksa da çökmeden boş.
+    bos = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\n" \
+          b"trailer<</Root 1 0 R>>\n%%EOF"
+    assert epdk.metin_cikar(bos)[0] == ""
+
+
+def test_backfill_epdk_metni_liste_kaydinin_onune_ekler():
+    import crawl
+    import sources as _sources
+    idx = retrieval.Index(os.path.join(tempfile.mkdtemp(), "t.db"))
+    meta = {"path": "Elektrik Piyasası Piyasa Kurul Kararları › EDAŞ", "category": "Gelir Gereksinimi"}
+    kocan = "Akedaş'ın gelir gereksinimi\nElektrik Piyasası Piyasa Kurul Kararları › EDAŞ › Gelir Gereksinimi"
+    idx.upsert({"ref": "epdk:elektrik:1:a", "subject": "epdk", "title": "EPDK Kurul Kararı 4632/10", "body": kocan,
+                "url": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=a", "meta": meta})
+    idx.upsert({"ref": "epdk:elektrik:1:b", "subject": "epdk", "title": "EPDK Kurul Kararı 13134",
+                "body": "Karar metni burada.\n\n" + kocan, "meta": meta})
+    ids = {r["ref"]: r["id"] for r in idx.db.execute("SELECT id, ref FROM docs")}
+    for i in ids.values():
+        idx.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?, ?, ?, ?)", (i, 2, b"\x00" * 8, "m"))
+    idx.db.commit()
+    istenen = []
+
+    def getir(src, istek):
+        istenen.append(dict(istek))
+        return {"text": "TOPLANTI TARİHİ : 26/09/2013 " + "Kurul gelir gereksinimini revize etti. " * 8,
+                "metin_bicimi": "ocr"}
+
+    ozet = crawl._backfill(idx, ["epdk"], 0, lambda m: None, ocr=True, getir=getir)
+    assert ozet["epdk"] == {"aday": 1, "metin_eklendi": 1, "metin_yok": 0}
+    assert istenen == [{"id": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=a", "page_chars": 200000, "ocr": True}]
+    r = idx.db.execute("SELECT body, meta FROM docs WHERE ref = 'epdk:elektrik:1:a'").fetchone()
+    assert r["body"].startswith("TOPLANTI TARİHİ") and r["body"].endswith(kocan)
+    assert json.loads(r["meta"])["metin"] == "ocr" and json.loads(r["meta"])["category"] == "Gelir Gereksinimi"
+    vek = {x[0] for x in idx.db.execute("SELECT doc_id FROM vecs")}
+    assert ids["epdk:elektrik:1:a"] not in vek and ids["epdk:elektrik:1:b"] in vek
+
+
+def test_epdk_canli_metin_cikmazsa_indeksteki_okunmus_metin_gelir():
+    import server
+    idx = retrieval.Index(os.path.join(tempfile.mkdtemp(), "t.db"))
+    url = "https://www.epdk.gov.tr/Detay/DownloadDocument?id=Ye3t/BDj37WU="
+    idx.upsert({"ref": "epdk:elektrik:33883:Ye3t/BDj37WU=", "subject": "epdk", "title": "t", "url": url,
+                "body": "KARAR ÖRNEĞİ okunmuş metin", "citation": "EPDK, 24.05.2012 tarihli ve 3851 sayılı Kurul Kararı",
+                "meta": {"metin": "ocr"}})
+    idx.upsert({"ref": "epdk:elektrik:1:z", "subject": "epdk", "title": "t", "body": "kocan",
+                "url": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=z", "meta": {}})
+    idx.db.commit()
+    canli = {"error": "Belge metni çıkarılamadı", "source_url": url, "text": ""}
+    eski = server.index
+    server.index = lambda: idx
+    try:
+        out = server._epdk_arsivden({"id": url}, canli)
+        assert out["text"].startswith("KARAR ÖRNEĞİ") and "OCR" in out["uyari"] and url in out["uyari"]
+        assert out["citation"].startswith("EPDK, 24.05.2012") and out["metin_kaynagi"] == "yerel indeks (ocr)"
+        assert server._epdk_arsivden({"id": "epdk:elektrik:33883:Ye3t/BDj37WU="}, canli)["text"]
+        assert server._epdk_arsivden({"id": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=z"}, canli) is canli
+        assert server._epdk_arsivden({"id": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=yok"}, canli) is canli
+    finally:
+        server.index = eski
+
+
+def test_tarih_onar_epdk_atifinda_tarih_yoksa_karar_satirindan_alir():
+    import crawl
+    idx = retrieval.Index(os.path.join(tempfile.mkdtemp(), "t.db"))
+    idx.upsert({"ref": "epdk:elektrik:1915:x", "subject": "epdk", "title": "EPDK Kurul Kararı 5999-3 ()",
+                "body": "T.C. ENERJİ PİYASASI DÜZENLEME KURULU KARAR ÖRNEĞİ TOPLANTI TARİHİ : 30/12/2015 metin",
+                "citation": "EPDK, ? tarihli ve 5999-3 sayılı Kurul Kararı"})
+    idx.reindex_fts()
+    crawl._tarih_onar(idx, ["epdk"], lambda m: None)
+    r = idx.db.execute("SELECT date, citation FROM docs").fetchone()
+    assert r["date"] == "2015-12-30" and r["citation"] == "EPDK, 30.12.2015 tarihli ve 5999-3 sayılı Kurul Kararı"
 
 
 if __name__ == "__main__":

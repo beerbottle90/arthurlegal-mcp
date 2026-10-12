@@ -8,6 +8,7 @@
     python crawl.py --embed-only            # vectorise whatever lacks a vector
     python crawl.py --only-new --source rekabet --pages 40   # tazeleme: yalnız yeni ref'ler
     python crawl.py --backfill-text --source bddk,btk        # gövdesi başlıktan ibaret belgelere tam metin
+    python crawl.py --backfill-text --source epdk --ocr      # .doc ve taranmış PDF (OCR: ocr.py)
     python crawl.py --pack                  # dağıtım öncesi: gövde sonda, FTS yeniden + optimize, VACUUM
     python crawl.py --tarih-onar            # boş tarihleri atıftan, Rekabet'te karar metninden tamamlar
 
@@ -93,13 +94,26 @@ class _Tagged:
 _BACKFILL_ID = {
     "bddk": lambda r: r["ref"].split(":", 1)[1],
     "btk": lambda r: r["url"],
+    "epdk": lambda r: r["url"],
     "rekabet": lambda r: r["ref"].split(":", 1)[1],
 }
 # Gövde bu kadar karakterden az fazlaysa belge "yalnız başlık" sayılır.
 _BACKFILL_PAY = 200
 
 
-def _backfill(idx: "retrieval.Index", keys: List[str], limit: int, log) -> Dict[str, Any]:
+def _epdk_kocan(r) -> bool:
+    """EPDK'nın listeden gelen gövdesi: "konu\\nyol › kategori"; taramada metin eklenmemiş."""
+    meta = json.loads(r["meta"] or "{}")
+    govde = (r["body"] or "").strip()
+    return "\n\n" not in govde and govde.endswith("%s › %s" % (meta.get("path", ""), meta.get("category", "")))
+
+
+# Gövdesi başlık değil liste kaydı olan kurumlar: metin bu kaydın önüne eklenir.
+_BACKFILL_KOCAN = {"epdk": _epdk_kocan}
+
+
+def _backfill(idx: "retrieval.Index", keys: List[str], limit: int, log, ocr: bool = False,
+              getir=None) -> Dict[str, Any]:
     """Listeden indekslenmiş belgelere tam metni sonradan ekler.
 
     Neden var: BDDK, BTK ve Rekabet ilk taramada ``--fetch-text`` olmadan
@@ -107,9 +121,13 @@ def _backfill(idx: "retrieval.Index", keys: List[str], limit: int, log) -> Dict[
     belgenin 13.313'ü (%68) böyleydi. ``semantik_ara`` o belgelerde kararın
     METNİNİ değil yalnız BAŞLIĞINI arıyordu — ve BDDK ile BTK'nin canlı araması
     da başlıkta olduğu için, karar metnine dair soru hiçbir yoldan sorulamıyordu.
+    EPDK'da 3.745 kararın 2.019'u (2016 öncesinin ~%97'si) aynı durumdaydı: belgeler
+    eski Word (.doc) ya da taranmış PDF. ``ocr=True`` taranmışları da okur (bkz. ``ocr.py``).
 
     Yeniden başlatılabilir: yalnız gövdesi hâlâ başlıktan ibaret satırları seçer.
-    Metni değişen belgenin vektörü silinir; ``embed_missing`` yenisini üretir.
+    Metni değişen belgenin vektörü silinir; ``embed_missing`` yenisini üretir. Metnin nasıl
+    okunduğu (doc, ocr …) ``meta.metin``'e yazılır. ``getir(src, kimlik)`` belgeyi indirmek
+    yerine başka yerden okumak için verilebilir.
     """
     all_sources = sources.load_all()
     ozet: Dict[str, Any] = {}
@@ -118,24 +136,38 @@ def _backfill(idx: "retrieval.Index", keys: List[str], limit: int, log) -> Dict[
         if not src or key not in _BACKFILL_ID:
             log("skip %s: backfill desteklenmiyor (geçerli: %s)" % (key, ", ".join(_BACKFILL_ID)))
             continue
-        rows = idx.db.execute(
-            "SELECT id, ref, url, title FROM docs WHERE subject = ? "
-            "AND length(body) <= length(title) + ? ORDER BY date DESC",
-            (key, _BACKFILL_PAY)).fetchall()
+        kocan = _BACKFILL_KOCAN.get(key)
+        if kocan:
+            rows = [r for r in idx.db.execute(
+                "SELECT id, ref, url, title, body, meta FROM docs WHERE subject = ? AND length(body) < 2000 "
+                "ORDER BY date DESC", (key,)) if kocan(r)]
+        else:
+            rows = idx.db.execute(
+                "SELECT id, ref, url, title, body, meta FROM docs WHERE subject = ? "
+                "AND length(body) <= length(title) + ? ORDER BY date DESC",
+                (key, _BACKFILL_PAY)).fetchall()
         if limit:
             rows = rows[:limit]
         done = bos = 0
         t0 = time.time()
         for i, r in enumerate(rows, 1):
+            istek = {"id": _BACKFILL_ID[key](r), "page_chars": 200000}
+            if ocr:
+                istek["ocr"] = True
             try:
-                g = src.get({"id": _BACKFILL_ID[key](r), "page_chars": 200000})
+                g = getir(src, istek) if getir else src.get(istek)
             except Exception as exc:  # noqa: BLE001 - tek belge taramayı durdurmasın
                 g = {"error": "%s: %s" % (type(exc).__name__, exc)}
             text = (g.get("text") or "").strip()
-            if len(text) <= len(r["title"] or "") + _BACKFILL_PAY:
+            if len(text) <= (0 if kocan else len(r["title"] or "")) + _BACKFILL_PAY:
                 bos += 1                        # taranmış PDF / erişilemedi: başlıkta kalır, sonra yeniden denenir
             else:
-                idx.db.execute("UPDATE docs SET body = ? WHERE id = ?", (text[:200000], r["id"]))
+                govde = (text + "\n\n" + r["body"].strip()) if kocan else text
+                meta = json.loads(r["meta"] or "{}")
+                if g.get("metin_bicimi"):
+                    meta["metin"] = g["metin_bicimi"]
+                idx.db.execute("UPDATE docs SET body = ?, meta = ? WHERE id = ?",
+                               (govde[:200000], json.dumps(meta, ensure_ascii=False), r["id"]))
                 idx.db.execute("DELETE FROM vecs WHERE doc_id = ?", (r["id"],))
                 done += 1
             if i % 100 == 0:
@@ -152,6 +184,9 @@ _PACK_ONCE = ("id", "subject", "date", "court", "lang", "status")
 
 
 _TARIH_METNI = re.compile(r"\d{1,2}\s*[./]\s*\d{1,2}\s*[./]\s*\d{4}")
+# Kararın kendi tarih satırı: "Karar Tarihi: 08/07/2009", EPDK karar örneğinde "TOPLANTI TARİHİ : 30/12/2015".
+_KARAR_TARIHI_SATIRI = re.compile(r"(?:Karar\s+Tarihi|KARAR\s+TARİHİ|Toplantı\s+Tarihi|TOPLANTI\s+TARİHİ)"
+                                  r"\s*:?\s*(\d{1,2}\s*[./]\s*\d{1,2}\s*[./]\s*\d{4})")
 
 
 def _tarih_onar(idx: "retrieval.Index", keys: List[str], log) -> Dict[str, Any]:
@@ -162,7 +197,8 @@ def _tarih_onar(idx: "retrieval.Index", keys: List[str], log) -> Dict[str, Any]:
     Sigorta Tahkim'de 77, BDDK'da 17 karar. Tarih süzgeci onları görmüyordu: ``date_from``
     verilince düşüyor, yalnız ``date_to`` verilince yılına bakılmadan giriyordu. Rekabet'in
     liste tarihi 41 kararda kararın kendi "Karar Tarihi" satırından farklı; orada
-    ``rekabet.karar_tarihi`` seçer ve atıf da o tarihle yeniden yazılır.
+    ``rekabet.karar_tarihi`` seçer ve atıf da o tarihle yeniden yazılır. Atıfında tarih olmayan
+    kararda (EPDK "? tarihli") tarih kararın kendi tarih satırından alınır.
 
     Vektörlere dokunmaz (tarih vektöre girmez). Atıfı değişen satır ``docs_fts``'te de
     güncellenir, çünkü atıf orada aranır. Yeniden çalıştırılabilir.
@@ -196,6 +232,11 @@ def _tarih_onar(idx: "retrieval.Index", keys: List[str], log) -> Dict[str, Any]:
                     meta.setdefault("decision_no", hm.group(2))
             else:
                 tarih = iso_tarih(atif)
+                satir = None if tarih else _KARAR_TARIHI_SATIRI.search(r["bas"] or "")
+                if satir:                       # atıfta tarih yok: kararın kendi tarih satırı
+                    tarih = iso_tarih(satir.group(1))
+                    if tarih and key == "epdk" and "? tarihli" in atif:
+                        atif = atif.replace("? tarihli", "%s.%s.%s tarihli" % (tarih[8:], tarih[5:7], tarih[:4]), 1)
             if tarih and tarih != r["date"]:
                 idx.db.execute("UPDATE docs SET date = ? WHERE id = ?", (tarih, r["id"]))
                 tarih_n += 1
@@ -312,7 +353,9 @@ def main(argv=None) -> int:
     ap.add_argument("--fetch-text", action="store_true", help="download full decision texts (slow) where supported")
     ap.add_argument("--backfill-text", action="store_true",
                     help="no crawl: fetch full text for documents indexed from a listing only "
-                         "(bddk, btk, rekabet); resumable; --limit caps documents per source")
+                         "(bddk, btk, epdk, rekabet); resumable; --limit caps documents per source")
+    ap.add_argument("--ocr", action="store_true",
+                    help="with --backfill-text: OCR scanned PDFs (needs ocr.py's tools; workstation only)")
     ap.add_argument("--pack", action="store_true",
                     help="no crawl: pack the index for shipping (body column last, FTS rebuilt + optimized, "
                          "VACUUM); content, ids and vectors unchanged")
@@ -339,7 +382,7 @@ def main(argv=None) -> int:
         return 0
     if args.backfill_text:
         keys = [k.strip() for k in args.source.split(",") if k.strip()] or ["bddk", "btk"]
-        _backfill(idx, keys, args.limit, log)
+        _backfill(idx, keys, args.limit, log, ocr=args.ocr)
         idx.reindex_fts()
         idx.set_state("last_backfill", time.strftime("%Y-%m-%dT%H:%M:%S"))
         log("index: %d documents" % idx.count())

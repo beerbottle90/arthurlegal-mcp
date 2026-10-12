@@ -2,6 +2,17 @@
 
 ## Yayımlanmamış
 
+- EPDK: 3.745 kararın 2.019'unun gövdesi yalnız liste kaydıydı (konu + kategori). 2016 öncesinin ~%97'si böyleydi;
+  belgeler eski Word (.doc) ya da taranmış PDF olduğu için metin çıkmıyordu. 2.007'sine metin eklendi: 1.722 Word
+  dosyası (`textx.doc_to_text`, olefile), 281 taranmış belge OCR'la (`ocr.py`: pypdfium2 + Tesseract 5, Türkçe
+  tessdata_best, 300 dpi; 11'i Word'e resim olarak konmuş sayfa), 4 arşiv. Kalan 12: elektronik tablo, portal sayfası,
+  bir RTF, bir indirilemeyen belge. Okuma biçimi `meta.metin`'de. `crawl.py --backfill-text --source epdk --ocr`
+  aynı işi yapar. Canlı belgeden metin çıkmazsa `kurum_karari_getir` metni indeksten verir (sunucuda olefile ve
+  OCR yok); taranmış belgede OCR uyarısıyla. Portalın kendi sayfası (menü) artık karar metni sayılmaz. Ölçüm:
+  bağımsız 16 soruluk set (Sonnet yazdı, soruları sonuçları görmeden, metindeki içerikten): hybrid ilk 10 %12 -> %81,
+  ilk sıra %0 -> %38, MRR 0,02 -> 0,56. Bedel: ilk ölçüm setinin 12 anlam sorusundan 3'ünde hedef geriledi (ilk 10
+  %92 -> %83): aynı konudaki eski kararlar artık metinleriyle bulunuyor; ikisinde öne geçenler aynı kuralın önceki
+  sürümleri. İkinci set değişmedi. Veri değişikliği: dağıtıma giden dizinde.
 - Tarihler: kurum çözümleyicileri yalnız iki haneli gün ve ayı tanıyordu; "28.6.2005" boş kalıyordu. 11.10.2026'da
   tarihi boş olan: Rekabet'te 10.445 kararın 8.529'u, Sigorta Tahkim'de 77, BDDK'da 17 karar. Tarih süzgeci onları
   görmüyordu: `date_from` verilince düşüyor, yalnız `date_to` verilince yılına bakılmadan giriyordu. Ortak
