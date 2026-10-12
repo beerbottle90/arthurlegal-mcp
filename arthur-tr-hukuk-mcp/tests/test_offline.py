@@ -722,7 +722,10 @@ def test_backfill_epdk_metni_liste_kaydinin_onune_ekler():
     idx.upsert({"ref": "epdk:elektrik:1:a", "subject": "epdk", "title": "EPDK Kurul Kararı 4632/10", "body": kocan,
                 "url": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=a", "meta": meta})
     idx.upsert({"ref": "epdk:elektrik:1:b", "subject": "epdk", "title": "EPDK Kurul Kararı 13134",
-                "body": "Karar metni burada.\n\n" + kocan, "meta": meta})
+                "body": "Karar metni burada. " * 20 + "\n\n" + kocan, "meta": meta})
+    idx.upsert({"ref": "epdk:elektrik:1:c", "subject": "epdk", "title": "EPDK Kurul Kararı 7",   # yalnız kaşe okunmuş
+                "body": "KURUL KARARI  EPDK  Hepsi Film  7\n\n" + kocan, "meta": meta,
+                "url": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=c"})
     ids = {r["ref"]: r["id"] for r in idx.db.execute("SELECT id, ref FROM docs")}
     for i in ids.values():
         idx.db.execute("INSERT INTO vecs(doc_id, dim, vec, model) VALUES(?, ?, ?, ?)", (i, 2, b"\x00" * 8, "m"))
@@ -735,13 +738,18 @@ def test_backfill_epdk_metni_liste_kaydinin_onune_ekler():
                 "metin_bicimi": "ocr"}
 
     ozet = crawl._backfill(idx, ["epdk"], 0, lambda m: None, ocr=True, getir=getir)
-    assert ozet["epdk"] == {"aday": 1, "metin_eklendi": 1, "metin_yok": 0}
-    assert istenen == [{"id": "https://www.epdk.gov.tr/Detay/DownloadDocument?id=a", "page_chars": 200000, "ocr": True}]
+    assert ozet["epdk"] == {"aday": 2, "metin_eklendi": 2, "metin_yok": 0}
+    assert sorted(x["id"] for x in istenen) == ["https://www.epdk.gov.tr/Detay/DownloadDocument?id=a",
+                                                "https://www.epdk.gov.tr/Detay/DownloadDocument?id=c"]
+    assert all(x["ocr"] for x in istenen)
     r = idx.db.execute("SELECT body, meta FROM docs WHERE ref = 'epdk:elektrik:1:a'").fetchone()
     assert r["body"].startswith("TOPLANTI TARİHİ") and r["body"].endswith(kocan)
     assert json.loads(r["meta"])["metin"] == "ocr" and json.loads(r["meta"])["category"] == "Gelir Gereksinimi"
+    c = idx.db.execute("SELECT body FROM docs WHERE ref = 'epdk:elektrik:1:c'").fetchone()["body"]
+    assert "Hepsi Film" not in c and c.endswith(kocan), "kaşe metni atılır, liste kaydı kalır"
     vek = {x[0] for x in idx.db.execute("SELECT doc_id FROM vecs")}
     assert ids["epdk:elektrik:1:a"] not in vek and ids["epdk:elektrik:1:b"] in vek
+    assert ids["epdk:elektrik:1:c"] not in vek
 
 
 def test_epdk_canli_metin_cikmazsa_indeksteki_okunmus_metin_gelir():

@@ -102,10 +102,16 @@ _BACKFILL_PAY = 200
 
 
 def _epdk_kocan(r) -> bool:
-    """EPDK'nın listeden gelen gövdesi: "konu\\nyol › kategori"; taramada metin eklenmemiş."""
+    """EPDK'nın listeden gelen gövdesi: "konu\\nyol › kategori"; taramada metin eklenmemiş.
+
+    Önüne yalnız kaşe ya da Resmî Gazete başlığı eklenmiş gövde de böyle sayılır (taranmış 6 karar,
+    33-199 karakter): o metin karar değildir.
+    """
     meta = json.loads(r["meta"] or "{}")
     govde = (r["body"] or "").strip()
-    return "\n\n" not in govde and govde.endswith("%s › %s" % (meta.get("path", ""), meta.get("category", "")))
+    if not govde.endswith("%s › %s" % (meta.get("path", ""), meta.get("category", ""))):
+        return False
+    return "\n\n" not in govde or len(govde.rsplit("\n\n", 1)[0].strip()) < _BACKFILL_PAY
 
 
 # Gövdesi başlık değil liste kaydı olan kurumlar: metin bu kaydın önüne eklenir.
@@ -162,7 +168,7 @@ def _backfill(idx: "retrieval.Index", keys: List[str], limit: int, log, ocr: boo
             if len(text) <= (0 if kocan else len(r["title"] or "")) + _BACKFILL_PAY:
                 bos += 1                        # taranmış PDF / erişilemedi: başlıkta kalır, sonra yeniden denenir
             else:
-                govde = (text + "\n\n" + r["body"].strip()) if kocan else text
+                govde = (text + "\n\n" + r["body"].strip().rsplit("\n\n", 1)[-1]) if kocan else text
                 meta = json.loads(r["meta"] or "{}")
                 if g.get("metin_bicimi"):
                     meta["metin"] = g["metin_bicimi"]
