@@ -106,17 +106,22 @@ memory in use (`memory`).
 
 ## Interactive views (MCP Apps)
 
-In Claude (web, desktop and the iOS/Android apps) `tr_mevzuat_madde_getir` shows its
-result as an ArthurLegal card: law and Official Gazette details, each article's heading and
-text, the citation to quote with a copy button, a link to the official text, and a
-"verified / partly verified / not verified" badge. An article that could not be fetched
-carries the same `UYARI` line the instructions require. The tool's JSON is unchanged, so
-clients without MCP Apps read exactly what they read before.
+In Claude (web, desktop and the iOS/Android apps) results come with ArthurLegal views. The tools'
+JSON is unchanged, so clients without MCP Apps read exactly what they read before.
 
-The card is `arayuz/madde-karti.html`, served as `ui://arthurlegal/madde-karti.html`. It
-loads the pinned MCP Apps client (`@modelcontextprotocol/ext-apps`) from unpkg, which is
-the only origin its sandbox allows; it uses the device's system font and follows Claude's
-light or dark theme. `VIEWS` in `server.py` maps tools to views.
+- `tr_mevzuat_madde_getir`: an article card with the law and Official Gazette details, each
+  article's heading (with its parent headings for codes such as TBK and TMK), the text, the
+  citation to quote with a copy button, a link to the official text and a verified / partly
+  verified / not verified badge. An article that could not be fetched carries the `UYARI` line.
+- `tr_ictihat_ara`: a decision list with chamber, docket numbers and date; each decision's text
+  opens inside the card and can be handed to Claude for a summary.
+- `al_masasi`: ArthurLegal Masası, a full-screen desk with legislation and citation check,
+  case law, source status and the other ArthurLegal modules in one panel. On this endpoint the
+  modules that run on the lawyer's computer (memory, masking, UYAP) are shown as desktop-only.
+
+The views are in `arayuz/` (served as `ui://arthurlegal/...`). Light theme by default, dark and
+automatic on request; the device's system font; the only origin the sandbox allows is unpkg, for
+the pinned MCP Apps client (`@modelcontextprotocol/ext-apps`).
 
 ## Germany (`de_`)
 

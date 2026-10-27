@@ -676,47 +676,53 @@ def build() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# MCP Apps views
+# MCP Apps: ArthurLegal Masası and the in-chat cards
 # --------------------------------------------------------------------------- #
-# Tool -> (ui:// URI, file under arayuz/, title). A host that renders MCP Apps
-# (Claude on the web, desktop and mobile) draws the view beside the call; every
+# The views live in arayuz/ (a copy; their home is the private arthurlegal-app4all
+# repository, synced with its sunucu/esitle.py). A host that renders MCP Apps
+# (Claude on the web, desktop and mobile) draws the card beside the call; every
 # other client keeps reading the same JSON text, so no tool contract changes.
-ARAYUZ_DIR = os.path.join(HERE, "arayuz")
-VIEWS = {
-    "tr_mevzuat_madde_getir": (
-        "ui://arthurlegal/madde-karti.html", "madde-karti.html", "Mevzuat madde kartı"),
-}
-MCP_APP_MIME = "text/html;profile=mcp-app"
-# What the view's sandbox may load: only the pinned ext-apps client from unpkg.
-# The card uses each device's system font, so it needs no font host either.
-VIEW_META = {
-    "ui": {
-        "csp": {"resourceDomains": ["https://unpkg.com"]},
-        "prefersBorder": False,
-    },
+# Without arayuz/ the server runs as before, text only.
+sys.path.insert(0, os.path.join(HERE, "arayuz"))
+try:
+    import al_arayuz  # noqa: E402
+except ImportError:
+    al_arayuz = None
+
+# The tools the desk calls directly. Modules that run on the lawyer's computer
+# (memory, masking, UYAP) are marked "masaustu" here: this endpoint serves the web
+# and phone, where they do not exist by design. Land registry goes through Claude
+# (the tkgm_ tools below are on this endpoint).
+MASA_TOOLS = ("tr_mevzuat_madde_getir", "tr_ictihat_ara", "tr_ictihat_getir", "status")
+REMOTE_MODULES = {
+    "tapu": {"durum": "claude"}, "beyin": {"durum": "masaustu"}, "mask": {"durum": "masaustu"},
+    "uyap": {"durum": "masaustu"}, "donna": {"durum": "hazir"},
 }
 
 _resources: List[Resource] = []
 
 
 def _attach_views() -> None:
-    """Point each tool in VIEWS at its view and register the view as a resource.
+    """Give carded tools their _meta, add al_masasi and register the views.
 
-    A view whose tool did not load (its backend failed) or whose file is missing
-    is skipped: the tool stays text-only rather than pointing at nothing.
+    A tool whose backend failed to load is simply absent, so it gets no card; the
+    desk then reports that source as unavailable instead of pointing at nothing.
     """
-    by_name = {t.name: t for t in _tools}
-    for tool_name, (uri, filename, title) in VIEWS.items():
-        tool = by_name.get(tool_name)
-        path = os.path.join(ARAYUZ_DIR, filename)
-        if tool is None or not os.path.isfile(path):
-            continue
-        with open(path, encoding="utf-8") as fh:
-            html = fh.read()
-        _resources.append(Resource(uri, title, html, mime_type=MCP_APP_MIME,
-                                   description="%s görünümü" % tool_name, meta=VIEW_META))
-        # The flat "ui/resourceUri" key is the older spelling some hosts still read.
-        tool.meta = {"ui": {"resourceUri": uri}, "ui/resourceUri": uri}
+    if al_arayuz is None:
+        return
+    for tool in _tools:
+        meta = al_arayuz.arac_meta(tool.name)
+        if meta:
+            tool.meta = meta
+    tanim = al_arayuz.masa_araci()
+    able = [t.name for t in _tools if t.name in MASA_TOOLS]
+    _tools.append(Tool(
+        tanim["name"], tanim["description"], tanim["inputSchema"],
+        lambda args: al_arayuz.masa_cevabi("uzak", able, REMOTE_MODULES, args.get("bolum")),
+        meta=al_arayuz.arac_meta("al_masasi")))
+    for k in al_arayuz.kaynaklar():
+        _resources.append(Resource(k["uri"], k["name"], k["text"], mime_type=k["mimeType"],
+                                   description=k["description"], meta=k["_meta"]))
 
 
 INSTRUCTIONS_HEADER ="""MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın; açıkça "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/" yazın.

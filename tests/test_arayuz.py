@@ -76,40 +76,55 @@ class DispatcherResourcesTest(unittest.TestCase):
 
 
 class ServerViewsTest(unittest.TestCase):
-    """server._attach_views binds the madde card to tr_mevzuat_madde_getir."""
+    """server._attach_views: carded tools, the al_masasi desk and the three views."""
 
     def setUp(self) -> None:
         self.saved_tools, self.saved_resources = list(server._tools), list(server._resources)
-        server._tools[:] = [Tool("tr_mevzuat_madde_getir", "m", {"type": "object"}, lambda a: {})]
+        server._tools[:] = [Tool(ad, "x", {"type": "object"}, lambda a: {})
+                            for ad in ("tr_mevzuat_madde_getir", "tr_ictihat_ara", "status", "nl_search")]
         server._resources[:] = []
 
     def tearDown(self) -> None:
         server._tools[:] = self.saved_tools
         server._resources[:] = self.saved_resources
 
-    def test_madde_tool_points_at_the_card_and_the_card_is_served(self) -> None:
+    def test_carded_tools_desk_and_views(self) -> None:
         server._attach_views()
-        tool = server._tools[0]
-        self.assertEqual(tool.meta["ui"]["resourceUri"], URI)
-        self.assertEqual(tool.meta["ui/resourceUri"], URI)
-        [view] = server._resources
-        self.assertEqual(view.uri, URI)
-        self.assertEqual(view.mime_type, "text/html;profile=mcp-app")
-        # The card loads the pinned client from unpkg, so the sandbox must allow it.
-        self.assertIn("https://unpkg.com/@modelcontextprotocol/ext-apps@", view.text)
-        self.assertIn("https://unpkg.com", view.meta["ui"]["csp"]["resourceDomains"])
-        self.assertIn("app.connect()", view.text)
+        tools = {t.name: t for t in server._tools}
+        self.assertEqual(tools["tr_mevzuat_madde_getir"].meta["ui"]["resourceUri"], URI)
+        self.assertEqual(tools["tr_ictihat_ara"].meta["ui/resourceUri"], "ui://arthurlegal/ictihat-karti.html")
+        self.assertIsNone(tools["nl_search"].meta)
+        self.assertEqual(tools["al_masasi"].meta["ui"]["resourceUri"], "ui://arthurlegal/masa.html")
+        self.assertEqual({r.uri for r in server._resources},
+                         {URI, "ui://arthurlegal/ictihat-karti.html", "ui://arthurlegal/masa.html"})
+        masa = tools["al_masasi"].handler({"bolum": "ictihat"})
+        self.assertEqual((masa["ortam"], masa["bolum"]), ("uzak", "ictihat"))
+        # Memory, masking and UYAP run on the lawyer's computer; this endpoint serves web and phone.
+        self.assertEqual(masa["moduller"]["beyin"], {"durum": "masaustu"})
+        self.assertEqual(masa["moduller"]["tapu"], {"durum": "claude"})
+        self.assertEqual(masa["yetenekler"], ["status", "tr_ictihat_ara", "tr_mevzuat_madde_getir"])
 
-    def test_missing_tool_leaves_no_dangling_view(self) -> None:
-        server._tools[:] = []
+    def test_views_are_whole_pages(self) -> None:
         server._attach_views()
+        for r in server._resources:
+            with self.subTest(uri=r.uri):
+                self.assertEqual(r.mime_type, "text/html;profile=mcp-app")
+                self.assertNotIn("/*AL:", r.text)
+                self.assertIn("https://unpkg.com/@modelcontextprotocol/ext-apps@", r.text)
+                self.assertIn("https://unpkg.com", r.meta["ui"]["csp"]["resourceDomains"])
+                for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML"):
+                    self.assertNotIn(forbidden, r.text)
+
+    def test_without_arayuz_the_server_stays_text_only(self) -> None:
+        saved = server.al_arayuz
+        server.al_arayuz = None
+        try:
+            server._attach_views()
+        finally:
+            server.al_arayuz = saved
         self.assertEqual(server._resources, [])
-
-    def test_card_never_writes_tool_data_as_html(self) -> None:
-        with open(os.path.join(server.ARAYUZ_DIR, "madde-karti.html"), encoding="utf-8") as fh:
-            html = fh.read()
-        self.assertNotIn("innerHTML", html)
-        self.assertNotIn("insertAdjacentHTML", html)
+        self.assertNotIn("al_masasi", [t.name for t in server._tools])
+        self.assertTrue(all(t.meta is None for t in server._tools))
 
 
 if __name__ == "__main__":
