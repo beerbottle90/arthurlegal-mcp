@@ -46,9 +46,9 @@ import urllib.request
 from typing import Any, Callable, Dict, List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mcpcore import McpError, Tool, run  # noqa: E402
+from mcpcore import McpError, Resource, Tool, run  # noqa: E402
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Deployed bundle: every backend sits next to this file.
@@ -672,9 +672,54 @@ def build() -> None:
         {"type": "object", "properties": {}},
         _t_status,
     ))
+    _attach_views()
 
 
-INSTRUCTIONS_HEADER = """MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın; açıkça "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/" yazın.
+# --------------------------------------------------------------------------- #
+# MCP Apps views
+# --------------------------------------------------------------------------- #
+# Tool -> (ui:// URI, file under arayuz/, title). A host that renders MCP Apps
+# (Claude on the web, desktop and mobile) draws the view beside the call; every
+# other client keeps reading the same JSON text, so no tool contract changes.
+ARAYUZ_DIR = os.path.join(HERE, "arayuz")
+VIEWS = {
+    "tr_mevzuat_madde_getir": (
+        "ui://arthurlegal/madde-karti.html", "madde-karti.html", "Mevzuat madde kartı"),
+}
+MCP_APP_MIME = "text/html;profile=mcp-app"
+# What the view's sandbox may load: only the pinned ext-apps client from unpkg.
+# The card uses each device's system font, so it needs no font host either.
+VIEW_META = {
+    "ui": {
+        "csp": {"resourceDomains": ["https://unpkg.com"]},
+        "prefersBorder": False,
+    },
+}
+
+_resources: List[Resource] = []
+
+
+def _attach_views() -> None:
+    """Point each tool in VIEWS at its view and register the view as a resource.
+
+    A view whose tool did not load (its backend failed) or whose file is missing
+    is skipped: the tool stays text-only rather than pointing at nothing.
+    """
+    by_name = {t.name: t for t in _tools}
+    for tool_name, (uri, filename, title) in VIEWS.items():
+        tool = by_name.get(tool_name)
+        path = os.path.join(ARAYUZ_DIR, filename)
+        if tool is None or not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as fh:
+            html = fh.read()
+        _resources.append(Resource(uri, title, html, mime_type=MCP_APP_MIME,
+                                   description="%s görünümü" % tool_name, meta=VIEW_META))
+        # The flat "ui/resourceUri" key is the older spelling some hosts still read.
+        tool.meta = {"ui": {"resourceUri": uri}, "ui/resourceUri": uri}
+
+
+INSTRUCTIONS_HEADER ="""MADDE ATFI KURALI: Bir kanun maddesini (not, sözleşme, protokol, dilekçe veya karar gövdesi dâhil) yazmadan önce tr_mevzuat_madde_getir(number="6769", madde_no="120") ile metnini ve başlığını çekin; yanıttaki citation alanını birebir kullanın ve maddeye yüklediğiniz içeriğin (hakkın sahibi, şart, süre, sonuç) başlık ve metinle örtüştüğünü kontrol edin. Çekilemeyen maddeyi ezberden yazmayın; açıkça "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/" yazın.
 
 CANLI VERİ: Araç veri getiremezse (hata, `unavailable`, `upstream_blocked`, onay yok) hafızadan doldurmayın; aynı UYARI satırını aracın `source_url`'si ya da kaynağın resmî giriş sayfasıyla yazın; bağlantı uydurulmaz, "[doğrulayın]" etiketi kullanılmaz.
 
@@ -715,4 +760,5 @@ if __name__ == "__main__":
         sys.stderr.write(" (%d backend yüklenemedi: %s)"
                          % (len(_failed), ", ".join(f["prefix"] for f in _failed)))
     sys.stderr.write("\n")
-    run(_tools, name="arthurlegal-mcp", version=__version__, instructions=text)
+    run(_tools, name="arthurlegal-mcp", version=__version__, instructions=text,
+        resources=_resources)

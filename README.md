@@ -104,6 +104,20 @@ it live (`de_live`); Azerbaijan's probe reports whether e-qanun.az answers now.
 On the hosted endpoint it also names the image that answered (`build`) and the
 memory in use (`memory`).
 
+## Interactive views (MCP Apps)
+
+In Claude (web, desktop and the iOS/Android apps) `tr_mevzuat_madde_getir` shows its
+result as an ArthurLegal card: law and Official Gazette details, each article's heading and
+text, the citation to quote with a copy button, a link to the official text, and a
+"verified / partly verified / not verified" badge. An article that could not be fetched
+carries the same `UYARI` line the instructions require. The tool's JSON is unchanged, so
+clients without MCP Apps read exactly what they read before.
+
+The card is `arayuz/madde-karti.html`, served as `ui://arthurlegal/madde-karti.html`. It
+loads the pinned MCP Apps client (`@modelcontextprotocol/ext-apps`) from unpkg, which is
+the only origin its sandbox allows; it uses the device's system font and follows Claude's
+light or dark theme. `VIEWS` in `server.py` maps tools to views.
+
 ## Germany (`de_`)
 
 Two sources stand behind the `de_` prefix:
