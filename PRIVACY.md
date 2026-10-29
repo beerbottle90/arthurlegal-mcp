@@ -16,8 +16,8 @@ The service is operated by DATS Web3 Solutions, Inc. Contact details are at the 
 - The service receives only what Claude (or another MCP client) sends when it calls a tool:
   the tool's name and its arguments, such as search words, a statute number or a document
   identifier. It does not receive your conversation, your files or your Claude account details.
-- It uses those arguments to query official legal sources and returns the result. It writes no
-  request logs and, except for the German tools described below, does not store your search text
+- It uses those arguments to query official legal sources and returns the result. Except for the
+  German tools described below, it writes no request logs and does not store your search text
   after answering. To avoid repeating requests to official sources, it keeps recently fetched
   public documents in memory under their official identifiers (such as a law and article number)
   until they expire or the server restarts.
@@ -64,7 +64,7 @@ them.
 | German tools (`de_`) | The German backend caches official responses on the server's disk, keyed by the request address and its parameters (which include the search words): up to 1 hour for searches, 24 hours for single documents, 7 days for reference lists. It also keeps an audit line per call: time, tool name, a SHA-256 hash of the input (not the text), result size and status. Both sit on the server's temporary disk; the service uses no persistent storage, so they are erased when the server is redeployed. |
 | Official identifiers of fetched public documents (law and article numbers, decision ids) | Kept in memory as cache keys, with the public document, until the entry expires or the server restarts; not written to disk or to logs (German tools: previous row). |
 | Parcel identifiers and parcel data (land-registry tools, `/mcp` only) | Kept in memory for up to 24 hours, to avoid repeat requests to TKGM and to enforce its rate limits; never written to disk or to logs. |
-| Request logs | The service writes none. Its host, Fly.io (primary region: Amsterdam, the Netherlands), processes connection data such as IP addresses and timestamps to run its network, under the [Fly.io Privacy Statement](https://fly.io/legal/privacy-policy). |
+| Request logs | The service writes none, apart from the German tools' audit line (see that row). Its host, Fly.io (primary region: Amsterdam, the Netherlands), processes connection data such as IP addresses and timestamps to run its network, under the [Fly.io Privacy Statement](https://fly.io/legal/privacy-policy). |
 | Index of public legal documents | Kept and refreshed; contains official publications only. |
 
 ## Who else receives data
