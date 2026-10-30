@@ -1,8 +1,8 @@
 # Tapu-Kadastro — tkgm MCP (Kullanım Rehberi)
 
-> ✅ **Custom MCP backend VAR (`tkgm-mcp` v0.5.2).** TKGM Parsel Sorgu'dan **canlı parsel**
+> ✅ **Custom MCP backend VAR (`tkgm-mcp` v0.6.0).** TKGM Parsel Sorgu'dan **canlı parsel**
 > (il/ilçe/mahalle + ada/parsel, koordinat ya da yer adı), parsel raporu, ölçü, **ölçekli kroki**,
-> harita ve 3D arazi, güzergâh-koridor kesişimi, föy/portföy, harç-masraf hesabı, tapu kaydı
+> harita ve tahmini 3D görünüm (yalnız yerel), güzergâh-koridor kesişimi, föy/portföy, harç-masraf hesabı, tapu kaydı
 > yapılandırma ve **dayanak köprüsü**. Araç öneki **`tkgm_`**.
 >
 > **Kullanıcıdan dosya İSTEME.** "Kadıköy Caferağa 123 ada 45 parsel" diyen kullanıcıya parseli
@@ -67,7 +67,7 @@ yüzlerce parsellik döküm için döngü kurma (araç bunu durdurur).
 | `tkgm_geometri` | Alan, çevre, kenar boyları, semtler, iç açılar (grad) | kısa JSON |
 | `tkgm_kroki` | A4, mm birimli **ölçekli SVG**; `komsular` ile çevre parseller | dosya yolu / SVG |
 | `tkgm_harita` | OpenStreetMap altlıklı etkileşimli HTML harita | dosya yolu / HTML |
-| `tkgm_arazi_3d` | Copernicus GLO-30 üstüne parsel; kot, eğim, bakı + 3D HTML (yalnız yerel) | özet + dosya yolu |
+| `tkgm_arazi_3d` | Copernicus GLO-30 üstüne parsel; kot, eğim, bakı + çevre binaların TAHMİNİ kütlesi + 3D HTML (yalnız yerel) | özet, `uyari_3d`, dosya yolu, `arayuzde_ac` |
 | `tkgm_koridor_kesisim` | Hat + genişlik → parsel başına kesilen alan, eksen boyu | tablo + CSV |
 | `tkgm_parsel_foyu` | Tek parsel için Word föyü (yalnız yerel) | .docx yolu |
 | `tkgm_portfoy_tablosu` | Çok parsel için Excel dökümü (yalnız yerel) | .xlsx yolu |
@@ -80,7 +80,9 @@ yüzlerce parsellik döküm için döngü kurma (araç bunu durdurur).
 
 **Token disiplini.** Yerel kipte görsel ve raporlar **dosyaya** yazılır, yanıtta yol ve birkaç
 satır özet döner. `parsel_raporu`nun `rapor_md` alanı kullanıcıya olduğu gibi gösterilmek içindir.
-SVG/HTML içeriğini sohbete dökme; kullanıcı isterse dosya yolunu ver.
+SVG/HTML içeriğini sohbete dökme; kullanıcı isterse dosya yolunu ver. Yanıtta `arayuzde_ac` varsa
+dosya yolu yerine o bağlantıyı ver: harita ve 3D Tapu arayüzünde açılır (dosyadan açılan haritada
+OpenStreetMap karoları engellenebilir; uydu görünümü yalnız arayüzde gelir).
 
 ---
 
@@ -120,6 +122,10 @@ döndürdüğü `dayanak`, `alinti` ve `matrah_kurali` alanlarını da aktar; ta
   tespiti değildir; düzeltme 3402 s. K. m. 41 yoluna ve kadastro müdürlüğü kayıtlarına tabidir.
 - **3D arazi 30 m'lik yüzey modelidir (DSM):** bina ve ağaç yüksekliklerini içerir; küçük kent
   parsellerinde eğim kabadır. Keşif ve harita mühendisi ölçüsünün yerini tutmaz.
+- **3D bina kütlesi TAHMİNDİR.** Taban izi açık veriden (Overture: OpenStreetMap, Microsoft ML), boy
+  kat × 3 m kuralından gelir. Yanıttaki `uyari_3d` metnini kullanıcıya her seferinde aynen ilet: görsel
+  gerçek veriye dayanmaz, yapay zekâ ve otomatik kurallarla üretilmiş, fikir verme amaçlı bir
+  TAHMİNDİR. Kat sayısını sen tahmin etme; kullanıcı söylerse `kat`a yaz.
 - **`dayanak_koprusu` adres verir, metin vermez.** Madde metnini `tr_mevzuat_*` ile çekmeden
   alıntılama; yanıttaki `teyit` alanı "YOK" diyorsa adres ezberdendir: önce doğrula, doğrulanamadıysa yanına
   açıkça "UYARI: veri çekilemedi, teyidiniz gerekli: https://www.mevzuat.gov.tr/" yaz. Bu kural

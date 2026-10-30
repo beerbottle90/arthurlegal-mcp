@@ -121,8 +121,10 @@ class Kilitler(Arayuz):
         self.assertIn(tkgm_ui.BELIRTEC, govde.decode("utf-8"))
         self.assertNotIn("__TKGM_BELIRTEC__", govde.decode("utf-8"))
         self.assertEqual(basliklar.get("X-Frame-Options"), "DENY")
-        self.assertEqual(basliklar.get("Referrer-Policy"), "no-referrer")
-        self.assertEqual(self._iste("/dosya/a_kroki.svg")[2].get("Referrer-Policy"), "no-referrer")
+        # Yalnız köken gider: OSM karoyu Referer'sız vermez, ?t= belirteci adreste kalır.
+        self.assertEqual(basliklar.get("Referrer-Policy"), "strict-origin")
+        self.assertEqual(self._iste("/dosya/a_kroki.svg")[2].get("Referrer-Policy"), "strict-origin")
+        self.assertIn("frame-ancestors 'none'", basliklar.get("Content-Security-Policy"))
 
     def test_cevap_teslimi(self):
         kod, j = self._cagir("arayuze_yaz", {"baslik": "Önalım", "metin": "<script>x</script> cevap"})

@@ -441,8 +441,9 @@ class Html(unittest.TestCase):
                       h.arazi_3d_html(self.p, [self.komsu], self.izgara, self.ozet)):
             self.assertNotIn("tkgm.gov.tr", sayfa)
             adresler = set(re.findall(r"https?://[^/\"'\s]+", sayfa))
+            # Esri uydu ucu sayfada durur ama anahtarsız çalışmaz; anahtarı yalnız yerel arayüz yerleştirir.
             self.assertLessEqual(adresler, {"https://cdnjs.cloudflare.com", "https://tile.openstreetmap.org",
-                                           "https://cdn.jsdelivr.net"})
+                                           "https://cdn.jsdelivr.net", "https://ibasemaps-api.arcgis.com"})
         with open(h.__file__.replace(".pyc", ".py"), encoding="utf-8") as fh:
             self.assertNotIn("tkgm.gov.tr", fh.read())
 
@@ -452,7 +453,8 @@ class Html(unittest.TestCase):
             "nitelik": _SALDIRI, "adaNo": _SALDIRI, "mahalleAd": "<img src=x onerror=alert(1)>",
             "parselNo": " '\"--><svg onload=alert(1)>"})
         (kotu,) = parseller.oku(json.dumps(gj))
-        for sayfa, betik_sayisi in ((h.harita_html(kotu, [kotu, self.komsu]), 2),
+        # Harita: dosyadan-açılış notu + Leaflet + harita betiği. 3B: importmap + modül.
+        for sayfa, betik_sayisi in ((h.harita_html(kotu, [kotu, self.komsu]), 3),
                                     (h.arazi_3d_html(kotu, [self.komsu], self.izgara, self.ozet), 2)):
             self.assertEqual(sayfa.count("</script>"), betik_sayisi)
             self.assertEqual(len(re.findall(r"<script\b", sayfa)), betik_sayisi)

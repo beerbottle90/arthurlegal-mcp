@@ -24,6 +24,7 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
+import tkgm_bina as bina
 import tkgm_canli as canli
 import tkgm_geo as geo
 import tkgm_harc as harc
@@ -40,7 +41,7 @@ from tkgm_aktar import BICIMLER, aktar
 from tkgm_analiz import olc, tr_bicim
 from tkgm_kroki import ciz
 
-__version__ = "0.5.2"
+__version__ = "0.6.0"
 canli.SURUM = __version__
 
 PARSEL_SORGU = "https://parselsorgu.tkgm.gov.tr/"
@@ -83,7 +84,16 @@ Metni o araçlarla çekmeden alıntılamayın; süreleri teyitsiz yazmayın.
 parsel_foyu, portfoy_tablosu ve arazi_3d burada YOKTUR; tapu kaydı (malik adı, TCKN) bu uca
 gönderilmez. Bellek kalıcı değildir: ref kaybolursa parsel_oku'nun `ref_kodu`nu verin."""
        if kaynak.paylasilan_mi() else
-       """TOKEN. Görseller dosyaya yazılır, yol döner. `inline=true` yalnız kullanıcı SVG/HTML
+       """3D. `arazi_3d` araziyi ve çevre binaların TAHMİNİ kütlesini çizer (açık bina tabanı + kat × 3 m).
+Yanıttaki `uyari_3d` metnini kullanıcıya her seferinde AYNEN iletin: görsel gerçek veriye dayanmaz,
+yapay zekâ/otomatik kurallarla üretilmiş, fikir verme amaçlı bir tahmindir. Kat sayısını siz tahmin
+etmeyin; kullanıcı söylerse `kat`a yazın. Uydu ya da Google görüntüsünden 3D üretilmez.
+
+AÇMA. Yanıtta `arayuzde_ac` varsa kullanıcıya dosya yolu yerine o bağlantıyı verin: harita ve 3D,
+ArthurLegal Tapu arayüzünde açılır. Dosyadan (çift tıklayarak) açılan haritada OpenStreetMap
+karoları engellenebilir ("Access blocked"); uydu görünümü de yalnız arayüzde gelir.
+
+TOKEN. Görseller dosyaya yazılır, yol döner. `inline=true` yalnız kullanıcı SVG/HTML
 metnini açıkça istediğinde.
 Yerel arayüzün Sor sekmesinden gelen mesaj "ArthurLegal'de sor:" ile başlar: cevabı sohbette ver ve
 `arayuze_yaz` ile arayüze de teslim et (yalnız yerel kipte).""")
@@ -98,6 +108,8 @@ REHBER = """TKGM araçları — ne yapar, ne yapmaz
 3) DOSYA: kullanıcı GeoJSON/KML getirirse parsel_oku(dosya=… | icerik=…) aynı ref'i üretir.
 4) ÖLÇ/ÇİZ/RAPOR: geometri(ref) kenar-semt-açı; kroki(ref, komsular=[…]) A4 ölçekli SVG; harita(ref);
    parsel_raporu(ref) tek rapor; disa_aktar(ref, bicim=geojson|kml|dxf|csv); koordinat_donustur.
+   arazi_3d(ref, kat?) yalnız yerel kipte: kot/eğim + çevre binaların TAHMİNİ kütlesi; `uyari_3d`
+   kullanıcıya aynen iletilir. Yanıtta `arayuzde_ac` varsa dosya yolu yerine o bağlantı verilir.
 5) HUKUK: dayanak_koprusu(konu=… | ref=…) → dayanak adresleri + hazır tr_ araç çağrıları.
 6) KAPSAM DIŞI: malik, şerh, beyan, rehin Parsel Sorgu'da yoktur; kullanıcı kendi e-Devlet / Web Tapu
    kaydından alır (tapu_kaydi_oku yerel kipte maskeleyerek yapılandırır). Güzergâh boyunca toplu döküm yapılmaz."""
@@ -212,11 +224,18 @@ def _nokta_cifti(n: Any, i: int) -> tuple:
 
 
 def _cikti(parsel: Dict[str, Any], ek: str, metin: str, inline: bool, alan: str) -> Dict[str, Any]:
-    """Dosyaya yaz ve yolu döndür; paylaşılan sunucuda ya da istenirse metni döndür."""
+    """Dosyaya yaz ve yolu döndür; paylaşılan sunucuda ya da istenirse metni döndür.
+
+    Arayüz aynı süreçte açıksa (`--ui-ile`) harita, 3D ve kroki için `arayuzde_ac` de döner:
+    yalnız o dosyayı gösteren yerel bağlantı. Dosyadan açılan harita karo alamayabilir."""
     if inline or kaynak.uzak_mi():
         return {alan: metin}
     yol = kaynak.dosya_yaz(kaynak.dosya_adi(parsel, ek), metin)
-    return {"dosya": yol, "boyut_kb": round(len(metin.encode("utf-8")) / 1024.0, 1)}
+    out: Dict[str, Any] = {"dosya": yol, "boyut_kb": round(len(metin.encode("utf-8")) / 1024.0, 1)}
+    bag = arayuz.arayuz_baglantisi(yol)
+    if bag:
+        out["arayuzde_ac"] = bag
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -755,6 +774,8 @@ def _t_harita(args: Dict[str, Any]) -> Any:
     p = _parsel(args)
     html = harita.harita_html(p, _komsular(args, p))
     out: Dict[str, Any] = {"parsel": parseller.etiket(p), "altlik": "OpenStreetMap (tarayıcı yükler)"}
+    if not kaynak.uzak_mi():
+        out["uydu"] = "Tapu arayüzünde, kullanıcının kendi Esri anahtarı girilmişse"
     try:
         out.update(_cikti(p, "harita.html", html, bool(args.get("inline")), "html"))
     except kaynak.ErisimHatasi as exc:
@@ -770,13 +791,35 @@ def _t_arazi_3d(args: Dict[str, Any]) -> Any:
     p = _parsel(args)
     kom = _komsular(args, p)
     try:
-        izgara = harita.dem_izgara(*harita.parsel_kutusu(p, kom))
+        # Girdi, ağa çıkmadan denetlenir: yanlış `kat` 2 MB indirdikten sonra değil, önce reddedilsin.
+        kat, varsayilan = bina.girdi_denetle(args.get("kat"), args.get("varsayilan_kat"))
+    except bina.BinaHatasi as exc:
+        raise McpError(str(exc)) from exc
+    try:
+        kutu = harita.parsel_kutusu(p, kom)
+        izgara = harita.dem_izgara(*kutu)
         ozet = harita.arazi_ozeti(p, izgara)
-        html = harita.arazi_3d_html(p, kom, izgara, ozet)
-        out: Dict[str, Any] = {"parsel": parseller.etiket(p), "arazi": ozet, "kaynak": izgara.get("kaynak"),
+        uyarilar = [izgara["uyari"]] if isinstance(izgara.get("uyari"), str) else list(izgara.get("uyari") or [])
+        kutle, bina_ozeti = None, None
+        if args.get("binalar", True) is not False:
+            try:
+                veri = bina.binalar(*kutu)
+                kutle = bina.kutle_modeli(p, veri, kat, varsayilan)
+                k = kutle["ozet"]
+                bina_ozeti = {"cizilen": k["bina_sayisi"], "parsel_binasi": k["parsel_binasi"], "kip": k["kip"],
+                              "overture_surumu": veri["surum"], "notlar": k["notlar"], "atif": k["atif"],
+                              "indirilen_kb": round(veri.get("indirilen_bayt", 0) / 1024.0)}
+            except bina.BinaHatasi as exc:
+                # Bina verisi gelmezse arazi yine çizilir; kullanıcı eksik katmanı bilir.
+                uyarilar.append("Binalar çizilmedi: %s" % exc)
+        html = harita.arazi_3d_html(p, kom, izgara, ozet, kutle)
+        out: Dict[str, Any] = {"parsel": parseller.etiket(p), "uyari_3d": harita.UYARI_3D, "arazi": ozet,
+                               "kaynak": izgara.get("kaynak"),
                                "indirilen_kb": round(izgara.get("indirilen_bayt", 0) / 1024.0)}
-        if izgara.get("uyari"):
-            out["uyari"] = izgara["uyari"]
+        if bina_ozeti:
+            out["binalar"] = bina_ozeti
+        if uyarilar:
+            out["uyari"] = uyarilar
         out.update(_cikti(p, "arazi3d.html", html, bool(args.get("inline")), "html"))
     except harita.HaritaHatasi as exc:
         raise McpError(str(exc)) from exc
@@ -904,7 +947,9 @@ def _t_status(args: Dict[str, Any]) -> Any:
         "server": "tkgm-mcp",
         "version": __version__,
         "upstream": "TKGM Parsel Sorgu (canlı, hız sınırlı: `canli`), yer adı için OpenStreetMap Nominatim, arazi_3d için "
-                    "Copernicus DEM (yalnız yerel kipte). Harita karolarını kullanıcının tarayıcısı yükler.",
+                    "Copernicus DEM ve Overture bina tabanları (yalnız yerel kipte). Harita karolarını kullanıcının "
+                    "tarayıcısı yükler.",
+        "arayuz": None if kaynak.uzak_mi() else arayuz.durum(),
         "canli": canli.durum(sayilar=not kaynak.paylasilan_mi()),
         "kip": "paylaşılan (dosya erişimi kapalı)" if kaynak.uzak_mi() else "yerel (dosya okur/yazar)",
         "cikti_klasoru": None if kaynak.uzak_mi() else kaynak.cikti_klasoru(),
@@ -1089,10 +1134,18 @@ TUM_ARACLAR = [
          _t_harita),
     Tool("arazi_3d",
          "Copernicus GLO-30 yükseklik modeli üstüne parsel: min/max/ortalama kot, kot farkı, ortalama eğim %, "
-         "hâkim bakı + döndürülebilir 3D HTML. 30 m'lik YÜZEY modelidir (bina/ağaç dâhil); küçük kent "
-         "parsellerinde eğim kabadır, ölçü yerine geçmez. ~1-2 MB indirir. Yalnız yerel kipte.",
+         "hâkim bakı + çevre binaların TAHMİNİ kütlesi (Overture/OSM tabanı; boy = kat × 3 m: `kat`, yoksa tapu "
+         "niteliğindeki 'Altı Katlı' gibi ifade, yoksa açık veri, yoksa varsayılan) + döndürülebilir 3D HTML. "
+         "Yanıttaki `uyari_3d` kullanıcıya AYNEN iletilir: görsel gerçek veriye dayanmaz, fikir verme amaçlı "
+         "tahmindir. 30 m'lik YÜZEY modelidir; ölçü yerine geçmez. ~1-2 MB indirir. Yalnız yerel kipte.",
          {"type": "object", "properties": {
-             "ref": _REF, "komsular": {"type": "array", "items": {"type": "string"}}, "inline": _INLINE},
+             "ref": _REF, "komsular": {"type": "array", "items": {"type": "string"}},
+             "kat": {"type": "integer", "minimum": 1, "maximum": 80,
+                     "description": "parseldeki binanın zemin üstü kat sayısı; YALNIZ kullanıcı söylediyse"},
+             "binalar": {"type": "boolean", "default": True, "description": "false: yalnız arazi"},
+             "varsayilan_kat": {"type": "integer", "minimum": 1, "maximum": 80, "default": 3,
+                                "description": "yüksekliği bilinmeyen binalar için"},
+             "inline": _INLINE},
           "required": ["ref"]},
          _t_arazi_3d),
     Tool("parsel_foyu",
@@ -1195,5 +1248,6 @@ if __name__ == "__main__":
         arayuz.calistir(TOOLS, _kapi())
     else:
         if _bayrak("--ui-ile"):
+            arayuz.yoklamayi_ac()
             threading.Thread(target=arayuz.calistir, args=(TOOLS, _kapi(), False), daemon=True).start()
         run(TOOLS, name="tkgm-mcp", version=__version__, instructions=INSTRUCTIONS)
