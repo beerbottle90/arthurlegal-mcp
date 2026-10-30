@@ -287,8 +287,21 @@ araçları sarılmadığından çağrıları kayda girmez, ölçümü yanıltır
 "writes no request logs" beyanıyla çelişmez: o beyan canlı uç noktalar (`arthurlegal-mcp.fly.dev`)
 içindir ve kayıt orada hiç açılmaz.
 
-    fly secrets set AUDIT_LOG=1 -a <test-app>
-    fly logs -a <test-app> | grep '{"olay":'
+Test uygulaması [`fly.denetim.toml`](fly.denetim.toml) ile kurulur. Dosya `fly.toml`'ın kopyasıdır,
+yalnız dört satırı farklıdır: ad, boştayken durma (iki satır) ve TKGM makine sayısı. Ayrılmadığını
+`tests/test_denetim.py` sınar. Uygulama canlıyla aynı Fly organizasyonunda açılır; böylece
+`Dockerfile.code` canlının taban imajını kullanır, `az-relay` iç ağdan erişilir.
+
+    fly apps create arthurlegal-mcp-denetim
+    fly secrets set AUDIT_LOG=1 EMBEDDINGS_API_KEY=<voyage-anahtarı> -a arthurlegal-mcp-denetim
+    flyctl deploy . -c fly.denetim.toml --dockerfile Dockerfile.code --depot=false
+
+Doğrulama: loglarda `denetim logu AÇIK` satırı görünür, `/directory/mcp` 404 döner. Makine boştayken
+durduğundan ölçümden önce `fly machine start -a arthurlegal-mcp-denetim` ile kaldırılır; yoksa ilk
+çağrı başarısız sayılır. `fly logs` yalnız yakın geçmişi gösterir, ölçüm süresince kayıtlar dosyaya
+alınır:
+
+    fly logs -a arthurlegal-mcp-denetim | grep '{"olay":' > denetim-kaydi.jsonl
 
 ---
 
