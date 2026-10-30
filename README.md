@@ -250,6 +250,46 @@ Without a key the server still answers, on BM25 and fuzzy matching, and every
 response says `semantic: "off"` rather than passing a keyword match off as a
 conceptual one.
 
+## Denetim logu (yalnız test uygulaması)
+
+`AUDIT_LOG=1` ile açılan ağ geçidi, modelin "Madde kontrolü: … okundu" beyanını bağımsız bir
+kayıtla karşılaştırmak için her araç çağrısını tek satırlık bir JSON kaydı olarak HER ZAMAN
+standart hata (stderr) akışına yazar: fly logs stdout ile stderr'i birlikte toplar, stdio'da
+protokol kanalı (stdout) temiz kalır. Kayıt satırları `{"olay":` ile başlar; tüketiciler bu öneke
+göre süzer (stderr'de sunucunun başka satırları da vardır). Ayrıntı: `denetim.py`.
+
+- `olay: "cagri"`: `ts`, `session_id`, `request_id`, `tool`, `params`, `resolved`
+  (`tr_mevzuat_madde_getir`: kanun/madde/ok/mulga/durum; `durum` arka ucun ham madde durumu,
+  `mulga` yalnız `durum == "repealed"`; `tr_mevzuat_getir`: kanun/mevzuat_id), `pages` (sayfa,
+  toplam, ilk-son madde), `mulga`, `status` (ok, partial, error, rate_limited, upstream_blocked,
+  unavailable), `duration_ms`, `sure_siniri_asildi` (≥ 100 sn: Claude.ai çağrıyı keser),
+  `backend_version`, `returned` (bütün araçlarda modele giden metnin sha256'sı ve ilk 300
+  karakteri), `kimlikler` (sonuç listelerindeki kayıtların `document_id`, `karar_id`, `ref`,
+  `esas_no`, `karar_no`, `citation` gibi kimlik alanları, en çok 100; başlık ve metin yok).
+- `olay: "iptal"`: `notifications/cancelled`; çağrıyla `session_id` + `request_id` ile eşleşir.
+- Maskeleme yok: `params` arama metni dahil argümanların olduğu gibi kopyasıdır. Gizlenen her
+  alan ölçülemeyen bir davranış olurdu ("aradım, bulamadım" beyanı, arama sonucundan atıf).
+  İstemcinin `session_id`, `request_id`, `reason` metinleri en çok 200 karakter yazılır.
+- Dönen metnin tamamı değil sha256 + ilk 300 karakteri yazılır: metni kesin tanımlar, aynı
+  parametrelerle yeniden getirilebilir, log satırını şişirmez. Kaynak sonradan değişirse eski
+  metin geri gelmez; fark yalnız özetten görünür.
+- Yalnız açıkken `initialize` yanıtı `Mcp-Session-Id` başlığı taşır (kimlik doğrulanmaz,
+  bilinmeyen kimlik reddedilmez). Kapalıyken başlık yoktur, yanıtlar bayt bayt aynıdır.
+
+**Herkese açık uygulamada kapalı kalmalı.** Yalnız ayrı test uygulamasında ve yalnız sentetik
+sorularla (atıf sınav kümesi): sunucu kimlik doğrulamasız, adrese gerçek dosya bilgisiyle bağlanan
+olursa o bilgi de kayda girer. `AUDIT_LOG` tanımsız ya da `1` dışında bir değerse kayıt kapalıdır.
+
+Canlı uygulamada açılmaz: `FLY_APP_NAME` `fly.toml`'daki ad (`arthurlegal-mcp`) iken `AUDIT_LOG=1`
+yok sayılır, stderr'e tek satır uyarı düşer ve sunucu kayıtsız çalışmayı sürdürür. Açıkken
+`/directory/mcp` sunulmaz, yalnız `/mcp` kalır: test uygulamasında dizin trafiği yoktur ve o yolun
+araçları sarılmadığından çağrıları kayda girmez, ölçümü yanıltırdı. [PRIVACY.md](PRIVACY.md)'deki
+"writes no request logs" beyanıyla çelişmez: o beyan canlı uç noktalar (`arthurlegal-mcp.fly.dev`)
+içindir ve kayıt orada hiç açılmaz.
+
+    fly secrets set AUDIT_LOG=1 -a <test-app>
+    fly logs -a <test-app> | grep '{"olay":'
+
 ---
 
 Source: [github.com/beerbottle90/arthurlegal-mcp](https://github.com/beerbottle90/arthurlegal-mcp) · License: [MIT](LICENSE); each backend folder carries its own copy.
