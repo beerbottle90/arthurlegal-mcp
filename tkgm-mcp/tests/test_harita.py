@@ -404,7 +404,7 @@ class Html(unittest.TestCase):
         sayfa = h.harita_html(self.p, [self.komsu])
         for beklenen in ("123/4", "© OpenStreetMap contributors", "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                          "leaflet/1.9.4/leaflet.min.js", 'integrity="sha512-', "maxZoom:19", "fitBounds",
-                         "L.control.scale", "1.200,00 m²", "Tarla", "Ankara / Çankaya / Örnek", "md. 4",
+                         "L.control.scale", "1.200,00 m²", "Tarla", "Ankara / Çankaya / Örnek", "resmî işlemlerde kullanılamaz",
                          "röperli"):
             self.assertIn(beklenen, sayfa)
         veri = self._veri(sayfa, "var V=")
@@ -417,7 +417,7 @@ class Html(unittest.TestCase):
     def test_uc_boyut_icerigi(self):
         sayfa = h.arazi_3d_html(self.p, [self.komsu], self.izgara, self.ozet)
         for beklenen in ("123/4", "three@0.160.0", "importmap", "OrbitControls", 'min="1" max="5"', 'value="2"',
-                         "sentetik", "Copernicus", "DLR", "md. 4", "DSM", "Hâkim bakı", "GB"):
+                         "sentetik", "Copernicus", "DLR", "resmî işlemlerde kullanılamaz", "DSM", "Hâkim bakı", "GB"):
             self.assertIn(beklenen, sayfa)
         veri = self._veri(sayfa, "const V=")
         self.assertEqual(len(veri["dz"]), veri["nx"] * veri["ny"])

@@ -440,7 +440,7 @@ class Portfoy(unittest.TestCase):
 
 class AgYok(unittest.TestCase):
     def test_modul_ag_kutuphanesi_almaz(self):
-        """Parsel Sorgu Kullanım Koşulları md. 3: bu modülün TKGM'ye — ya da herhangi bir yere —
+        """Tasarım kuralı: bu modülün TKGM'ye — ya da herhangi bir yere —
         istek göndermesinin yolu olmamalı. Adres yalnız dizgi olarak geçer."""
         with open(rapor.__file__, encoding="utf-8") as fh:
             kaynak = fh.read()
