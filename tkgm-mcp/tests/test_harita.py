@@ -404,7 +404,7 @@ class Html(unittest.TestCase):
         sayfa = h.harita_html(self.p, [self.komsu])
         for beklenen in ("123/4", "© OpenStreetMap contributors", "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                          "leaflet/1.9.4/leaflet.min.js", 'integrity="sha512-', "maxZoom:19", "fitBounds",
-                         "L.control.scale", "1.200,00 m²", "Tarla", "Ankara / Çankaya / Örnek", "md. 4",
+                         "L.control.scale", "1.200,00 m²", "Tarla", "Ankara / Çankaya / Örnek", "resmî işlemlerde kullanılamaz",
                          "röperli"):
             self.assertIn(beklenen, sayfa)
         veri = self._veri(sayfa, "var V=")
@@ -417,7 +417,7 @@ class Html(unittest.TestCase):
     def test_uc_boyut_icerigi(self):
         sayfa = h.arazi_3d_html(self.p, [self.komsu], self.izgara, self.ozet)
         for beklenen in ("123/4", "three@0.160.0", "importmap", "OrbitControls", 'min="1" max="5"', 'value="2"',
-                         "sentetik", "Copernicus", "DLR", "md. 4", "DSM", "Hâkim bakı", "GB"):
+                         "sentetik", "Copernicus", "DLR", "resmî işlemlerde kullanılamaz", "DSM", "Hâkim bakı", "GB"):
             self.assertIn(beklenen, sayfa)
         veri = self._veri(sayfa, "const V=")
         self.assertEqual(len(veri["dz"]), veri["nx"] * veri["ny"])
@@ -441,8 +441,9 @@ class Html(unittest.TestCase):
                       h.arazi_3d_html(self.p, [self.komsu], self.izgara, self.ozet)):
             self.assertNotIn("tkgm.gov.tr", sayfa)
             adresler = set(re.findall(r"https?://[^/\"'\s]+", sayfa))
+            # Esri uydu ucu sayfada durur ama anahtarsız çalışmaz; anahtarı yalnız yerel arayüz yerleştirir.
             self.assertLessEqual(adresler, {"https://cdnjs.cloudflare.com", "https://tile.openstreetmap.org",
-                                           "https://cdn.jsdelivr.net"})
+                                           "https://cdn.jsdelivr.net", "https://ibasemaps-api.arcgis.com"})
         with open(h.__file__.replace(".pyc", ".py"), encoding="utf-8") as fh:
             self.assertNotIn("tkgm.gov.tr", fh.read())
 
@@ -452,7 +453,8 @@ class Html(unittest.TestCase):
             "nitelik": _SALDIRI, "adaNo": _SALDIRI, "mahalleAd": "<img src=x onerror=alert(1)>",
             "parselNo": " '\"--><svg onload=alert(1)>"})
         (kotu,) = parseller.oku(json.dumps(gj))
-        for sayfa, betik_sayisi in ((h.harita_html(kotu, [kotu, self.komsu]), 2),
+        # Harita: dosyadan-açılış notu + Leaflet + harita betiği. 3B: importmap + modül.
+        for sayfa, betik_sayisi in ((h.harita_html(kotu, [kotu, self.komsu]), 3),
                                     (h.arazi_3d_html(kotu, [self.komsu], self.izgara, self.ozet), 2)):
             self.assertEqual(sayfa.count("</script>"), betik_sayisi)
             self.assertEqual(len(re.findall(r"<script\b", sayfa)), betik_sayisi)

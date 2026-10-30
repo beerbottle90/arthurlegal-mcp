@@ -1,7 +1,8 @@
 # tkgm-mcp
 
 Tapu-kadastro parsel araçları: TKGM Parsel Sorgu'dan **canlı parsel** (hız sınırlı), parsel raporu,
-ölçü, **ölçekli SVG kroki**, harita, biçim dönüşümü ve dayanak köprüsü. Yalnız standart kütüphane;
+ölçü, **ölçekli SVG kroki**, harita (isteğe bağlı uydu görünümü), **tahmini 3D görünüm**, biçim dönüşümü
+ve dayanak köprüsü. Yalnız standart kütüphane;
 `pip install` yok. Birleşik `arthurlegal-mcp` ucunda araçlar `tkgm_` önekiyle görünür; adları ucun
 öbür araçlarıyla (`tr_…_ara`, `tr_hukuk_arastirma_rehberi` gibi) sözcük paylaşmaz (`tests/test_canli.py`).
 
@@ -85,12 +86,30 @@ sunucunun diskini internete açar. Orada parsel `icerik` ile metin olarak verili
     python server.py --ui        # http://127.0.0.1:8765 açılır: parseli TKGM'den getir ya da dosyayı bırak, kroki/harita/3D gör, Word föy indir
     python server.py --ui-ile    # MCP (stdio) + aynı süreçte arayüz: Claude'un okuttuğu parseller arayüzde de görünür
 
+Görünüm AL Masası'yla aynı dildedir: açık tema varsayılan (beyaz zemin, siyah yazı), koyu tema AL
+laciverti, Otomatik sistem temasına uyar; sol panelde sorgu formu ve parseller, sağda sekmeler. Renkler
+`arthurlegal-app4all` ortak tasarımından (`al.css`), arma ve simge ArthurLegal simge üreticisinden gelir.
+
 Arayüz ayrı bir API değildir; MCP araç listesini `POST /api/cagir` üzerinden açar. Yalnız 127.0.0.1'e
 bağlanır. Kilitler: yabancı `Host` ret (DNS rebinding); süreç başına **rastgele belirteç** — her POST
 `X-Tkgm: <belirteç>`, her `/api` ve `/dosya` GET'i `?t=<belirteç>` taşır ve belirteç yalnız sayfaya gömülür;
-yabancı `Origin` ve `Sec-Fetch-Site: cross-site` ret; sayfa çerçevelenemez (`X-Frame-Options: DENY`),
-dosya bağlantıları Referer ile belirteç sızdırmaz. Windows'ta kapıya münhasır bağlanılır
-(`SO_EXCLUSIVEADDRUSE`). Dosya sunumu çıktı klasöründeki düz adlarla sınırlıdır.
+yabancı `Origin` ve `Sec-Fetch-Site: cross-site` ret; sayfa çerçevelenemez (`X-Frame-Options: DENY`).
+Windows'ta kapıya münhasır bağlanılır (`SO_EXCLUSIVEADDRUSE`). Dosya sunumu çıktı klasöründeki düz
+adlarla sınırlıdır.
+
+**Harita karoları.** OpenStreetMap karo sunucusu Referer taşımayan isteğe "Access blocked" karosu döndürür.
+Sayfalar `Referrer-Policy: strict-origin` ile sunulur ve Leaflet karoları aynı politikayla ister: yalnız
+köken (`http://127.0.0.1:8765/`) gider, adresteki `?t=` belirteci gitmez. index.html sıkı bir CSP taşır;
+harita ve 3D, srcdoc'lu iframe'lerde bu politikayı miras aldığı için izin listesi tam olarak yüklenen
+adreslerdir (Leaflet için cdnjs, OSM karoları, three.js için jsDelivr, Esri karoları). Dosyadan
+(çift tıklayarak) açılan harita köken gönderemez; sayfa bunu bir notla söyler.
+
+**Arayüzde aç.** Arayüz aynı süreçte açıksa (`--ui-ile`; ArthurLegal kurulumu Tapu'yu böyle başlatır)
+`harita`, `arazi_3d` ve `kroki` yanıtı `arayuzde_ac` bağlantısı da döndürür:
+`http://127.0.0.1:8765/dosya/<ad>?g=<görüntüleme belirteci>`. Görüntüleme belirteci sayfa belirtecinden
+ayrıdır, yalnız GET `/dosya/<ad>` açar, hiçbir `/api` ucunu açmaz ve başka bir sitenin sayfasına
+gömülemez (yalnız üst düzey açılış). Ayar klasöründe kalıcıdır; arayüzü hangi süreç sunuyorsa
+(Claude Desktop'un başlattığı MCP ya da masaüstü kısayolu) bağlantı çalışır.
 
 **TKGM'den getir formu.** Parsel Sorgu'daki sırayla alt alta zorunlu kutular. İl → İlçe → Mahalle/köy açılır
 listeleri TKGM'nin kendi idari listelerinden dolar (`GET /api/idari`); ad yazılmaz, seçilir, sorgu mahalle
@@ -110,7 +129,32 @@ teslim eder, cevap Cevaplar listesine düşer. Bunun için Claude Desktop'ta yer
 uç kullanıcının diskine yazamaz. O durumda cevap elle yapıştırılıp kaydedilir. Arayüz modele doğrudan
 bağlanmaz ve API anahtarı istemez.
 Kroki `<img>` içinde, harita ve 3D `sandbox`'lı iframe içinde gösterilir. "Dosyalarım" sekmesi çıktı
-klasörünü listeler — Claude oturumlarında üretilen dosyalar da orada görünür.
+klasörünü listeler — Claude oturumlarında üretilen dosyalar da orada görünür. Sayfa adresine `#uc`
+eklenirse 3D sekmesi, `#harita` eklenirse harita sekmesi açılır.
+
+## Tahmini 3D görünüm
+
+`arazi_3d` (ve arayüzün "3D Görünüm" sekmesi) araziyi Copernicus GLO-30 yükseklik modelinden, çevre
+binaların tabanlarını Overture Maps açık verisinden (OpenStreetMap ve Microsoft ML) çizer. Binanın boyu
+kural tablosuyla tahmin edilir (`tkgm_bina.py`): kullanıcının verdiği `kat` > tapu niteliğindeki ifade
+("Altı Katlı", "Zemin+4") > açık verideki yükseklik/kat > varsayılan 3 kat; kat başına 3 m. Kullanıcı ya
+da nitelik yüksekliği varsa açık verideki yükseklikler o sahnede kullanılmaz, komşular varsayılan kattır.
+Bina verisi gelmezse arazi yine çizilir ve yanıtta söylenir. Bina verisi diske yazılmaz.
+
+Kütle görüntüden çıkarılmaz; Google görüntüsünden bina izi ya da 3D türetilmez. Uydu görüntüsü (aşağıda)
+3D'de yalnız zemin dokusu olarak serilir. Her yüzeyde aynı uyarı durur — 3D sayfasında kartın dışında,
+betiksiz ve kapatılamaz bir şerit, araç yanıtında `uyari_3d`, arayüzün 3D sekmesinde:
+
+> UYARI: Bu 3B görsel gerçek (ölçülmüş ya da resmî) veriye dayanmaz. Yapay zekâ ve otomatik kurallarla üretilmiş bir TAHMİNDİR; yalnız fikir vermek amacıyla oluşturulmuştur. Ölçüm, imar durumu, ruhsat, röleve ya da bilirkişi incelemesi yerine geçmez ve resmî işlemde kullanılamaz.
+
+## Uydu görünümü (Esri, kendi anahtarınızla)
+
+Harita ve 3D, Esri World Imagery uydu görüntüsünü de gösterebilir. Bunun için her kullanıcı kendi ücretsiz
+ArcGIS Location Platform anahtarını (Basemaps yetkili) arayüzün Harita ya da 3D sekmesindeki "Uydu
+görünümü" kutusuna girer, ya da `TKGM_ESRI_ANAHTARI` ortam değişkenine yazar. Anahtar ayar klasöründe
+durur (`~/.arthurlegal/tkgm`, `TKGM_AYAR` ile değişir), hiçbir üretilen dosyaya, araç yanıtına ya da
+Claude'a gitmez: sayfada bir işaret durur, anahtarı yalnız yerel arayüz sayfayı tarayıcıya verirken
+yerleştirir. Anahtar girilmemişse altlık OpenStreetMap'tir.
 
 ## Araçlar
 
@@ -125,8 +169,8 @@ klasörünü listeler — Claude oturumlarında üretilen dosyalar da orada gör
 | `parsel_oku` | Kullanıcının getirdiği GeoJSON/KML → `ref`, öznitelik, hesap alanı, nitelik rejimi uyarıları |
 | `geometri` | Alan, çevre, kenar boyları, semtler, iç açılar (grad) |
 | `kroki` | A4, mm birimli, ölçekli SVG; komşu parsellerle |
-| `harita` | OpenStreetMap altlıklı etkileşimli HTML harita (karoları kullanıcının tarayıcısı yükler) |
-| `arazi_3d` | Copernicus GLO-30 üstüne parsel: kot, eğim, bakı + 3D HTML — yalnız yerel kipte |
+| `harita` | OpenStreetMap altlıklı etkileşimli HTML harita (karoları kullanıcının tarayıcısı yükler); arayüzde kendi anahtarınızla uydu katmanı |
+| `arazi_3d` | Copernicus GLO-30 üstüne parsel: kot, eğim, bakı + çevre binaların **tahmini** kütlesi + 3D HTML; `uyari_3d` aynen iletilir — yalnız yerel kipte |
 | `koridor_kesisim` | Hat + genişlik → parsel başına kesilen alan ve eksen boyu, ölçülmüş hata payıyla |
 | `parsel_foyu` / `portfoy_tablosu` | Word föyü (.docx) ve Excel dökümü (.xlsx) — yalnız yerel kipte |
 | `tarife_kalemi` / `harc_hesapla` | 2026 tapu harcı + döner sermaye; her rakam `veri/tarife_2026.json`da alıntısıyla |
@@ -162,8 +206,11 @@ Yanıt maskelenMEYENİ de adıyla sayar: adres, doğum tarihi ve Arthur Mask yok
 - **OpenStreetMap Nominatim:** yalnız `yer_bul`, saniyede en çok bir istek.
 - **Copernicus DEM:** `arazi_3d`nin karosu (AWS açık veri, adres beyaz listeli, ~1-2 MB), yalnız yerel
   kipte: kimlik doğrulamasız paylaşılan uçta isteyen herkes sunucuya bant genişliği harcatabilirdi.
+- **Overture Maps:** `arazi_3d`nin bina tabanları (`stac.overturemaps.org` sürüm adı + resmî PMTiles
+  arşivinden HTTP Range, parsel başına ~300 KB), yalnız yerel kipte, yalnız bellekte.
+- **Esri:** yalnız kullanıcı anahtarını kaydederken, anahtarın geçerliliğini sınamak için bir istek.
 
-Harita ve 3D sayfalarındaki OSM karoları ile three.js/Leaflet betiklerini sunucu değil, dosyayı
+Harita ve 3D sayfalarındaki OSM/Esri karoları ile three.js/Leaflet betiklerini sunucu değil, dosyayı
 açan tarayıcı yükler.
 
 ## Dışa aktarımın hassasiyeti
@@ -188,6 +235,18 @@ arasındaki fark bir işarettir, hata tespiti değildir.
 Görsel ve dışa aktarım dosyaya yazılır; modele yol ve birkaç satır özet döner (kroki yanıtı
 ~120 token). Yanıtlar sıkıştırılmış JSON'dur. Parseller içerik özetinden türeyen `ref` ile
 anılır; geometri her çağrıda yeniden gönderilmez.
+
+## Sürüm notları
+
+**0.6.0 (30.10.2026)**
+- Tahmini 3D görünüm: `arazi_3d` çevre binaların tahmini kütlesini çizer (`kat`, `binalar`,
+  `varsayilan_kat`); yanıt `uyari_3d` ve `binalar` özetini taşır. Uyarı her yüzeyde, kapatılamaz.
+- Uydu görünümü: Esri World Imagery, kullanıcının kendi anahtarıyla; anahtar dosyaya ve yanıta yazılmaz.
+- Harita karoları: `strict-origin` Referer politikası (OSM'nin "Access blocked" karosu), sıkı CSP,
+  dosyadan açılan harita için not; bilgi kartı katlanır, yakınlaştırma düğmeleri kartın altında kalmaz.
+- `arayuzde_ac`: harita, 3D ve kroki yanıtında arayüzde açan bağlantı (yalnız o dosyayı açan belirteçle).
+- Arayüz AL Masası'nın tasarım diline geçti (açık/koyu/otomatik tema, sol panel, yumuşak kartlar);
+  logo ve simge yeni ArthurLegal simgesinden.
 
 ## Test
 

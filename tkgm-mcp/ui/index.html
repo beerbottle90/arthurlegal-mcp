@@ -1,76 +1,193 @@
 <!doctype html>
-<html lang="tr">
+<html lang="tr" data-tema="acik">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="tkgm-uyari-3d" content="__TKGM_UYARI_3D__">
 <title>ArthurLegal · Tapu</title>
 <link rel="icon" href="/logo.png">
+<!--
+  ArthurLegal Tapu arayüzü. Görünüm AL Masası'yla aynı dildedir: renk ve biçim belirteçleri
+  arthurlegal-app4all ortak/tasarim/al.css'ten (açık tema varsayılan, koyu tema AL laciverti),
+  arma ArthurLegal-setup/varlik/simge.py'den. Tema seçimi bu sayfada saklanır (al.tema).
+-->
+<script>
+/* Tema ilk boyamadan önce uygulanır: koyu temada beyaz bir an yanıp sönmesin. */
+(function () { var s = "acik"; try { s = localStorage.getItem("al.tema") || "acik"; } catch (e) { }
+  var koyu = s === "koyu" || (s === "otomatik" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.tema = koyu ? "koyu" : "acik"; })();
+</script>
 <style>
-:root{--lacivert:#0b1f3a;--derin:#071427;--panel:#10294d;--panel2:#15335e;--altin:#c9a44c;--altin2:#e3c77a;
---krem:#f5efe0;--soluk:#a9b6cc;--cizgi:rgba(201,164,76,.28);--kirmizi:#e2776b;--yesil:#7fc8a0}
-*{box-sizing:border-box}html,body{height:100%;margin:0}
-body{background:var(--derin);color:var(--krem);font:14px/1.5 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column}
-h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0}
-header{display:flex;align-items:center;gap:14px;padding:10px 20px;background:var(--lacivert);border-bottom:1px solid var(--cizgi)}
-header img{width:42px;height:42px;border-radius:6px}
-header h1{font-size:20px;letter-spacing:.3px}header h1 span{color:var(--altin)}
-header .alt{color:var(--soluk);font-size:12px}
-header .sag{margin-left:auto;font-size:12px;color:var(--soluk);text-align:right}
-main{flex:1;display:grid;grid-template-columns:300px 1fr;min-height:0}
-aside{background:var(--lacivert);border-right:1px solid var(--cizgi);padding:16px;overflow:auto}
-section{display:flex;flex-direction:column;min-width:0;min-height:0}
-.birak{border:1.5px dashed var(--altin);border-radius:10px;padding:18px 12px;text-align:center;color:var(--soluk);cursor:pointer;transition:.15s}
-.birak.ustunde,.birak:hover{background:var(--panel);color:var(--krem)}
-.birak b{color:var(--altin2);display:block;font-size:15px;margin-bottom:4px}
-.adim{font-size:12px;color:var(--soluk);margin:12px 0 0;padding-left:16px}.adim li{margin:3px 0}
-.adim a,.bag{color:var(--altin2)}
-.canli{margin-bottom:16px}.canli b{color:var(--altin2);display:block;font-size:15px;margin-bottom:6px}
-.canli .dugmeler{margin-top:6px}.veya{font-size:12px;color:var(--soluk);text-align:center;margin:0 0 10px}
-.canli label{margin:6px 0 2px}.zorunlu{color:var(--kirmizi)}.ikili{display:flex;gap:8px}.ikili>div{flex:1;min-width:0}
-select:disabled,input:disabled{opacity:.55}.gecersiz{border-color:var(--kirmizi)!important}
-.koordinat{margin-top:10px;font-size:12px;color:var(--soluk)}.koordinat summary{cursor:pointer}
-#f-uyari{margin-top:6px;min-height:18px}
-.liste{margin-top:16px;display:flex;flex-direction:column;gap:6px}
-.pk{background:var(--panel);border:1px solid transparent;border-radius:8px;padding:8px 10px;cursor:pointer}
-.pk.secili{border-color:var(--altin);background:var(--panel2)}
-.pk b{display:block;font-size:13px}.pk small{color:var(--soluk)}
-nav{display:flex;gap:2px;padding:0 16px;background:var(--lacivert);border-bottom:1px solid var(--cizgi);overflow-x:auto}
-nav button{background:none;border:0;color:var(--soluk);padding:11px 14px;font:inherit;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
-nav button.acik{color:var(--altin2);border-bottom-color:var(--altin)}
-.govde{flex:1;overflow:auto;padding:18px 20px}
+:root {
+  --zemin: #ffffff;
+  --yuzey: #ffffff;
+  --grup: #f6f5f1;
+  --grup-ust: #efede6;
+  --alan: rgb(247 201 72 / 0.12);
+  --cizgi: rgb(13 24 38 / 0.10);
+  --cizgi-guclu: rgb(13 24 38 / 0.18);
+  --metin: #0d1117;
+  --ikincil: #4b5565;
+  --soluk: #808a99;
+  --altin: #f7c948;
+  --altin-metin: #8a6400;
+  --lacivert: #12285a;
+  --birincil: #12285a;
+  --birincil-yazi: #ffffff;
+  --dolgu: rgb(118 118 128 / 0.12);
+  --dolgu-ust: rgb(118 118 128 / 0.20);
+  --secili: rgb(247 201 72 / 0.16);
+  --nane-metin: #1f7a52;   --nane-zemin: #eaf6f0;
+  --amber-metin: #87621f;  --amber-zemin: #fbf3e0;
+  --kirmizi-metin: #b43d2a; --kirmizi-zemin: #fceeeb;
+  --mavi-metin: #2c62b5;   --mavi-zemin: #edf3fd;
+  --halka: rgb(44 98 181 / 0.35);
+  --golge: 0 1px 2px rgb(13 24 38 / 0.05), 0 4px 16px rgb(13 24 38 / 0.06);
+
+  --yazi: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+          "Segoe UI Variable", "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --yazi-baslik: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display",
+                 "Segoe UI Variable", "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --k-kart: 20px;
+  --k-grup: 14px;
+  --k-alan: 12px;
+  --k-hap: 999px;
+
+  --guvenli-ust: 0px;
+  --guvenli-sag: 0px;
+  --guvenli-alt: 0px;
+  --guvenli-sol: 0px;
+  color-scheme: light;
+}
+
+:root[data-tema="koyu"] {
+  --zemin: #0a1430;
+  --yuzey: #0e1d3d;
+  --grup: #142749;
+  --grup-ust: #1a3057;
+  --alan: rgb(247 201 72 / 0.12);
+  --cizgi: rgb(255 255 255 / 0.08);
+  --cizgi-guclu: rgb(255 255 255 / 0.16);
+  --metin: #f2f4f8;
+  --ikincil: #a7b3c6;
+  --soluk: #7c889c;
+  --altin-metin: #f7cd55;
+  --lacivert: #e8e4da;
+  --birincil: #f7c948;
+  --birincil-yazi: #0a1430;
+  --dolgu: rgb(255 255 255 / 0.07);
+  --dolgu-ust: rgb(255 255 255 / 0.12);
+  --secili: rgb(247 201 72 / 0.16);
+  --nane-metin: #6fd3a4;   --nane-zemin: rgb(63 169 124 / 0.16);
+  --amber-metin: #e7c26a;  --amber-zemin: rgb(224 178 76 / 0.15);
+  --kirmizi-metin: #f08a78; --kirmizi-zemin: rgb(229 83 63 / 0.16);
+  --mavi-metin: #8db8f5;   --mavi-zemin: rgb(94 155 239 / 0.16);
+  --halka: rgb(141 184 245 / 0.45);
+  --golge: 0 0 0 0.5px rgb(255 255 255 / 0.06);
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}[hidden]{display:none!important}
+body{background:var(--zemin);color:var(--metin);font:15px/1.5 var(--yazi);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--yazi-baslik);letter-spacing:-.015em;margin:0}
+h1{font-size:24px;line-height:1.25;font-weight:650}h3{font-size:15px;font-weight:600}
+a{color:var(--altin-metin)}
+.masa{display:grid;grid-template-columns:304px minmax(0,1fr);height:100vh}
+
+/* ---- Sol panel (Masa'daki gibi) ---- */
+.panel{display:flex;flex-direction:column;gap:12px;padding:16px 14px;border-right:.5px solid var(--cizgi);background:var(--zemin);overflow:auto}
+.panel-ust{display:flex;align-items:center;gap:10px;padding:2px 4px 4px}
+.arma{flex:none;width:30px;height:30px;border-radius:8px;display:block;box-shadow:0 0 0 .5px var(--cizgi)}
+.marka{font-weight:700;font-size:15px;letter-spacing:-.01em;white-space:nowrap}.marka span{color:var(--altin-metin)}
+.modul-adi{color:var(--ikincil);font-size:15px;font-weight:500;white-space:nowrap}
+.bolum-adi{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--soluk);padding:6px 4px 0}
+.grup{display:flex;flex-direction:column;gap:4px;padding:14px;background:var(--grup);border-radius:var(--k-grup)}
+.grup h3{margin-bottom:4px}
+.veya{font-size:12px;color:var(--soluk);text-align:center}
+.birak{border:1px dashed var(--cizgi-guclu);border-radius:var(--k-grup);padding:16px 12px;text-align:center;color:var(--ikincil);font-size:13px;cursor:pointer;transition:background-color .12s}
+.birak.ustunde,.birak:hover{background:var(--grup)}
+.birak b{color:var(--metin);display:block;font-size:14px;margin-bottom:2px}
+.nasil{font-size:12.5px;color:var(--ikincil)}.nasil summary{cursor:pointer;font-weight:600;color:var(--ikincil)}
+.adim{margin:6px 0 0;padding-left:18px}.adim li{margin:3px 0}
+.panel-alt{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:6px}
+.segment{display:flex;gap:2px;padding:3px;border-radius:var(--k-hap);background:var(--dolgu)}
+.segment button{flex:1;min-height:30px;padding:0 8px;font-size:12.5px;background:transparent}
+.segment button[aria-pressed="true"]{background:var(--yuzey);box-shadow:var(--golge);font-weight:600}
+.surum,.yerel{font-size:12px;color:var(--soluk);padding:0 4px}
+
+/* ---- İçerik ---- */
+.icerik{display:flex;flex-direction:column;min-width:0;min-height:0}
+.icerik-ust{padding:22px 28px 6px}
+.alt-yazi{margin:4px 0 0;color:var(--ikincil);font-size:14.5px;max-width:78ch}
+.sekmeler{display:flex;flex-wrap:wrap;gap:4px;padding:10px 28px 8px}
+.sekmeler button{flex:none;min-height:34px;padding:0 14px;background:transparent;color:var(--ikincil);font-weight:500;white-space:nowrap}
+.sekmeler button:hover{background:var(--dolgu)}
+.sekmeler button.acik{background:var(--secili);color:var(--metin);font-weight:600}
+.govde{flex:1;overflow:auto;padding:10px 28px 24px}
 .sek{display:none}.sek.acik{display:block}
 .izgara{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
-.kart{background:var(--panel);border:1px solid var(--cizgi);border-radius:10px;padding:14px 16px}
-.kart h3{font-size:15px;color:var(--altin2);margin-bottom:8px}
-table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.07);text-align:left;vertical-align:top}
-td:first-child{color:var(--soluk);white-space:nowrap}th{color:var(--altin2);font-weight:600}
-.uyari{background:rgba(201,164,76,.12);border-left:3px solid var(--altin);padding:8px 10px;border-radius:4px;margin:8px 0;font-size:13px}
-.hata{background:rgba(226,119,107,.14);border-left:3px solid var(--kirmizi)}
-.dugmeler{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-button.d,a.d{background:var(--altin);color:#1a1405;border:0;border-radius:7px;padding:8px 13px;font:600 13px inherit;cursor:pointer;text-decoration:none;display:inline-block}
-button.d.ikincil,a.d.ikincil{background:transparent;color:var(--altin2);border:1px solid var(--altin)}
-button.d:disabled{opacity:.5;cursor:wait}
-input,select,textarea{background:var(--derin);color:var(--krem);border:1px solid var(--cizgi);border-radius:6px;padding:7px 9px;font:inherit;width:100%}
-textarea{min-height:170px;font-family:Consolas,monospace;font-size:12px}
-label{display:block;font-size:12px;color:var(--soluk);margin:8px 0 3px}
-.cerceve{width:100%;height:calc(100vh - 210px);min-height:420px;border:1px solid var(--cizgi);border-radius:10px;background:#fff}
-.kroki{background:#fff;border-radius:10px;max-width:100%;height:calc(100vh - 200px);display:block;margin:0 auto}
-.bos{color:var(--soluk);text-align:center;padding:60px 20px}
-.kucuk{font-size:12px;color:var(--soluk)}code{color:var(--altin2)}
-pre.metin{white-space:pre-wrap;word-break:break-word;font:13px/1.5 "Segoe UI",system-ui,sans-serif;margin:6px 0 0}
-.cevap{border-top:1px solid var(--cizgi);padding:10px 0}.cevap:first-child{border-top:0}
-footer{padding:6px 20px;font-size:11px;color:var(--soluk);background:var(--lacivert);border-top:1px solid var(--cizgi)}
+.kart{background:var(--yuzey);border:.5px solid var(--cizgi);border-radius:var(--k-kart);box-shadow:var(--golge);padding:16px 18px;min-width:0}
+.kart h3{margin-bottom:10px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td,th{padding:5px 6px;border-bottom:.5px solid var(--cizgi);text-align:left;vertical-align:top}
+td:first-child{color:var(--ikincil);white-space:nowrap}th{color:var(--ikincil);font-weight:600}
+.uyari{background:var(--amber-zemin);color:var(--amber-metin);padding:10px 14px;border-radius:var(--k-alan);margin:8px 0;font-size:13.5px;line-height:1.45}
+.uyari.hata{background:var(--kirmizi-zemin);color:var(--kirmizi-metin)}
+.uyari.bilgi{background:var(--mavi-zemin);color:var(--mavi-metin)}
+.uyari3d{font-weight:500}
+.dugmeler{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+
+/* ---- Düğmeler, alanlar (al.css) ---- */
+button,a.d{font:inherit;font-size:14px;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:0 14px;border:0;border-radius:var(--k-hap);background:var(--dolgu);color:var(--metin);cursor:pointer;text-decoration:none;transition:background-color .12s,transform .12s,opacity .12s}
+button:hover,a.d:hover{background:var(--dolgu-ust)}button:active{transform:scale(.97)}
+button.d,a.d{background:var(--birincil);color:var(--birincil-yazi);font-weight:600}
+button.d:hover,a.d:hover{opacity:.9;background:var(--birincil)}
+button.d.ikincil,a.d.ikincil{background:var(--dolgu);color:var(--metin);font-weight:500}
+button.d.ikincil:hover,a.d.ikincil:hover{background:var(--dolgu-ust)}
+button:disabled{opacity:.5;cursor:default;transform:none}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;box-shadow:0 0 0 3px var(--halka)}
+input,select,textarea{font:inherit;font-size:14px;color:var(--metin);background:var(--yuzey);border:.5px solid var(--cizgi-guclu);border-radius:var(--k-alan);padding:8px 11px;width:100%;min-width:0}
+input[type=checkbox]{width:auto;vertical-align:middle;accent-color:var(--birincil)}
+input::placeholder,textarea::placeholder{color:var(--soluk)}
+textarea{min-height:170px;font-family:Consolas,"SF Mono",monospace;font-size:12.5px;resize:vertical}
+label{display:block;font-size:12px;font-weight:600;color:var(--ikincil);margin:8px 0 4px}
+.zorunlu{color:var(--kirmizi-metin)}.ikili{display:flex;gap:8px}.ikili>div{flex:1;min-width:0}
+select:disabled,input:disabled{opacity:.55}.gecersiz{border-color:var(--kirmizi-metin)!important}
+.koordinat{margin-top:8px;font-size:12.5px;color:var(--ikincil)}.koordinat summary{cursor:pointer;font-weight:600}
+#f-uyari{margin-top:6px;min-height:18px}
+.liste{display:flex;flex-direction:column;gap:6px}
+.pk{background:var(--yuzey);border:.5px solid var(--cizgi);border-radius:var(--k-grup);padding:9px 12px;cursor:pointer}
+.pk:hover{border-color:var(--cizgi-guclu)}.pk.secili{background:var(--secili);border-color:transparent}
+.pk b{display:block;font-size:13.5px;font-weight:600}.pk small{color:var(--ikincil)}
+.cerceve{width:100%;height:calc(100vh - 250px);min-height:420px;border:.5px solid var(--cizgi);border-radius:var(--k-grup);background:#fff;display:block}
+.kroki{background:#fff;border-radius:var(--k-grup);border:.5px solid var(--cizgi);max-width:100%;height:calc(100vh - 240px);display:block;margin:0 auto}
+.bos{padding:40px 20px;border-radius:var(--k-grup);border:.5px dashed var(--cizgi-guclu);color:var(--ikincil);text-align:center;font-size:14px}
+.kucuk{font-size:12.5px;color:var(--ikincil)}code{color:var(--altin-metin)}
+.bag{color:var(--altin-metin)}
+pre.metin{white-space:pre-wrap;word-break:break-word;font:13.5px/1.5 var(--yazi);margin:6px 0 0}
+.cevap{border-top:.5px solid var(--cizgi);padding:10px 0}.cevap:first-child{border-top:0}
+.ayar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:12px;padding:12px 14px;border-radius:var(--k-grup);background:var(--grup);font-size:13.5px}
+.ayar .durum{font-weight:600}.ayar input{flex:1 1 220px;width:auto}
+.secenekler{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:10px 0}
+.secenekler label{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13.5px;font-weight:500;color:var(--metin)}
+.secenekler input[type=number]{width:90px}
+footer{padding:8px 28px;font-size:11.5px;color:var(--soluk);border-top:.5px solid var(--cizgi)}
+@media (max-width:860px){
+  .masa{grid-template-columns:minmax(0,1fr);height:auto;min-height:100vh}
+  .panel{border-right:0;border-bottom:.5px solid var(--cizgi);overflow:visible}
+  .icerik-ust,.sekmeler,.govde,footer{padding-left:16px;padding-right:16px}
+  .cerceve,.kroki{height:70vh}
+}
+@media (prefers-reduced-motion:reduce){button{transition:none}button:active{transform:none}}
 </style>
 </head>
 <body>
-<header>
-  <img src="/logo.png" alt="ArthurLegal">
-  <div><h1>ArthurLegal <span>· Tapu</span></h1><div class="alt">Parsel ölçüsü · ölçekli kroki · harita · 3D arazi · föy</div></div>
-  <div class="sag" title="Parsel dosyası ve tapu metni bu bilgisayarda işlenir. Canlı parsel sorgusu TKGM Parsel Sorgu'ya bu bilgisayardan, dakikada en çok 30 istekle gider. Harita ve 3D sekmeleri yalnız siz açınca OpenStreetMap karolarını ve Copernicus yükseklik verisini çeker; bu, parselin konumunu o sunuculara bildirir.">Yerel çalışır — parsel ve tapu verisi bu bilgisayarda işlenir<br><span id="surum"></span></div>
-</header>
-<main>
-<aside>
-  <div class="canli" id="f"><b>TKGM'den getir</b>
+<div class="masa">
+<aside class="panel">
+  <div class="panel-ust"><svg class="arma" viewBox="0 0 100 100" role="img" aria-label="ArthurLegal arması"><defs><linearGradient id="alArmaZ" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#183064"/><stop offset="1" stop-color="#071230"/></linearGradient><linearGradient id="alArmaA" x1="0" y1="0.2" x2="0" y2="0.8"><stop offset="0" stop-color="#FFE48A"/><stop offset="1" stop-color="#F7BE2D"/></linearGradient></defs><path fill="url(#alArmaZ)" d="M100.00 50.00L99.90 69.75L99.61 76.01L99.13 80.49L98.44 84.05L97.55 87.01L96.44 89.52L95.11 91.68L93.53 93.53L91.68 95.11L89.52 96.44L87.01 97.55L84.05 98.44L80.49 99.13L76.01 99.61L69.75 99.90L50.00 100.00L30.25 99.90L23.99 99.61L19.51 99.13L15.95 98.44L12.99 97.55L10.48 96.44L8.32 95.11L6.47 93.53L4.89 91.68L3.56 89.52L2.45 87.01L1.56 84.05L0.87 80.49L0.39 76.01L0.10 69.75L0.00 50.00L0.10 30.25L0.39 23.99L0.87 19.51L1.56 15.95L2.45 12.99L3.56 10.48L4.89 8.32L6.47 6.47L8.32 4.89L10.48 3.56L12.99 2.45L15.95 1.56L19.51 0.87L23.99 0.39L30.25 0.10L50.00 0.00L69.75 0.10L76.01 0.39L80.49 0.87L84.05 1.56L87.01 2.45L89.52 3.56L91.68 4.89L93.53 6.47L95.11 8.32L96.44 10.48L97.55 12.99L98.44 15.95L99.13 19.51L99.61 23.99L99.90 30.25Z"/><path fill="url(#alArmaA)" d="M43.75 23.50L56.25 23.50L35.00 77.50L22.50 77.50ZM43.75 23.50L56.25 23.50L77.50 77.50L65.00 77.50ZM30.50 57.50L69.50 57.50L69.50 66.75L30.50 66.75Z"/></svg><span class="marka">Arthur<span>Legal</span></span><span class="modul-adi">· Tapu</span></div>
+  <section class="grup canli" id="f"><h3>TKGM'den getir</h3>
     <label for="f-il">İl <span class="zorunlu">*</span></label>
     <select id="f-il"><option value="">İl listesi için tıklayın</option></select>
     <label for="f-ilce">İlçe <span class="zorunlu">*</span></label>
@@ -91,32 +208,43 @@ footer{padding:6px 20px;font-size:11px;color:var(--soluk);background:var(--laciv
       </div>
       <div class="dugmeler"><button class="d ikincil" id="f-konum" type="button" disabled>Noktadaki parseli getir</button></div>
     </details>
-  </div>
+  </section>
   <div class="veya">ya da dosyayla</div>
   <div class="birak" id="birak"><b>Parsel dosyasını bırakın</b>GeoJSON / KML — ya da tıklayıp seçin<input type="file" id="dosya" accept=".json,.geojson,.kml" multiple hidden></div>
+  <details class="nasil"><summary>Nasıl çalışır</summary>
   <ol class="adim">
     <li>İl, ilçe ve mahalleyi TKGM'nin kendi listesinden seçin; ada ve parseli yalnız rakamla yazın (köy parsellerinde ada 0). Sorgula, bütün alanlar geçerli olunca açılır.</li>
     <li>İlk canlı istekte bir onay kartı çıkar; parsel bilgisi TKGM Parsel Sorgu'nun herkese açık verisinden gelir. Gelen kayıt istenenle karşılaştırılır, fark varsa uyarı çıkar.</li>
     <li>Elinizde <a href="https://parselsorgu.tkgm.gov.tr/" target="_blank" rel="noopener">Parsel Sorgu</a>'dan indirilmiş GeoJSON/KML varsa yukarıya bırakın.</li>
-  </ol>
+  </ol></details>
+  <div class="bolum-adi">Parseller</div>
   <div class="liste" id="liste"></div>
+  <div class="panel-alt">
+    <div class="segment tema-secimi" role="group" aria-label="Tema">
+      <button type="button" data-tema="acik">Açık</button><button type="button" data-tema="koyu">Koyu</button><button type="button" data-tema="otomatik">Otomatik</button>
+    </div>
+    <div class="yerel" title="Parsel dosyası ve tapu metni bu bilgisayarda işlenir. Canlı parsel sorgusu TKGM Parsel Sorgu'ya bu bilgisayardan, dakikada en çok 30 istekle gider. Harita ve 3D sekmeleri yalnız siz açınca OpenStreetMap (ya da anahtarınızla Esri) karolarını, Copernicus yükseklik verisini ve Overture bina tabanlarını çeker; bu, parselin konumunu o sunuculara bildirir.">Yerel çalışır — parsel ve tapu verisi bu bilgisayarda işlenir</div>
+    <div class="surum" id="surum"></div>
+  </div>
 </aside>
-<section>
-  <nav id="nav"></nav>
+<main class="icerik">
+  <header class="icerik-ust"><h1>ArthurTapu</h1>
+    <p class="alt-yazi">Parsel ölçüsü, ölçekli kroki, harita, tahmini 3D görünüm ve föy. Parseli soldan TKGM'den getirin ya da dosyasını bırakın.</p></header>
+  <nav id="nav" class="sekmeler" aria-label="Tapu sekmeleri"></nav>
   <div class="govde">
     <div class="sek" data-ad="Özet" id="ozet"></div>
     <div class="sek" data-ad="Sor" id="sor"></div>
     <div class="sek" data-ad="Kroki" id="kroki"></div>
     <div class="sek" data-ad="Harita" id="harita"></div>
-    <div class="sek" data-ad="3D Arazi" id="uc"></div>
+    <div class="sek" data-ad="3D Görünüm" id="uc"></div>
     <div class="sek" data-ad="Hukuk ve Harç" id="hukuk"></div>
     <div class="sek" data-ad="Koridor" id="koridor"></div>
     <div class="sek" data-ad="Tapu Kaydı" id="tapu"></div>
     <div class="sek" data-ad="Dosyalarım" id="dosyalar"></div>
   </div>
-</section>
+  <footer>Bilgi amaçlıdır; resmî işlemlerde kullanılamaz, aplikasyon krokisi veya röperli kroki yerine geçmez. 3D görünüm tahmindir. Canlı sorgu TKGM'ye tek sırayla, dakikada en çok 30 istekle gider: <a class="bag" href="https://github.com/beerbottle90/arthurlegal-mcp/blob/master/tkgm-mcp/docs/MANIFESTO.md" target="_blank" rel="noopener">nasıl tasarlandı</a>.</footer>
 </main>
-<footer>Bilgi amaçlıdır; resmî işlemlerde kullanılamaz, aplikasyon krokisi veya röperli kroki yerine geçmez. Canlı sorgu TKGM'ye tek sırayla, dakikada en çok 30 istekle gider: <a class="bag" href="https://github.com/beerbottle90/arthurlegal-mcp/blob/master/tkgm-mcp/docs/MANIFESTO.md" target="_blank" rel="noopener">nasıl tasarlandı</a>.</footer>
+</div>
 
 <script>
 "use strict";
@@ -137,6 +265,9 @@ async function cagir(arac, args = {}) {
   const j = await r.json(); if (!j.ok) throw new Error(j.hata); return j.sonuc;
 }
 const hataKutusu = e => el("div", { class: "uyari hata" }, String(e.message || e));
+// 3B uyarısı tek kaynaktan (tkgm_harita.UYARI_3D): sunucu sayfayı verirken <meta>'ya yerleştirir.
+const UYARI_3D = (document.querySelector('meta[name="tkgm-uyari-3d"]') || {}).content || "";
+const uyari3d = () => el("div", { class: "uyari uyari3d", role: "note" }, UYARI_3D);
 const bos = m => el("div", { class: "bos" }, m);
 const tablo = satirlar => el("table", {}, satirlar.filter(s => s[1] != null && s[1] !== "").map(([a, b]) => el("tr", {}, el("td", {}, a), el("td", {}, b))));
 const digerleri = () => durum.parseller.filter(p => p.ref !== durum.secili).map(p => p.ref);
@@ -149,6 +280,46 @@ sekmeler.forEach((s, i) => $("#nav").append(el("button", { onclick: () => sekmeA
 function sekmeAc(id) { sekmeler.forEach(s => s.classList.toggle("acik", s.id === id));
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("acik", b.id === "n-" + id)); ciz(id); }
 const aktif = () => sekmeler.find(s => s.classList.contains("acik")).id;
+
+/* ---------- tema: AL Masası'ndaki üç seçenek (açık varsayılan) ---------- */
+const tema = { gecici: null,
+  secim() { if (this.gecici) return this.gecici; try { return localStorage.getItem("al.tema") || "acik"; } catch (e) { return "acik"; } },
+  uygula() { const s = this.secim(), koyu = s === "koyu" || (s === "otomatik" && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.tema = koyu ? "koyu" : "acik";
+    document.querySelectorAll(".tema-secimi button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tema === s))); },
+  sec(s) { this.gecici = s; try { localStorage.setItem("al.tema", s); } catch (e) { } this.uygula(); } };
+document.querySelectorAll(".tema-secimi button").forEach(b => b.addEventListener("click", () => tema.sec(b.dataset.tema)));
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => tema.uygula());
+tema.uygula();
+
+/* ---------- uydu görünümü: kullanıcının kendi Esri anahtarı ----------
+   Anahtar sunucuda ayar klasörüne yazılır, hiçbir yanıtta geri dönmez; sayfa yalnız var olup olmadığını görür.
+   Harita/3D, anahtar varsa sunucunun yerleştirdiği uydu katmanını gösterir. */
+async function esriAyari(yenile) {
+  const kutu = el("div", { class: "ayar" });
+  const yaz = async deger => {
+    const r = await fetch("/api/ayar", { method: "POST", headers: { "Content-Type": "application/json", "X-Tkgm": T }, body: JSON.stringify({ esri_anahtari: deger }) });
+    const j = await r.json();
+    if (!j.ok) { kutu.append(hataKutusu(new Error(j.hata))); return; }
+    durum.onbellek = {};               // önbellekteki 3D sayfası eski anahtar durumuyla üretildi
+    if (j.sinanamadi) alert("Anahtar kaydedildi; Esri'ye ulaşılamadığı için sınanamadı.");
+    yenile();
+  };
+  let a = { esri: false };
+  try { a = await al("/api/ayar"); } catch (e) { }
+  if (a.esri) {
+    kutu.append(el("span", { class: "durum" }, "Uydu görünümü açık"),
+      el("span", { class: "kucuk" }, a.esri_kaynak === "ortam" ? "Anahtar TKGM_ESRI_ANAHTARI ortam değişkeninden geliyor." : "Esri anahtarınız bu bilgisayarda kayıtlı; dosyalara ve Claude'a gitmez."),
+      a.esri_kaynak === "ortam" ? "" : el("button", { class: "d ikincil", onclick: e => mesgul(e.target, () => yaz("")) }, "Anahtarı kaldır"));
+  } else {
+    const g = el("input", { type: "password", placeholder: "ArcGIS Location Platform anahtarı", autocomplete: "off" });
+    kutu.append(el("span", { class: "durum" }, "Uydu görünümü"),
+      el("span", { class: "kucuk" }, "Ücretsiz bir ", el("a", { class: "bag", href: "https://location.arcgis.com/", target: "_blank", rel: "noopener noreferrer" }, "ArcGIS Location Platform"),
+        " anahtarı (Basemaps yetkili) girerseniz harita ve 3D'de Esri uydu görüntüsü de gelir. Anahtar yalnız bu bilgisayarda durur."),
+      g, el("button", { class: "d ikincil", onclick: e => mesgul(e.target, async () => { if (g.value.trim()) await yaz(g.value.trim()); }) }, "Kaydet"));
+  }
+  return kutu;
+}
 
 /* ---------- dosya alma ---------- */
 const birak = $("#birak"), girdi = $("#dosya");
@@ -344,20 +515,35 @@ const cizici = {
     await yenile();
   },
   async harita(kap) {
+    const ayar = await esriAyari(() => ciz("harita"));
     const goster = async () => { const s = await cagir("harita", { ref: durum.secili, komsular: digerleri(), inline: true });
-      kap.replaceChildren(el("iframe", { class: "cerceve", sandbox: "allow-scripts", srcdoc: s.html })); };
+      kap.replaceChildren(ayar, el("iframe", { class: "cerceve", sandbox: "allow-scripts", srcdoc: s.html })); };
     if (durum.haritaOnay) return goster();
-    kap.replaceChildren(el("div", { class: "bos" }, "Harita altlığı OpenStreetMap'ten, Leaflet betiği CDN'den yüklenir: parselin konumu (karo koordinatları) o sunuculara gider. Kroki sekmesi hiçbir yere bağlanmaz.",
+    kap.replaceChildren(ayar, el("div", { class: "bos" }, "Harita altlığı OpenStreetMap'ten (anahtarınız varsa Esri uydu görüntüsünden), Leaflet betiği CDN'den yüklenir: parselin konumu (karo koordinatları) o sunuculara gider. Kroki sekmesi hiçbir yere bağlanmaz.",
       el("div", { class: "dugmeler", style: "justify-content:center" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { durum.haritaOnay = true; await goster(); }) }, "Haritayı yükle")))); },
   async uc(kap) {
-    const p = secili(), onb = durum.onbellek["3d" + p.ref];
-    const goster = s => kap.replaceChildren(el("div", { class: "izgara", style: "margin-bottom:12px" }, el("div", { class: "kart" }, el("h3", {}, "Arazi özeti"),
-      tablo([["Kot (min – maks)", tr(s.arazi.min_kot_m, 1) + " – " + tr(s.arazi.max_kot_m, 1) + " m"], ["Ortalama kot", tr(s.arazi.ortalama_kot_m, 1) + " m"], ["Kot farkı", tr(s.arazi.kot_farki_m, 1) + " m"],
-        ["Ortalama eğim", "% " + tr(s.arazi.ortalama_egim_yuzde, 1)], ["Hâkim bakı", s.arazi.hakim_baki], ["Kaynak", s.kaynak]]), el("div", { class: "kucuk" }, s.arazi.not || ""), s.uyari ? el("div", { class: "uyari" }, s.uyari) : "")),
-      el("iframe", { class: "cerceve", sandbox: "allow-scripts", srcdoc: s.html }));
+    const p = secili(), anahtar = "3d" + p.ref, onb = durum.onbellek[anahtar];
+    const ayar = await esriAyari(() => ciz("uc"));
+    const goster = s => { const b = s.binalar, pb = b && b.parsel_binasi;
+      const pbYazi = pb ? (pb.kat ? pb.kat + " kat" : "kat bilinmiyor") + (pb.yukseklik_m ? " ≈ " + tr(pb.yukseklik_m, 0) + " m" : "") + (pb.dayanak ? " (" + pb.dayanak + ")" : "") : "açık veride bina izi yok";
+      kap.replaceChildren(uyari3d(), ayar, el("div", { class: "izgara", style: "margin-bottom:12px" },
+        el("div", { class: "kart" }, el("h3", {}, "Arazi özeti"),
+          tablo([["Kot (min – maks)", tr(s.arazi.min_kot_m, 1) + " – " + tr(s.arazi.max_kot_m, 1) + " m"], ["Ortalama kot", tr(s.arazi.ortalama_kot_m, 1) + " m"], ["Kot farkı", tr(s.arazi.kot_farki_m, 1) + " m"],
+            ["Ortalama eğim", "% " + tr(s.arazi.ortalama_egim_yuzde, 1)], ["Hâkim bakı", s.arazi.hakim_baki], ["Kaynak", s.kaynak]]), el("div", { class: "kucuk" }, s.arazi.not || "")),
+        el("div", { class: "kart" }, el("h3", {}, "Binalar (tahmini kütle)"),
+          b ? tablo([["Çizilen bina", b.cizilen], ["Parseldeki bina", pbYazi], ["Overture sürümü", b.overture_surumu]]) : el("div", { class: "kucuk" }, "Bina katmanı çizilmedi."),
+          ((b && b.notlar) || []).map(n => el("div", { class: "kucuk", style: "margin-top:6px" }, n)), (s.uyari || []).map(u => el("div", { class: "uyari" }, u)))),
+        el("iframe", { class: "cerceve", sandbox: "allow-scripts", srcdoc: s.html })); };
     if (onb) return goster(onb);
-    kap.replaceChildren(el("div", { class: "bos" }, "Yükseklik verisi Copernicus GLO-30'dan indirilir (~1–2 MB, tek seferlik).", el("div", { class: "dugmeler", style: "justify-content:center" },
-      el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try { const s = await cagir("arazi_3d", { ref: p.ref, komsular: digerleri(), inline: true }); durum.onbellek["3d" + p.ref] = s; goster(s); } catch (x) { kap.append(hataKutusu(x)); } }) }, "Araziyi getir"))));
+    const kat = el("input", { type: "number", min: "1", max: "80", step: "1", placeholder: "örn. 6" }), bin = el("input", { type: "checkbox" });
+    bin.checked = true;
+    kap.replaceChildren(uyari3d(), ayar, el("div", { class: "kart" }, el("h3", {}, "Tahmini 3D görünüm"),
+      el("div", { class: "kucuk" }, "Arazi Copernicus GLO-30 yükseklik modelinden (~1–2 MB), çevre binaların tabanları Overture açık verisinden gelir; boy kat × 3 m kuralıyla tahmin edilir. Parseldeki binanın kat sayısını biliyorsanız yazın; boşsa tapu niteliği ('Altı Katlı' gibi), o da yoksa açık veri ya da varsayılan 3 kat kullanılır."),
+      el("div", { class: "secenekler" }, el("label", {}, "Kat sayısı", kat), el("label", {}, bin, "Çevre binaları çiz")),
+      el("div", { class: "dugmeler" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try {
+        const args = { ref: p.ref, komsular: digerleri(), inline: true, binalar: bin.checked };
+        if (kat.value) args.kat = Number(kat.value);
+        const s = await cagir("arazi_3d", args); durum.onbellek[anahtar] = s; goster(s); } catch (x) { kap.append(hataKutusu(x)); } }) }, "3D görünümü getir"))));
   },
   async hukuk(kap) {
     const p = secili(), sonuc = el("div"), hsonuc = el("div"), liste = el("div");

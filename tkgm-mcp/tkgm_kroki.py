@@ -28,7 +28,7 @@ _FX, _FY, _FW, _FH = 20.0, 22.0, 170.0, 170.0   # çizim çerçevesi
 _ETIKET_SINIRI = 60      # bundan çok köşede kenar/köşe yazısı okunmaz; tabloya bırakılır
 _TABLO_SINIRI = 42       # 3 sütun × 14 satır
 
-UYARI = ("Bilgi amaçlıdır; resmî işlemlerde kullanılamaz (TKGM Parsel Sorgu Kullanım Koşulları md. 4).",
+UYARI = ("Bilgi amaçlıdır; resmî işlemlerde kullanılamaz.",
          "Geometri kullanıcının sağladığı dosyadan alınmıştır; aplikasyon krokisi veya röperli "
          "kroki yerine geçmez.")
 

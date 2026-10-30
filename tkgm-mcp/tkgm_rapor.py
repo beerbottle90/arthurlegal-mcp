@@ -15,7 +15,7 @@ bir ölçekte ve milimetre ölçüsüyle yerleşir. Belge %100 ölçekle yazdır
 başlıktaki ölçekte çıkar; `tkgm_kroki` ile aynı söz.
 
 Bu modül ağa çıkmaz. Portföydeki Parsel Sorgu sütunu yalnız bir adres dizgisidir;
-kullanıcı onu kendi tarayıcısında açar (Kullanım Koşulları md. 3).
+kullanıcı onu kendi tarayıcısında açar.
 """
 
 from __future__ import annotations
@@ -1048,7 +1048,7 @@ def portfoy_xlsx(parseller: Sequence[Dict[str, Any]], tarih: str = "") -> bytes:
         "Rejim uyarıları parsel niteliğindeki sözcüklerden türetilir; uyarı çıkmaması kısıt "
         "bulunmadığı anlamına gelmez.",
         "Parsel Sorgu bağlantısını kullanıcı kendi tarayıcısında açar; bu araç TKGM'ye istek "
-        "göndermez (Kullanım Koşulları md. 3). Bağlantı bilerek düz metindir: kopyalayıp adres "
+        "göndermez. Bağlantı bilerek düz metindir: kopyalayıp adres "
         "çubuğuna yapıştırın.",
         "Toplam satırı süzgece duyarlıdır (SUBTOTAL 109): yalnız görünen parseller toplanır.",
         hukuk.DOGRULAMA]

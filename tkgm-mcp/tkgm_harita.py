@@ -3,14 +3,24 @@
 İki ayrı sınır burada da geçerlidir:
 
 1. **TKGM sınırı.** Altlık ve yükseklik için TKGM'nin hiçbir servisi (ortofoto,
-   WMS, Parsel Sorgu) çağrılmaz; Kullanım Koşulları md. 3 dolaylı erişimi de
-   yasaklar. Altlık yalnız OpenStreetMap'tir ve onu bu sunucu değil, HTML'i
-   açan kullanıcının tarayıcısı çeker. Yükseklik yalnız Copernicus DEM'dir.
-   `_http_aralik` izinli iki S3 kovası dışındaki her adresi reddeder: yasak,
-   yoruma değil koda bağlıdır.
+   WMS, Parsel Sorgu) çağrılmaz. Altlık OpenStreetMap'tir; kullanıcı kendi ücretsiz
+   Esri anahtarını girdiyse Esri World Imagery uydu görüntüsü de seçilebilir.
+   Karoları bu sunucu değil, HTML'i açan kullanıcının tarayıcısı çeker. Yükseklik
+   yalnız Copernicus DEM'dir. `_http_aralik` izinli iki S3 kovası dışındaki her
+   adresi reddeder: sınır, yoruma değil koda bağlıdır.
+
+   Esri anahtarı hiçbir dosyaya ve araç çıktısına YAZILMAZ. Sayfada `ESRI_ISARETI`
+   durur; anahtarı yalnız yerel arayüz, sayfayı tarayıcıya verirken yerleştirir
+   (`esri_anahtari_ekle`). Paylaşılan dosyada ve sohbetteki Claude'un gördüğü
+   metinde anahtar bulunmaz; her kullanıcı kendi anahtarını kullanır.
 
 2. **Ağ sınırı.** Bu modülde ağa çıkan tek işlev `dem_izgara`dır. HTML üreten
-   iki işlev saftır; test edilebilir ve paylaşılan sunucuda yan etkisizdir.
+   işlevler saftır; test edilebilir ve paylaşılan sunucuda yan etkisizdir.
+
+3. **Karo erişimi.** OpenStreetMap karo sunucusu Referer taşımayan isteğe "Access
+   blocked" karosu döndürür (2026-10-30 ölçümü). Sayfa karoları `strict-origin` ile
+   ister: yalnız köken gider, adresteki belirteç gitmez. Dosyadan (file://) açılan
+   sayfa köken gönderemez; harita bunu görünür bir notla söyler ve arayüzü önerir.
 
 Copernicus karoları Cloud-Optimized GeoTIFF'tir. 1°×1° karo ~40 MB tutar; bir
 parsel için tamamını indirmek yerine başlık okunur, kutuya değen TIFF karosu
@@ -24,6 +34,7 @@ import html
 import itertools
 import json
 import math
+import re
 import socket
 import struct
 import threading
@@ -743,13 +754,23 @@ def _tablo(satirlar: Sequence[Tuple[str, str]]) -> str:
                                           for k, v in satirlar)
 
 
-_ORTAK_CSS = """html,body{margin:0;height:100%;font-family:Arial,Helvetica,sans-serif}
-.kart{position:absolute;z-index:1000;top:10px;left:10px;max-width:330px;background:rgba(255,255,255,.94);
-border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.35);padding:10px 12px;font-size:12.5px;color:#111;line-height:1.35}
-.kart h1{font-size:14px;margin:0 0 6px}.kart table{border-collapse:collapse}
-.kart th{text-align:left;font-weight:normal;color:#555;padding:1px 10px 1px 0;vertical-align:top;white-space:nowrap}
-.kart td{padding:1px 0}.kart p{margin:7px 0 0;font-size:10.5px;color:#555}
-@media (max-width:600px){.kart{max-width:none;right:10px;font-size:11.5px}}"""
+_ORTAK_CSS = """html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text",
+"Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+.kart{position:absolute;z-index:1000;top:12px;left:12px;max-width:340px;max-height:calc(100% - 120px);overflow:auto;
+background:rgba(255,255,255,.96);border:0.5px solid rgba(13,24,38,.12);border-radius:14px;
+box-shadow:0 1px 2px rgba(13,24,38,.06),0 6px 20px rgba(13,24,38,.12);padding:12px 14px;font-size:12.5px;
+color:#0d1117;line-height:1.4}
+.kart h1{font-size:14px;font-weight:650;letter-spacing:-.01em;margin:0 0 6px}.kart table{border-collapse:collapse}
+.kart th{text-align:left;font-weight:normal;color:#4b5565;padding:1px 10px 1px 0;vertical-align:top;white-space:nowrap}
+.kart td{padding:1px 0}.kart p{margin:7px 0 0;font-size:10.5px;color:#4b5565}
+.kart summary{list-style:none;cursor:pointer}.kart summary::-webkit-details-marker{display:none}
+.kart summary h1{display:inline}.kart summary::after{content:" \\25BE";color:#808a99}
+.kart details:not([open]) summary::after{content:" \\25B8"}
+@media (max-width:600px){.kart{max-width:none;right:12px;font-size:11.5px}}"""
+# Kart <details> içindedir: 3B sahnenin sol üçte birini örtüyordu (sekme doğrulamasında
+# görüldü). Katlama betiksizdir — CDN yokken ve her CSP altında çalışır; açık başlar ki
+# atıf satırları varsayılan olarak görünsün. Renkler AL Masası'nın açık temasındandır.
 
 
 # --------------------------------------------------------------------------- #
@@ -763,6 +784,44 @@ _LEAFLET_CSS_SRI = ("sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHE
 _LEAFLET_JS_SRI = ("sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7"
                    "CjE7ZJ+/vcRZRkIYIb6p4g==")
 _OSM_KARO = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+# OSM, Referer'sız karo isteğini reddeder; yalnız köken gönderilir (belirteç adreste kalır).
+KARO_REFERRER = "strict-origin"
+
+# Esri World Imagery, ArcGIS Location Platform'un anahtarlı görüntü karosu. Anahtarı her
+# kullanıcı kendisi üretir; anahtarsız uç kullanılmaz.
+ESRI_KARO = "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+ESRI_ATIF = "Powered by Esri · Kaynak: Esri, Vantor, Earthstar Geographics, and the GIS User Community"
+# İşarette `<` var: _js veri içindeki her `<`'ü \u003c, _h HTML'dekini &lt; yapar. Parsel
+# verisi işareti taklit edemez; anahtar yalnız bizim koyduğumuz yere girer.
+ESRI_ISARETI = "/*<ESRI>*/null"
+_ESRI_ANAHTARI = re.compile(r"[A-Za-z0-9._~-]{20,600}")
+
+# 3B sahnenin her zaman görünen uyarısı. Katlanan kartın DIŞINDA durur, kapatılamaz.
+# Kullanıcı isteğiyle (2026-09-21) depoya ve arayüze birlikte girdi; metin tek kaynaktandır.
+UYARI_3D = ("UYARI: Bu 3B görsel gerçek (ölçülmüş ya da resmî) veriye dayanmaz. Yapay zekâ ve otomatik "
+            "kurallarla üretilmiş bir TAHMİNDİR; yalnız fikir vermek amacıyla oluşturulmuştur. Ölçüm, "
+            "imar durumu, ruhsat, röleve ya da bilirkişi incelemesi yerine geçmez ve resmî işlemde "
+            "kullanılamaz.")
+
+# Dosyadan açılan harita: tarayıcı köken gönderemez, OSM karoları engelleyebilir.
+DOSYADAN_NOTU = ("Bu harita dosyadan açıldı. OpenStreetMap, dosyadan açılan sayfaların harita karolarını "
+                 "engelleyebilir (\u201cAccess blocked\u201d). Haritayı ArthurLegal Tapu arayüzünden açın: "
+                 "Dosyalarım sekmesi ya da Claude'un verdiği \u201carayüzde aç\u201d bağlantısı.")
+
+
+def esri_anahtari_gecerli(anahtar: Any) -> bool:
+    return isinstance(anahtar, str) and bool(_ESRI_ANAHTARI.fullmatch(anahtar))
+
+
+def esri_anahtari_ekle(sayfa: str, anahtar: Optional[str]) -> str:
+    """Sayfadaki işarete kullanıcının Esri anahtarını yerleştirir.
+
+    Yalnız yerel arayüz çağırır, sayfayı tarayıcıya verirken. Anahtar yoksa ya da
+    biçimi geçersizse sayfa aynen döner ve uydu katmanı görünmez.
+    """
+    if not esri_anahtari_gecerli(anahtar):
+        return sayfa
+    return sayfa.replace(ESRI_ISARETI, _js(anahtar), 1)
 
 
 def _leaflet_halkalari(parsel: Dict[str, Any]) -> List[List[List[List[float]]]]:
@@ -772,9 +831,16 @@ def _leaflet_halkalari(parsel: Dict[str, Any]) -> List[List[List[List[float]]]]:
 
 
 _HARITA_JS = """(function(){
-var V=__VERI__;
-var h=L.map('harita',{maxZoom:19,zoomSnap:0.25});
-L.tileLayer(V.karo,{maxZoom:19,attribution:V.atif}).addTo(h);
+var V=__VERI__,ESRI=__ESRI__;
+// Yakınlaştırma sağ üstte: sol üstteki bilgi kartı onu örtüyordu.
+var h=L.map('harita',{maxZoom:19,zoomSnap:0.25,zoomControl:false});
+var sokak=L.tileLayer(V.karo,{maxZoom:19,attribution:V.atif,referrerPolicy:V.referrer});
+L.control.zoom({position:'topright'}).addTo(h);
+// Uydu yalnız arayüz kullanıcının anahtarını yerleştirdiyse; dosyada ESRI null kalır.
+if(ESRI){var uydu=L.tileLayer(V.esri_karo+'?token='+encodeURIComponent(ESRI),
+{maxZoom:19,maxNativeZoom:18,attribution:V.esri_atif,referrerPolicy:V.referrer}).addTo(h);
+L.control.layers({'Uydu (Esri)':uydu,'Sokak (OSM)':sokak},null,{position:'topright',collapsed:false}).addTo(h);
+document.getElementById('uydu-atif').hidden=false;}else{sokak.addTo(h);}
 L.control.scale({metric:true,imperial:false}).addTo(h);
 // Metin her yerde textContent ile yazılır: Leaflet dizgi içeriği HTML olarak yorumlar.
 function yazi(s,alt){var d=document.createElement('div');var b=document.createElement('b');
@@ -794,35 +860,45 @@ def harita_html(parsel: Dict[str, Any], komsular: Optional[List[Dict[str, Any]]]
     """Tek dosyalık Leaflet haritası: OSM altlığı, vurgulu parsel, gri komşular.
 
     Altlık karoları ve Leaflet betiği dosyayı AÇAN tarayıcı tarafından çekilir; bu işlev
-    ağa çıkmaz. Çevrimdışıyken Leaflet yüklenemez ve harita çizilmez — çevrimdışı
-    çizim için kroki (SVG) kullanılır.
+    ağa çıkmaz. Harita kabı açık gri zeminlidir: karo gelmese de (çevrimdışı, OSM erişimi
+    kısıtlı) parsel ve komşuları okunur kalır. Uydu katmanı yalnız yerel arayüz kullanıcının
+    Esri anahtarını yerleştirdiğinde görünür.
     """
     olcu = olc(parsel)
     boylam, enlem = _etiket_noktasi(parsel)
     veri = {
-        "karo": _OSM_KARO, "atif": OSM_ATIF,
+        "karo": _OSM_KARO, "atif": OSM_ATIF, "referrer": KARO_REFERRER,
+        "esri_karo": ESRI_KARO, "esri_atif": ESRI_ATIF,
         "parsel": _leaflet_halkalari(parsel),
         "komsular": [{"ad": _ada_parsel(k), "h": _leaflet_halkalari(k)}
                      for k in (komsular or []) if k.get("ref") != parsel.get("ref")],
         "etiket": [round(enlem, 7), round(boylam, 7)],
         "ad": _ada_parsel(parsel), "alan": "%s m²" % tr_bicim(olcu["alan_m2"]),
     }
-    kart = ('<div class="kart"><h1>%s</h1>%s<p>%s</p><p>Altlık: %s</p></div>'
+    kart = ('<div class="kart"><details open><summary><h1>%s</h1></summary>%s<p>%s</p><p>Altlık: %s</p>'
+            '<p id="uydu-atif" hidden>Uydu: %s</p></details></div>'
             % (_h(etiket(parsel)), _tablo(_kart_satirlari(parsel, olcu)),
-               "<br>".join(_h(u) for u in UYARI), _h(OSM_ATIF)))
+               "<br>".join(_h(u) for u in UYARI), _h(OSM_ATIF), _h(ESRI_ATIF)))
     return "\n".join([
         "<!DOCTYPE html>", '<html lang="tr"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         "<title>Parsel haritası — %s</title>" % _h(etiket(parsel)),
         '<link rel="stylesheet" href="%sleaflet.min.css" integrity="%s" crossorigin="anonymous">'
         % (_LEAFLET, _LEAFLET_CSS_SRI),
+        '<meta name="referrer" content="%s">' % KARO_REFERRER,
         "<style>%s\n#harita{position:absolute;inset:0;background:#e9e9e6}"
-        ".etiket{background:rgba(255,255,255,.9);border:1px solid #d81b60;color:#111;font-size:12px;"
-        "text-align:center;padding:2px 6px;box-shadow:none}.etiket:before{display:none}</style>" % _ORTAK_CSS,
+        ".etiket{background:rgba(255,255,255,.92);border:1px solid #d81b60;border-radius:8px;color:#0d1117;"
+        "font-size:12px;text-align:center;padding:2px 7px;box-shadow:none}.etiket:before{display:none}"
+        ".dosyadan{position:absolute;z-index:1002;left:12px;right:12px;bottom:30px;margin:0 auto;max-width:560px;"
+        "background:#edf3fd;color:#2c62b5;border-radius:12px;padding:8px 12px;font-size:12px;line-height:1.4;"
+        "box-shadow:0 1px 6px rgba(13,24,38,.15)}</style>" % _ORTAK_CSS,
         '</head><body><div id="harita"></div>', kart,
+        # Leaflet'ten ÖNCE ve ondan bağımsız: CDN gelmese de not görünür.
+        '<div class="dosyadan" id="dosyadan" role="note" hidden>%s</div>' % _h(DOSYADAN_NOTU),
+        "<script>if(location.protocol==='file:')document.getElementById('dosyadan').hidden=false;</script>",
         '<script src="%sleaflet.min.js" integrity="%s" crossorigin="anonymous"></script>'
         % (_LEAFLET, _LEAFLET_JS_SRI),
-        "<script>%s</script>" % _HARITA_JS.replace("__VERI__", _js(veri)),
+        "<script>%s</script>" % _HARITA_JS.replace("__ESRI__", ESRI_ISARETI).replace("__VERI__", _js(veri)),
         "</body></html>"])
 
 
@@ -897,7 +973,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {Line2} from 'three/addons/lines/Line2.js';
 import {LineMaterial} from 'three/addons/lines/LineMaterial.js';
 import {LineGeometry} from 'three/addons/lines/LineGeometry.js';
-const V=__VERI__;
+const V=__VERI__,ESRI=__ESRI__;
 const kap=document.getElementById('sahne'),bekle=document.getElementById('bekle');
 let cizici;
 try{cizici=new THREE.WebGLRenderer({antialias:true});}
@@ -937,6 +1013,52 @@ arazi.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x4a4a4a})));});
 const kalin=new LineMaterial({color:0xd81b60,linewidth:4});
 V.parsel.forEach(function(k){const g=new LineGeometry();g.setPositions(k);arazi.add(new Line2(g,kalin));});
 
+// Bina kütleleri (TAHMİNİ, LoD1). Taban (x, -güney) düzleminde bir Shape'tir; rotateX(-90°)
+// (x, y, derinlik) → (x, derinlik, -y) eşler: derinlik yukarı çıkar, -y güneye döner.
+// Abartı araziyi büyütür, binayı değil: yalnız TABAN kotu abartılır, boy gerçek kalır.
+const binalar=new THREE.Group();sahne.add(binalar);
+const bMalzeme={p:new THREE.MeshLambertMaterial({color:0xf7c948}),v:new THREE.MeshLambertMaterial({color:0xf3f0ea}),
+t:new THREE.MeshLambertMaterial({color:0xaab0ba,transparent:true,opacity:0.85})};
+function halka(d,y){y.moveTo(d[0],d[1]);for(let k=2;k<d.length;k+=2)y.lineTo(d[k],d[k+1]);return y;}
+V.binalar.forEach(function(b){
+const sekiller=b.c.map(function(c){const s=halka(c[0],new THREE.Shape());
+for(let k=1;k<c.length;k++)s.holes.push(halka(c[k],new THREE.Path()));return s;});
+const g=new THREE.ExtrudeGeometry(sekiller,{depth:b.u,bevelEnabled:false,curveSegments:1});g.rotateX(-Math.PI/2);
+const m=new THREE.Mesh(g,bMalzeme[b.t]);m.userData.taban=b.y;binalar.add(m);
+if(b.t==='p'){const e=new THREE.LineSegments(new THREE.EdgesGeometry(g,20),new THREE.LineBasicMaterial({color:0x6b4500}));
+e.userData.taban=b.y;binalar.add(e);}});
+const kb=document.getElementById('binalar');
+if(kb)kb.addEventListener('change',function(){binalar.visible=kb.checked;ciz();});
+
+// Uydu zemini: yalnız arayüz kullanıcının Esri anahtarını yerleştirdiyse. Karolar bir tuvale
+// dizilir ve araziye doku olarak serilir: gösterimdir, görüntüden çıkarım yapılmaz ve
+// hiçbir şey saklanmaz. Web Mercator'da en çok 36 karo; yakınlaştırma buna göre seçilir.
+const zemin=arazi.children[0],kabartma=zemin.material;
+if(ESRI){
+const K=V.kutu,X=function(l,z){return (l+180)/360*Math.pow(2,z);},
+Y=function(e,z){const r=e*Math.PI/180;return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*Math.pow(2,z);};
+let z=18,x0,x1,y0,y1;
+for(;z>=12;z--){x0=Math.floor(X(K[0],z));x1=Math.floor(X(K[1],z));y0=Math.floor(Y(K[2],z));y1=Math.floor(Y(K[3],z));
+if((x1-x0+1)*(y1-y0+1)<=36)break;}
+const sx=x1-x0+1,sy=y1-y0+1,tuval=document.createElement('canvas');tuval.width=sx*256;tuval.height=sy*256;
+const firca=tuval.getContext('2d'),doku=new THREE.CanvasTexture(tuval);doku.colorSpace=THREE.SRGBColorSpace;
+const uv=new Float32Array(nx*ny*2);
+for(let i=0;i<ny;i++)for(let j=0;j<nx;j++){const n=i*nx+j;
+uv[n*2]=(X(K[0]+(K[1]-K[0])*j/(nx-1),z)-x0)/sx;uv[n*2+1]=1-(Y(K[2]+(K[3]-K[2])*i/(ny-1),z)-y0)/sy;}
+geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+const foto=new THREE.MeshLambertMaterial({map:doku,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+const ku=document.getElementById('uydu');let hata=0;
+for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){const im=new Image();im.crossOrigin='anonymous';
+im.onload=function(){firca.drawImage(im,(x-x0)*256,(y-y0)*256);doku.needsUpdate=true;ciz();};
+im.onerror=function(){if(++hata===sx*sy){zemin.material=kabartma;ku.checked=false;ku.disabled=true;
+document.getElementById('uydu-yok').textContent='Uydu karoları yüklenemedi (Esri anahtarı geçersiz ya da aylık kota dolu).';
+document.getElementById('uydu-yok').hidden=false;ciz();}};
+im.src=V.esri_karo.replace('{z}',z).replace('{y}',y).replace('{x}',x)+'?token='+encodeURIComponent(ESRI);}
+zemin.material=foto;ku.parentNode.hidden=false;document.getElementById('uydu-atif').hidden=false;
+document.getElementById('atif-uydu').hidden=false;
+document.getElementById('uydu-yok').hidden=true;
+ku.addEventListener('change',function(){zemin.material=ku.checked?foto:kabartma;ciz();});}
+
 function yazi(metin,renkli){const t=document.createElement('canvas'),b=t.getContext('2d');
 b.font='bold 44px Arial';t.width=Math.ceil(b.measureText(metin).width)+28;t.height=64;
 b.font='bold 44px Arial';b.fillStyle='rgba(255,255,255,.9)';b.fillRect(0,0,t.width,t.height);
@@ -956,7 +1078,8 @@ const denet=new OrbitControls(kamera,cizici.domElement);
 denet.maxPolarAngle=Math.PI/2-0.02;denet.minDistance=R*0.05;denet.maxDistance=R*6;
 function ciz(){cizici.render(sahne,kamera);}
 function abart(k){arazi.scale.y=k;
-const ey=V.etiket[1]*k;etiket.position.set(V.etiket[0],ey+R*0.07,V.etiket[2]);
+binalar.children.forEach(function(m){m.position.y=m.userData.taban*k;});
+const ey=V.etiket[1]*k+V.pb;etiket.position.set(V.etiket[0],ey+R*0.07,V.etiket[2]);
 kilavuz.geometry.attributes.position.array.set([V.etiket[0],ey,V.etiket[2],V.etiket[0],ey+R*0.07,V.etiket[2]]);
 kilavuz.geometry.attributes.position.needsUpdate=true;
 ok.position.y=V.kuzey_y*k;
@@ -978,9 +1101,46 @@ sur.addEventListener('input',function(){abart(parseFloat(sur.value));});
 bekle.style.display='none';boyut();kadraj(parseFloat(sur.value));abart(parseFloat(sur.value));"""
 
 
+def _bina_sahnesi(kutle: Optional[Dict[str, Any]], cerceve: Dict[str, float],
+                  zr: Sequence[Sequence[float]]) -> List[Dict[str, Any]]:
+    """tkgm_bina.kutle_modeli çıktısını yerel metreye çevirir: {"c", "y", "u", "t"}.
+
+    c: çokgen başına halkalar, her halka [x, -güney, …] (Shape düzlemi). y: taban kotu,
+    tabanın altındaki EN ALÇAK yüzey noktası; yamaçta binanın üst yanı toprağa gömülür,
+    alt yanı havada kalmaz. u: boy (m). t: p parseldeki, v veri, t varsayım.
+    Merkezi ızgara dışında kalan bina çizilmez: altında zemin yoktur.
+    """
+    ny, nx = len(zr), len(zr[0])
+    out: List[Dict[str, Any]] = []
+    for b in (kutle or {}).get("binalar") or []:
+        bm, em = b["merkez"]
+        fj = (bm - cerceve["b0"]) * cerceve["mb"] / cerceve["hx"] + (nx - 1) / 2.0
+        fi = (cerceve["e0"] - em) * cerceve["me"] / cerceve["hy"] + (ny - 1) / 2.0
+        if not (0.0 <= fi <= ny - 1 and 0.0 <= fj <= nx - 1):
+            continue
+        taban, cokgenler = math.inf, []
+        for cokgen in b["cokgenler"]:
+            halkalar = []
+            for halka in cokgen:
+                duz: List[float] = []
+                for boylam, enlem in halka:
+                    x, s = (boylam - cerceve["b0"]) * cerceve["mb"], (cerceve["e0"] - enlem) * cerceve["me"]
+                    taban = min(taban, _yuzey_kotu(zr, s / cerceve["hy"] + (ny - 1) / 2.0,
+                                                   x / cerceve["hx"] + (nx - 1) / 2.0))
+                    duz += [round(x, 1), round(-s, 1)]
+                halkalar.append(duz)
+            cokgenler.append(halkalar)
+        tur = "p" if b.get("parselde") else ("v" if b.get("dayanak") == "veri" else "t")
+        out.append({"c": cokgenler, "y": round(taban - 0.2, 1), "u": b["h"], "t": tur})
+    return out
+
+
 def arazi_3d_html(parsel: Dict[str, Any], komsular: Optional[List[Dict[str, Any]]],
-                  izgara: Dict[str, Any], ozet: Dict[str, Any]) -> str:
-    """Tek dosyalık 3B arazi: ızgaradan ağ, araziye örtülmüş parsel sınırı, düşey abartı sürgüsü.
+                  izgara: Dict[str, Any], ozet: Dict[str, Any],
+                  kutle: Optional[Dict[str, Any]] = None) -> str:
+    """Tek dosyalık 3B arazi: ızgaradan ağ, araziye örtülmüş parsel sınırı, düşey abartı sürgüsü;
+    `kutle` verildiyse tahmini bina kütleleri (tkgm_bina.kutle_modeli). Uyarı şeridi
+    (`UYARI_3D`) kartın dışında, betiksiz ve kapatılamazdır.
 
     Saf işlevdir; three.js dışında ağ çağrısı içermez. Kotlar en düşük kota göre
     desimetre tam sayı olarak gömülür: "1034.5" altı karakter, "345" üç.
@@ -1001,7 +1161,13 @@ def arazi_3d_html(parsel: Dict[str, Any], komsular: Optional[List[Dict[str, Any]
     eb, ee = _etiket_noktasi(parsel)
     ex, es = (eb - b0) * mb, (e0 - ee) * me
     ey = _yuzey_kotu(zr, es / hy + (ny - 1) / 2.0, ex / hx + (nx - 1) / 2.0)
+    bina_sahnesi = _bina_sahnesi(kutle, cerceve, zr)
     veri = {
+        "binalar": bina_sahnesi,
+        # Etiket parsel binasının çatısının üstüne çıkar; yoksa binanın içinde kalırdı.
+        "pb": max([b["u"] for b in bina_sahnesi if b["t"] == "p"] or [0.0]),
+        "kutu": [boylamlar[0], boylamlar[-1], enlemler[0], enlemler[-1]],
+        "esri_karo": ESRI_KARO,
         "nx": nx, "ny": ny, "gx": round(gx, 1), "gz": round(gz, 1), "hx": round(hx, 3), "hy": round(hy, 3),
         "dz": [v for s in dz for v in s],
         "parsel": _ortulu_cizgiler(parsel, cerceve, zr),
@@ -1019,27 +1185,61 @@ def arazi_3d_html(parsel: Dict[str, Any], komsular: Optional[List[Dict[str, Any]
         ("Ortalama eğim", "%% %s" % tr_bicim(ozet["ortalama_egim_yuzde"], 1)),
         ("Hâkim bakı", str(ozet["hakim_baki"])),
     ]
-    kart = ('<div class="kart"><h1>%s</h1>%s'
+    bina_html = ""
+    if kutle is not None:
+        kozet = kutle.get("ozet") or {}
+        pb = kozet.get("parsel_binasi")
+        if pb and pb.get("sayi") and pb.get("yukseklik_m"):
+            satir = "%s ≈ %s m (%s)" % ("%d kat" % pb["kat"] if pb.get("kat") else "kat bilinmiyor",
+                                        tr_bicim(pb["yukseklik_m"], 0), pb.get("dayanak") or "—")
+        elif pb and pb.get("kat"):
+            satir = "%d kat (%s); açık veride bina izi yok" % (pb["kat"], pb.get("dayanak") or "—")
+        else:
+            satir = "açık veride bina izi yok"
+        satirlar += [("Parseldeki bina (tahmini)", satir),
+                     ("Çizilen bina", "%d (tahmini kütle)" % len(bina_sahnesi))]
+        bina_html = ('<label class="sur"><input id="binalar" type="checkbox" checked> Binalar (tahmini kütle)'
+                     '</label><p>%s</p><p>%s</p>'
+                     % ("<br>".join(_h(n) for n in kozet.get("notlar") or []), _h(kozet.get("atif", ""))))
+    kart = ('<div class="kart"><details open><summary><h1>%s</h1></summary>%s'
             '<label class="sur">Düşey abartı <input id="abarti" type="range" min="1" max="5" step="0.5" '
-            'value="2"> <b id="kat">2×</b></label>'
+            'value="2"> <b id="kat">2×</b></label>%s'
+            '<label class="sur" hidden><input id="uydu" type="checkbox" checked> Uydu zemini (Esri)</label>'
             "<p>Renkler görelidir: yeşil %s m → açık %s m (görünen alanın en alçak ve en yüksek kotu).</p>"
-            "<p>%s</p><p>%s</p><p>Yükseklik: %s — %s</p></div>"
-            % (_h(etiket(parsel)), _tablo(satirlar), _h(tr_bicim(taban, 1)),
+            "<p>%s</p><p>%s</p><p>Yükseklik: %s — %s</p>"
+            '<p id="uydu-atif" hidden>Uydu: %s</p>'
+            '<p id="uydu-yok">Uydu zemini yalnız Tapu arayüzünde ve kendi Esri anahtarınız girilmişse görünür; '
+            "anahtar dosyaya yazılmaz.</p></details></div>"
+            % (_h(etiket(parsel)), _tablo(satirlar), bina_html, _h(tr_bicim(taban, 1)),
                _h(tr_bicim(max(max(s) for s in z), 1)), _h(ozet.get("not", "")),
                "<br>".join(_h(u) for u in UYARI), _h(izgara.get("kaynak", "Copernicus DEM")),
-               _h(izgara.get("atif", _ATIF % "WorldDEM-30"))))
+               _h(izgara.get("atif", _ATIF % "WorldDEM-30")), _h(ESRI_ATIF)))
     importmap = {"imports": {"three": _THREE + "build/three.module.min.js",
                              "three/addons/": _THREE + "examples/jsm/"}}
     return "\n".join([
         "<!DOCTYPE html>", '<html lang="tr"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        "<title>3B arazi — %s</title>" % _h(etiket(parsel)),
+        "<title>3B görünüm (tahmini) — %s</title>" % _h(etiket(parsel)),
         "<style>%s\n#sahne{position:absolute;inset:0;background:#eaf0f4}#sahne canvas{display:block}"
-        "#bekle{position:absolute;left:0;right:0;top:48%%;text-align:center;color:#555;font-size:13px}"
-        ".sur{display:block;margin-top:8px}.sur input{vertical-align:middle;width:130px}</style>" % _ORTAK_CSS,
+        "#bekle{position:absolute;left:0;right:0;top:48%%;text-align:center;color:#4b5565;font-size:13px}"
+        ".sur{display:block;margin-top:8px}.sur input[type=range]{vertical-align:middle;width:130px}"
+        ".uyari3d{position:absolute;z-index:1001;left:12px;right:12px;bottom:12px;margin:0 auto;max-width:780px;"
+        "background:rgba(251,243,224,.97);border:0.5px solid rgba(135,98,31,.35);border-radius:12px;padding:8px 12px;"
+        "font-size:12px;line-height:1.4;color:#5c4212;pointer-events:none;box-shadow:0 1px 6px rgba(13,24,38,.12)}"
+        ".atif3d{position:absolute;z-index:1000;top:12px;right:12px;max-width:min(430px,45%%);text-align:right;"
+        "background:rgba(255,255,255,.88);border-radius:8px;padding:3px 8px;font-size:10.5px;line-height:1.3;"
+        "color:#4b5565}</style>" % _ORTAK_CSS,
         '</head><body><div id="sahne"></div>',
         '<div id="bekle">3B görünüm yükleniyor… (three.js CDN\'den gelir; çevrimdışıyken görünmez)</div>',
         kart,
+        # Kartın DIŞINDA ve betiksiz: kart katlansa, CDN gelmese de uyarı ekranda kalır.
+        '<div class="uyari3d" role="note">%s</div>' % _h(UYARI_3D),
+        # Atıf da kartın dışında: kart katlanınca kaynak atfı ekrandan kalkmamalı.
+        '<div class="atif3d">%s%s<span id="atif-uydu" hidden> · Uydu: %s</span></div>'
+        % (_h("Yükseklik: Copernicus DEM (© DLR e.V., © Airbus DS)"),
+           _h(" · " + kutle["ozet"]["atif"]) if kutle and (kutle.get("ozet") or {}).get("atif") else "",
+           _h(ESRI_ATIF)),
         '<script type="importmap">%s</script>' % _js(importmap),
-        '<script type="module">%s</script>' % _UCBOYUT_JS.replace("__VERI__", _js(veri)),
+        '<script type="module">%s</script>'
+        % _UCBOYUT_JS.replace("__ESRI__", ESRI_ISARETI).replace("__VERI__", _js(veri)),
         "</body></html>"])
