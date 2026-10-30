@@ -49,6 +49,7 @@ FIKSTUR = os.path.join(TR_DIZINI, "tests", "fixtures", "smk_m120.json")
 TABAN_MCPCORE = os.path.join(KOK, "tests", "fixtures", "mcpcore_taban.py")
 TABAN_BLOB = "198960e197f71a5e6e9d8cbcae02043c558b0a8f"   # git rev-parse dc1a16d:mcpcore.py
 FLY_TOML = os.path.join(KOK, "fly.toml")
+FLY_DENETIM_TOML = os.path.join(KOK, "fly.denetim.toml")
 
 TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 KAYIT_ONEKI = '{"olay":'
@@ -73,6 +74,23 @@ KANUN_BLOGU = {   # _kanun_blogu(); Bedesten mevzuatNo'yu int verir
     "citation_missing": [],
     "source_url": "https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=6769&MevzuatTur=1&MevzuatTertip=5",
 }
+
+
+def _toml_degerleri(yol):
+    """fly.toml biçimindeki dosyanın {(bölüm, anahtar): ham değer} sözlüğü; yorumlar ve boş satırlar
+    atlanır. tomllib Python 3.11'de geldiği için düz satır okuması (fly.toml tek satırlık değerler taşır)."""
+    degerler, bolum = {}, ""
+    with open(yol, encoding="utf-8") as f:
+        for satir in f:
+            satir = satir.strip()
+            if not satir or satir.startswith("#"):
+                continue
+            if satir.startswith("["):
+                bolum = satir.strip("[]")
+                continue
+            anahtar, _, deger = satir.partition("=")
+            degerler[(bolum, anahtar.strip())] = deger.strip()
+    return degerler
 
 
 def _kalem(madde_no, metin, durum="text", baslik=None, **ek):
@@ -355,6 +373,20 @@ class KapaliykenTest(_Temel):
         with open(FLY_TOML, encoding="utf-8") as f:
             adlar = re.findall(r'(?m)^app\s*=\s*"([^"]+)"', f.read())
         self.assertEqual(adlar, [denetim.CANLI_UYGULAMA])
+
+    @unittest.skipUnless(os.path.exists(FLY_DENETIM_TOML), "fly.denetim.toml yok")
+    def test_test_uygulamasi_ayari_canliyla_ayni_dort_satir_disinda(self):
+        """fly.denetim.toml, fly.toml'dan yalnız ad, boşta durma ve TKGM makine sayısında ayrılır.
+
+        Canlıdaki bir ayar (bellek, bölge, gömme modeli...) değişip teste taşınmazsa ölçüm canlıyı
+        temsil etmez; ad canlıyla aynı olursa kayıt hiç açılmaz.
+        """
+        canli, test = _toml_degerleri(FLY_TOML), _toml_degerleri(FLY_DENETIM_TOML)
+        farkli = {k for k in canli.keys() | test.keys() if canli.get(k) != test.get(k)}
+        self.assertEqual(farkli, {("", "app"), ("http_service", "auto_stop_machines"),
+                                  ("http_service", "min_machines_running"), ("env", "TKGM_MAKINE_SAYISI")})
+        self.assertNotEqual(test[("", "app")], '"%s"' % denetim.CANLI_UYGULAMA)
+        self.assertEqual(test[("http_service", "auto_stop_machines")], "true")
 
     def _ana_blogu_calistir(self, ortam_ek):
         """server.py __main__ bloğunun TAMAMI (gerçek kod, AST'den); ağır parçalar sahte.
