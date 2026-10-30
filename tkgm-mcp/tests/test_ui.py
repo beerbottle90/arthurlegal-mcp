@@ -96,6 +96,13 @@ class Arayuz(unittest.TestCase):
         self.assertIn("a_kroki.svg", adlar)
         self.assertNotIn("gizli.txt", adlar)
 
+    def test_harc_menusu(self):
+        kod, govde, _ = self._iste("/api/harc_islemleri")
+        j = json.loads(govde)
+        self.assertEqual(kod, 200)
+        self.assertTrue(j["ok"] and j["islemler"] and j["yk_kaynagi"])
+        self.assertEqual(j["islemler"][0]["kod"], "satis")
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -105,7 +112,7 @@ class Kilitler(Arayuz):
     """v0.4 kapısı: süreç başına belirteç, köken denetimi, çerçeveleme ve Referer."""
 
     def test_belirtecsiz_get_ve_post_reddedilir(self):
-        for yol in ("/api/parseller", "/api/dosyalar", "/api/cevaplar", "/dosya/a_kroki.svg"):
+        for yol in ("/api/parseller", "/api/dosyalar", "/api/cevaplar", "/api/harc_islemleri", "/dosya/a_kroki.svg"):
             self.assertEqual(self._iste(yol, belirtec=False)[0], 403, yol)
         kod, _ = self._cagir("baslangic", {}, {"Content-Type": "application/json", "X-Tkgm": "1"})
         self.assertEqual(kod, 403)       # eski sabit başlık artık geçmez

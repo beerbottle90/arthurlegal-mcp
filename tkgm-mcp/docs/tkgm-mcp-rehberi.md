@@ -1,6 +1,6 @@
 # Tapu-Kadastro — tkgm MCP (Kullanım Rehberi)
 
-> ✅ **Custom MCP backend VAR (`tkgm-mcp` v0.6.0).** TKGM Parsel Sorgu'dan **canlı parsel**
+> ✅ **Custom MCP backend VAR (`tkgm-mcp` v0.6.1).** TKGM Parsel Sorgu'dan **canlı parsel**
 > (il/ilçe/mahalle + ada/parsel, koordinat ya da yer adı), parsel raporu, ölçü, **ölçekli kroki**,
 > harita ve tahmini 3D görünüm (yalnız yerel), güzergâh-koridor kesişimi, föy/portföy, harç-masraf hesabı, tapu kaydı
 > yapılandırma ve **dayanak köprüsü**. Araç öneki **`tkgm_`**.

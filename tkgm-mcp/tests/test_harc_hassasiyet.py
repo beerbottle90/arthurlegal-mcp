@@ -188,6 +188,64 @@ class MatrahKurallari(unittest.TestCase):
         self.assertEqual(h["tapu_harci"]["matrah_tl"], 3_000_000.0)
 
 
+@unittest.skipIf(harc.durum()["hata"], "tarife verisi yüklenemedi")
+class IslemMenusu(unittest.TestCase):
+    """Arayüz yalnız th_girdisi/ds_girdisi'nin istediği kutuları açar: o kutularla her hesap
+    çalışmalı, istenmeyen kutu hiçbir hesabın ön koşulu olmamalı."""
+
+    def _hesap(self, th, ds, g, yk="1,85"):
+        args = {"tapu_harci_islem": th, "doner_sermaye_kod": ds}
+        if g["tutar"]:
+            args["bedel"] = "2.000.000"                     # arayüz metni olduğu gibi gönderir
+        if g["evd"] == "zorunlu":
+            args["emlak_vergi_degeri"] = "1.250.000"
+        if g["yoresel_katsayi"]:
+            args["yoresel_katsayi"] = yk
+        return json.loads(server._t_harc({k: v for k, v in args.items() if v}))
+
+    def test_menudeki_her_islem_yalniz_istedigi_kutularla_hesaplanir(self):
+        menu = harc.islemler()["islemler"]
+        self.assertEqual(len(menu), len(harc.ISLEMLER))     # veri değişip satır düşerse fark edilir
+        for i in menu:
+            for ds in filter(None, {i["doner_sermaye"], i["doner_sermaye_kat"]}):
+                h = self._hesap(i["tapu_harci"], ds, i)
+                self.assertIsNotNone(h["tapu_harci"]["toplam_tl"], i["kod"])
+                self.assertIsNotNone(h.get("genel_toplam_tl"), i["kod"])
+            if not i["doner_sermaye"]:
+                self.assertFalse(i["yoresel_katsayi"], i["kod"])
+                self.assertIsNotNone(self._hesap(i["tapu_harci"], None, i)["tapu_harci"]["toplam_tl"])
+
+    def test_kutu_secimi_matrah_kuralini_izler(self):
+        kod = {i["kod"]: i for i in harc.islemler()["islemler"]}
+        self.assertEqual((kod["satis"]["tutar"], kod["satis"]["evd"]), ("Satış bedeli", "sinir"))
+        self.assertEqual((kod["bagis"]["tutar"], kod["bagis"]["evd"]), (None, "zorunlu"))
+        self.assertEqual((kod["ipotek"]["tutar"], kod["ipotek"]["evd"]), ("Borç tutarı", None))
+        self.assertEqual((kod["terkin"]["tutar"], kod["terkin"]["evd"], kod["terkin"]["yoresel_katsayi"]),
+                         (None, None, False))
+
+    def test_tarifenin_her_satiri_kendi_kutulariyla_hesaplanir(self):
+        """"Diğer işlem" yolu: aramada gelen her hesaplanabilir satır."""
+        for r in harc._VERI["tapu_harci"]:
+            g = harc.th_girdisi(r["kod"])
+            if g is None:
+                with self.assertRaises(harc.HarcHatasi, msg=r["kod"]):
+                    harc.tapu_harci(r["kod"], 1_000_000.0, 500_000.0)
+                continue
+            h = harc.tapu_harci(r["kod"], 1_000_000.0 if g["tutar"] else 0.0,
+                                500_000.0 if g["evd"] == "zorunlu" else None, adet=2 if g["adet"] else 1)
+            self.assertGreater(h["toplam_tl"], 0, r["kod"])
+        for r in harc._VERI["doner_sermaye"]:
+            g = harc.ds_girdisi(r["kod"])
+            d = harc.doner_sermaye(r["kod"], 1.5 if g and g["yoresel_katsayi"] else None, adet=2)
+            self.assertEqual(g is not None, d.get("toplam_tl") is not None, r["kod"])
+
+    def test_arama_kutu_bilgisini_tasir(self):
+        out = json.loads(server._t_tarife_ara({"sorgu": "satış"}))
+        satis = next(s for s in out["sonuclar"] if s["kod"] == "satis")
+        self.assertEqual(satis["girdi"]["evd"], "sinir")
+        self.assertTrue(any(s["tablo"] == "doner_sermaye" and s["girdi"] for s in out["sonuclar"]))
+
+
 class HukukGuncel(unittest.TestCase):
     """7571 ve 7579 değişiklikleri: yanlış hak düşürücü süre kaçırılmış bir dava demektir."""
 

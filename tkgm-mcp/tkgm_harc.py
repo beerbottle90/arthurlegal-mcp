@@ -73,18 +73,89 @@ def ara(sorgu: str, sinir: int = 12) -> List[Dict[str, Any]]:
             deger = ("binde %s" % r["oran_binde"] if r.get("oran_binde") is not None
                      else "%s TL" % r["maktu_tl"] if r.get("maktu_tl") is not None else r["tur"])
             out.append({"tablo": "tapu_harci", "kod": r["kod"], "islem": r["islem"], "deger": deger,
-                        "dayanak": r["dayanak"]})
+                        "dayanak": r["dayanak"], "girdi": th_girdisi(r["kod"])})
     for r in _VERI["doner_sermaye"]:
         if all(s in _katla(r["islem"] + " " + r["kod"]) for s in sozcukler):
             out.append({"tablo": "doner_sermaye", "kod": r["kod"], "islem": r["islem"],
                         "deger": "%s TL" % r["tutar_tl"] if r["tutar_tl"] is not None else "formül",
-                        "isaret": _isaret(r), "birim": r.get("birim")})
+                        "isaret": _isaret(r), "birim": r.get("birim"), "girdi": ds_girdisi(r["kod"])})
     return out[:sinir]
 
 
 # Tarifede işlem değil, kural/dayanak olan satırlar: hesaplanırsa anlamsız tutar üretir
 # ("satis_oran_dayanagi" tek taraflı yarım satış harcı, "asgari_nispi_harc" 346 TL işlem gibi).
 _HESAPLANMAZ = {"satis_oran_dayanagi", "asgari_nispi_harc"}
+
+
+def th_girdisi(kod: str) -> Optional[Dict[str, Any]]:
+    """Tapu harcı satırının hesap için İSTEDİĞİ girdiler; arayüz yalnız bunlara kutu açar.
+    Kural _matrah'takiyle aynıdır: "kayıtlı değer" matrahında tutar emlak vergisi değeridir;
+    öbür nispi işlemlerde beyan edilen tutar istenir, emlak vergisi değeri yalnız sınır çizer.
+    Hesaplanmayan (kural/dayanak) satırda None."""
+    r = _TH.get(kod)
+    if (r is None or kod in _HESAPLANMAZ or r["tur"] not in ("nispi", "maktu")
+            or (r["tur"] == "nispi" and r.get("oran_binde") is None)):
+        return None
+    k = _katla(r.get("matrah") or "")
+    if r["tur"] == "maktu":
+        return {"tutar": None, "evd": None, "adet": r["matrah"] if re.search(r"\b(be)?her\b", k) else None}
+    if "kayitli deger" in k:
+        return {"tutar": None, "evd": "zorunlu", "adet": None}
+    return {"tutar": "Bedel", "evd": "sinir" if "emlak vergisi deger" in k else None, "adet": None}
+
+
+def ds_girdisi(kod: str) -> Optional[Dict[str, Any]]:
+    """Döner sermaye satırının istediği girdiler: yöresel katsayı (YK ve formül satırları) ve
+    adedin tutarı değiştirip değiştirmediği. doner_sermaye()'nin tutar üretmediği satırda None."""
+    r = _DS.get(kod)
+    if r is None:
+        return None
+    isaret = _isaret(r)
+    if isaret == "formül":
+        if kod[:1] != "1" or _carpan(r.get("kosul") or "", 1) is None:
+            return None
+        k = _katla(r.get("kosul") or "")
+        adetli = k.startswith("bagimsiz bolum adedi") or (k.startswith("bir islem ucreti +")
+                                                          and "ilave islem ucreti" in k)
+        neyin = (r.get("kosul") or "").split(". ")[0]      # "Bir işlem ücreti + ilave her bağımsız bölüm…"
+    elif isaret in ("YK", "M"):
+        adetli = (r.get("birim") or "işlem başına") != "işlem başına"
+        neyin = r.get("birim")
+    else:
+        return None
+    return {"yoresel_katsayi": isaret != "M", "adet": neyin if adetli else None}
+
+
+# Arayüzün işlem menüsü: kullanıcı kod değil işlem seçer. Her satır bir tapu harcı kodunu
+# cetveldeki döner sermaye satırına eşler; hangi kutunun sorulacağı burada YAZILMAZ,
+# th_girdisi/ds_girdisi veriden türetir. Sütunlar: menü kodu, ad, tapu harcı kodu, döner
+# sermaye kodu, parsel kat irtifaklı ya da kat mülkiyetli bağımsız bölümse döner sermaye kodu,
+# tutar kutusunun adı. Terkinin cetvelde açık satırı yok: döner sermayesi eşlenmedi.
+ISLEMLER = (
+    ("satis", "Satış", "satis", "1.1.2.1", "1.1.1.1", "Satış bedeli"),
+    ("bagis", "Bağış", "bagis", "1.1.2.1", "1.1.1.1", None),
+    ("ipotek", "İpotek tesisi", "ipotek", "1.2.1", None, "Borç tutarı"),
+    ("kira_serhi", "Kira şerhi", "kira_serhi", "1.15", None, "Kira toplamı"),
+    ("satis_vaadi_serhi", "Satış vaadi şerhi", "satis_vaadi_serhi", "1.15", None, "Sözleşmedeki bedel"),
+    ("irtifak", "İrtifak / intifa hakkı tesisi", "irtifak_intifa_tesisi", "1.4", None, "Hak için ödenen bedel"),
+    ("sufa_serhi", "Önalım, alım ya da geri alım şerhi", "sufa_istira_vefa_serhi", "1.15", None, None),
+    ("taksim", "Paydaşlar arasında taksim", "paydaslar_arasi_taksim", "1.4", None, None),
+    ("ifraz_tevhit", "Ayırma (ifraz) / birleştirme (tevhit)", "ifraz_taksim_tevhit", "1.15", None, None),
+    ("terkin", "Terkin (ipotek ya da şerh kaldırma)", "terkin", None, None, None),
+)
+
+
+def islemler() -> Dict[str, Any]:
+    """Menü ve her işlemin istediği kutular. Veride bulunmayan satır menüden düşer, menü kırılmaz."""
+    out: List[Dict[str, Any]] = []
+    for kod, ad, th, ds, ds_kat, etiket in ISLEMLER:
+        g = th_girdisi(th)
+        if g is None or any(k and ds_girdisi(k) is None for k in (ds, ds_kat)):
+            continue
+        out.append({"kod": kod, "ad": ad, "tapu_harci": th, "doner_sermaye": ds, "doner_sermaye_kat": ds_kat,
+                    "tutar": g["tutar"] and (etiket or g["tutar"]), "evd": g["evd"],
+                    "yoresel_katsayi": bool(ds) and ds_girdisi(ds)["yoresel_katsayi"]})
+    return {"surum": _VERI.get("surum"), "islemler": out, "yk_kaynagi": YK_KAYNAGI, "uyari": ON_HESAP}
 
 
 def _matrah(r: Dict[str, Any], bedel: float, ev: Optional[float]) -> tuple:

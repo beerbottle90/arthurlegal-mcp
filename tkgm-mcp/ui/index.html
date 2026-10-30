@@ -546,29 +546,16 @@ const cizici = {
         const s = await cagir("arazi_3d", args); durum.onbellek[anahtar] = s; goster(s); } catch (x) { kap.append(hataKutusu(x)); } }) }, "3D görünümü getir"))));
   },
   async hukuk(kap) {
-    const p = secili(), sonuc = el("div"), hsonuc = el("div"), liste = el("div");
+    const p = secili(), sonuc = el("div");
     const sec = el("select", { onchange: async () => { if (!sec.value) return sonuc.replaceChildren(); try { const s = await cagir("dayanak_koprusu", { konu: sec.value, ref: p ? p.ref : undefined }), k = s.konu;
       sonuc.replaceChildren(el("table", {}, el("tr", {}, el("th", {}, "Mevzuat"), el("th", {}, "Maddeler")), k.dayanak.map(d => el("tr", {}, el("td", {}, d.mevzuat_no + " — " + d.ad), el("td", {}, d.maddeler)))),
         k.uyari ? el("div", { class: "uyari hata" }, k.uyari) : "", k.sure ? el("div", { class: "uyari" }, "Süre: " + k.sure) : "", k.parsel_verisi ? el("div", { class: "uyari" }, k.parsel_verisi) : "",
         el("div", { class: "kucuk" }, "Teyit: " + k.teyit), el("div", { class: "kucuk", style: "margin-top:6px" }, s.dogrulama),
         el("div", { class: "kucuk", style: "margin-top:6px" }, "Önerilen aramalar: ", (k.ictihat || []).map(c => el("code", { style: "display:block" }, "tr_ictihat_ara " + c.args.query))));
       } catch (e) { sonuc.replaceChildren(hataKutusu(e)); } } }, el("option", { value: "" }, "Konu seçin…"), (await konular()).map(k => el("option", { value: k.konu }, k.baslik)));
-    const g = id => $("#" + id).value, sayi = id => g(id) ? Number(g(id).replace(/\./g, "").replace(",", ".")) : undefined;
-    const ara = el("input", { placeholder: "işlem ara: satış, ipotek, aplikasyon, kat irtifakı…", oninput: async () => { if (ara.value.length < 2) return liste.replaceChildren();
-      const s = await cagir("tarife_kalemi", { sorgu: ara.value }); liste.replaceChildren(el("table", {}, s.sonuclar.map(r => el("tr", { style: "cursor:pointer", onclick: () => { $("#" + (r.tablo === "tapu_harci" ? "h-th" : "h-ds")).value = r.kod; } },
-        el("td", {}, r.kod), el("td", {}, r.islem + " — " + r.deger + (r.isaret ? " [" + r.isaret + "]" : "")))))); } });
     kap.replaceChildren(el("div", { class: "izgara" },
       el("div", { class: "kart" }, el("h3", {}, "Hukuk köprüsü"), p && p.rejim ? p.rejim.map(r => el("div", { class: "uyari" }, r)) : "", sec, sonuc),
-      el("div", { class: "kart" }, el("h3", {}, "Harç ve döner sermaye (2026)"), ara, liste,
-        el("label", {}, "Tapu harcı kodu"), el("input", { id: "h-th", placeholder: "örn. satis" }), el("label", {}, "Bedel / ipotekte borç (TL)"), el("input", { id: "h-bedel", placeholder: "3.000.000" }),
-        el("label", {}, "Emlak vergisi değeri (TL)"), el("input", { id: "h-evd" }), el("label", {}, "Döner sermaye kodu"), el("input", { id: "h-ds", placeholder: "örn. 1.1.2.1" }),
-        el("label", {}, "Yöresel katsayı · adet"), el("div", { style: "display:flex;gap:8px" }, el("input", { id: "h-yk", placeholder: "katsayı" }), el("input", { id: "h-adet", placeholder: "1" })),
-        el("div", { class: "dugmeler" }, el("button", { class: "d", onclick: e => mesgul(e.target, async () => { try { const s = await cagir("harc_hesapla", { tapu_harci_islem: g("h-th") || undefined, bedel: sayi("h-bedel"),
-          emlak_vergi_degeri: sayi("h-evd"), doner_sermaye_kod: g("h-ds") || undefined, yoresel_katsayi: sayi("h-yk"), adet: sayi("h-adet") }); const t = s.tapu_harci, d = s.doner_sermaye;
-          hsonuc.replaceChildren(t ? el("div", {}, el("b", {}, t.islem), tablo([...t.kalemler.map(k => [k.kalem, tr(k.tutar_tl) + " TL"]), ["Toplam", tr(t.toplam_tl) + " TL"], ["Dayanak", t.dayanak]]), (t.notlar || []).map(n => el("div", { class: "uyari" }, n)), el("div", { class: "kucuk" }, "“" + t.alinti + "”")) : "",
-            d ? el("div", { style: "margin-top:10px" }, el("b", {}, d.islem), tablo([["Tutar", d.toplam_tl != null ? tr(d.toplam_tl) + " TL" : null], ["Hesap", d.hesap], ["Koşul", d.kosul], ["Cetvel s.", d.sayfa]]), d.not ? el("div", { class: "uyari" }, d.not) : "", el("div", { class: "kucuk" }, "“" + d.alinti + "”")) : "",
-            s.genel_toplam_tl != null ? el("div", { class: "uyari" }, "Genel toplam: " + tr(s.genel_toplam_tl) + " TL") : "", el("div", { class: "kucuk" }, s.uyari));
-        } catch (x) { hsonuc.replaceChildren(hataKutusu(x)); } }) }, "Hesapla")), hsonuc)));
+      await harcKarti(p)));
   },
   async koridor(kap) {
     let hat = null; const sonuc = el("div"), ad = el("span", { class: "kucuk" }, "hat dosyası seçilmedi"), gen = el("input", { placeholder: "örn. 16", style: "max-width:140px", value: durum.koridorGen || "" });
@@ -595,6 +582,93 @@ const cizici = {
     kap.replaceChildren(el("div", { class: "kart" }, el("h3", {}, "Dosyalarım"), el("div", { class: "kucuk" }, "Klasör: " + s.klasor + " — Claude oturumlarında üretilen çıktılar da burada görünür."),
       s.dosyalar.length ? el("table", {}, s.dosyalar.map(d => el("tr", {}, el("td", {}, new Date(d.degisim * 1000).toLocaleString("tr-TR")), el("td", {}, el("a", { class: "bag", href: dosyaUrl(d.ad), target: "_blank", rel: "noopener" }, d.ad)), el("td", {}, tr(d.kb, 1) + " KB")))) : bos("Henüz çıktı yok."))); },
 };
+/* ---------- Harç ve döner sermaye: kod değil işlem seçilir ----------
+   Kutular yalnız seçilen işlemin hesapta İSTEDİĞİ girdilerdir; hangisinin istendiğini sunucu tarifeden
+   türetir (tkgm_harc.islemler, th_girdisi, ds_girdisi). Parselin niteliği döner sermaye satırını
+   (bağımsız bölüm mü) önden seçer; ilçesi, yöresel katsayının bu tarayıcıda hatırlandığı anahtardır. */
+let _harcMenusu; const harcMenusu = async () => _harcMenusu || (_harcMenusu = await al("/api/harc_islemleri"));
+const KAT_NITELIGI = /apartman|kat irtifak|kat mulkiyet|bagimsiz bolum|rezidans|\bblok/;
+const ykAnahtari = p => "tkgm.yk." + (p && p.ilce ? katla(p.il) + "/" + katla(p.ilce) : "genel");
+const ykOku = p => { try { return localStorage.getItem(ykAnahtari(p)) || ""; } catch (e) { return ""; } };
+const ykYaz = (p, v) => { try { localStorage.setItem(ykAnahtari(p), v); } catch (e) { } };
+function tutarKutusu(ornek) {            // 3000000 → 3.000.000; ayrıştırma sunucuda (Türkçe ve İngilizce yazım)
+  const k = el("input", { inputmode: "decimal", placeholder: ornek });
+  k.addEventListener("blur", () => { if (/^\d{4,}$/.test(k.value.trim())) k.value = Number(k.value.trim()).toLocaleString("tr-TR"); });
+  k.addEventListener("input", () => k.classList.remove("gecersiz"));
+  return k;
+}
+function harcSonucu(s) {
+  const t = s.tapu_harci, d = s.doner_sermaye, satirlar = [];
+  if (t && t.matrah_tl != null) satirlar.push(["Matrah", tr(t.matrah_tl) + " TL × binde " + Number(t.oran_binde).toLocaleString("tr-TR")]);
+  if (t) t.kalemler.forEach(k => satirlar.push(["Tapu harcı — " + k.kalem, tr(k.tutar_tl) + " TL"]));
+  if (d) satirlar.push(["Döner sermaye", d.toplam_tl != null ? tr(d.toplam_tl) + " TL" : "yöresel katsayı gerekli"]);
+  if (s.genel_toplam_tl != null && (t ? t.kalemler.length : 0) + (d ? 1 : 0) > 1) satirlar.push([el("b", {}, "Toplam"), el("b", {}, tr(s.genel_toplam_tl) + " TL")]);
+  const notlar = [...((t && t.notlar) || []), ...(d && d.not && !d.eksik ? [d.not] : [])];
+  return el("div", { style: "margin-top:12px" }, tablo(satirlar), notlar.map(n => el("div", { class: "uyari" }, n)),
+    el("details", { class: "nasil", style: "margin-top:8px" }, el("summary", {}, "Dayanak ve alıntılar"),
+      t ? el("p", {}, el("b", {}, t.islem + ": "), t.dayanak, el("br"), "“" + t.alinti + "”") : "",
+      d ? el("p", {}, el("b", {}, d.kod + " " + d.islem + ": "), [d.hesap, d.kosul, d.sayfa ? "cetvel s. " + d.sayfa : null].filter(Boolean).join(" · "), el("br"), "“" + d.alinti + "”") : ""),
+    el("div", { class: "kucuk", style: "margin-top:6px" }, s.uyari));
+}
+async function harcKarti(p) {
+  const m = await harcMenusu(), alanlar = el("div"), liste = el("div"), sonuc = el("div");
+  const secim = { th: null, ds: null };   // "Diğer işlem" yolunda tarifeden seçilen satırlar
+  const islem = el("select", { onchange: () => { sonuc.replaceChildren(); kutulariCiz(); } },
+    m.islemler.map(i => el("option", { value: i.kod }, i.ad)), el("option", { value: "diger" }, "Diğer işlem (tarifede ara)…"));
+  const katMi = el("input", { type: "checkbox" }), tutar = tutarKutusu("örn. 3.000.000"), evd = tutarKutusu("örn. 1.250.000");
+  const yk = el("input", { inputmode: "decimal", placeholder: "örn. 1,85" }), adet = el("input", { inputmode: "numeric", placeholder: "1" });
+  katMi.checked = !!(p && KAT_NITELIGI.test(katla(p.nitelik))); yk.value = ykOku(p);
+  let evdAcik = false;
+  const gerek = () => {
+    const i = m.islemler.find(x => x.kod === islem.value);
+    if (i) return { th: i.tapu_harci, ds: (katMi.checked && i.doner_sermaye_kat) || i.doner_sermaye, tutar: i.tutar, evd: i.evd,
+      yk: i.yoresel_katsayi, adet: null, kat: !!i.doner_sermaye_kat };
+    const t = (secim.th && secim.th.girdi) || {}, d = (secim.ds && secim.ds.girdi) || {};
+    return { th: secim.th && secim.th.kod, ds: secim.ds && secim.ds.kod, tutar: t.tutar, evd: t.evd, yk: !!d.yoresel_katsayi, adet: t.adet || d.adet, kat: false };
+  };
+  const ara = el("input", { placeholder: "işlem ara: aplikasyon, kat irtifakı, cins değişikliği…", oninput: async () => {
+    if (ara.value.length < 2) return liste.replaceChildren();
+    const s = await cagir("tarife_kalemi", { sorgu: ara.value });
+    liste.replaceChildren(el("table", {}, s.sonuclar.map(r => el("tr", { style: "cursor:pointer", onclick: () => {
+      if (!r.girdi) return sonuc.replaceChildren(el("div", { class: "uyari" }, r.islem + ": kural ya da tanım satırıdır, tutar üretmez."));
+      secim[r.tablo === "tapu_harci" ? "th" : "ds"] = r; ara.value = ""; liste.replaceChildren(); sonuc.replaceChildren(); kutulariCiz(); } },
+      el("td", {}, r.tablo === "tapu_harci" ? "Harç" : "Döner s."), el("td", {}, r.islem + " — " + r.deger))))); } });
+  const etiket = (ad, zorunlu) => el("label", {}, ad, zorunlu ? el("span", { class: "zorunlu" }, " *") : "");
+  const bag = (yazi, is) => el("a", { class: "bag", href: "#", onclick: e => { e.preventDefault(); is(); } }, yazi);
+  function kutulariCiz() {
+    const g = gerek(), ilce = p && p.ilce ? p.ilce : "", parca = [];
+    if (islem.value === "diger") parca.push(ara, liste, ["th", "ds"].filter(k => secim[k]).map(k => el("div", { class: "kucuk", style: "margin-top:6px" },
+      (k === "th" ? "Tapu harcı: " : "Döner sermaye: ") + secim[k].islem + " ", bag("kaldır", () => { secim[k] = null; kutulariCiz(); }))));
+    if (g.kat) parca.push(el("div", { class: "secenekler" }, el("label", {}, katMi, "Bağımsız bölüm (daire, dükkân)"),
+      p && p.nitelik ? el("span", { class: "kucuk" }, "tapudaki nitelik: " + p.nitelik) : ""));
+    if (g.tutar) parca.push(etiket(g.tutar + " (TL)", true), tutar);
+    if (g.evd === "zorunlu") parca.push(etiket("Emlak vergisi değeri (TL)", true), evd,
+      el("div", { class: "kucuk" }, "Bu işlemde harç emlak vergisi değeri üzerinden alınır."));
+    else if (g.evd === "sinir") parca.push(evdAcik ? [etiket("Emlak vergisi değeri (TL)", false), evd, el("div", { class: "kucuk" }, "İsteğe bağlı: harç matrahı bu değere göre sınırlanır.")]
+      : el("div", { class: "kucuk", style: "margin-top:8px" }, bag("+ Emlak vergisi değerini ekle", () => { evdAcik = true; kutulariCiz(); evd.focus(); }), " (matrah sınırı için, isteğe bağlı)"));
+    if (g.yk) parca.push(etiket("Yöresel katsayı" + (ilce ? " — " + ilce : ""), false), yk,
+      el("details", { class: "nasil", style: "margin-top:4px" }, el("summary", {}, "Döner sermaye için gerekli; nereden bulunur?"),
+        el("p", {}, m.yk_kaynagi, " Bir kez yazın, " + (ilce ? ilce + " için " : "") + "bu bilgisayarda hatırlanır.")));
+    if (g.adet) parca.push(etiket("Adet", false), adet, el("div", { class: "kucuk" }, g.adet));
+    alanlar.replaceChildren(...parca.flat());
+  }
+  const hesapla = el("button", { class: "d", onclick: e => mesgul(e.target, async () => {
+    const g = gerek(), eksik = [[g.tutar, tutar], [g.evd === "zorunlu", evd]].filter(([ist, k]) => { const bos = !!ist && !k.value.trim(); k.classList.toggle("gecersiz", bos); return bos; });
+    if (!g.th && !g.ds) return sonuc.replaceChildren(el("div", { class: "uyari" }, "Tarifeden bir işlem seçin."));
+    if (eksik.length) { eksik[0][1].focus(); return sonuc.replaceChildren(el("div", { class: "uyari" }, "Yıldızlı kutuyu doldurun.")); }
+    const deger = (ist, k) => ist && k.value.trim() ? k.value.trim() : undefined;
+    try {
+      const s = await cagir("harc_hesapla", { tapu_harci_islem: g.th || undefined, doner_sermaye_kod: g.ds || undefined, bedel: deger(g.tutar, tutar),
+        emlak_vergi_degeri: deger(g.evd === "zorunlu" || (g.evd && evdAcik), evd), yoresel_katsayi: deger(g.yk, yk), adet: deger(g.adet, adet) });
+      if (g.yk && yk.value.trim()) ykYaz(p, yk.value.trim());
+      sonuc.replaceChildren(harcSonucu(s));
+    } catch (x) { sonuc.replaceChildren(hataKutusu(x)); } }) }, "Hesapla");
+  kutulariCiz();
+  return el("div", { class: "kart" }, el("h3", {}, "Harç ve döner sermaye (" + m.surum + ")"),
+    p ? el("div", { class: "kucuk" }, "Parsel: " + p.parsel + (p.nitelik ? " · " + p.nitelik : "")) : "",
+    etiket("İşlem", false), islem, alanlar, el("div", { class: "dugmeler" }, hesapla), sonuc);
+}
+
 /* ---------- Sor: yerel yönlendirici, eşleşmeyen metin Claude'a kopyalanacak komut olur ---------- */
 const HARC_KODLARI = [["ayni sermaye", "ayni_sermaye"], ["üst hakkı", "ust_hakki_daimi_mustakil"], ["satış vaadi", "satis_vaadi_serhi"], ["ipotek", "ipotek"],
   ["satış", "satis"], ["satis", "satis"], ["bağış", "bagis"], ["bagis", "bagis"], ["kira", "kira_serhi"], ["intifa", "irtifak_intifa_tesisi"], ["irtifak", "irtifak_intifa_tesisi"]];
