@@ -52,6 +52,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import tkgm_canli as canli
+import tkgm_harc as harc
 import tkgm_harita as harita
 import tkgm_hukuk as hukuk
 import tkgm_kaynak as kaynak
@@ -282,6 +283,7 @@ def ozetler() -> List[Dict[str, Any]]:
     for p in parseller.bellektekiler()[:100]:
         olcu = olc(p)
         kayit = {"ref": p["ref"], "parsel": parseller.etiket(p), "alan_m2": olcu["alan_m2"],
+                 "il": p["oznitelik"].get("il"), "ilce": p["oznitelik"].get("ilce"),
                  "nitelik": p["oznitelik"].get("nitelik"), "pafta": p["oznitelik"].get("pafta"),
                  "mevkii": p["oznitelik"].get("mevkii"), "dosyadaki_alan_m2": olcu.get("tapu_alani_m2"),
                  "rejim": [r["uyari"] for r in hukuk.nitelik_rejimleri(p["oznitelik"].get("nitelik", ""))]}
@@ -424,6 +426,8 @@ def isleyici(tools: List[Tool]):
                 self._json(200, {"ok": True, "klasor": kaynak.cikti_klasoru(), "dosyalar": galeri()})
             elif yol == "/api/cevaplar":
                 self._json(200, {"ok": True, "cevaplar": kaynak.cevaplar()})
+            elif yol == "/api/harc_islemleri":
+                self._json(200, dict(harc.islemler(), ok=True))
             elif yol in ("/api/idari", "/api/idari/coz"):
                 kod, veri = (idari if yol == "/api/idari" else idari_coz)(parse_qs(urlparse(self.path).query))
                 self._json(kod, veri)

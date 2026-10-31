@@ -238,6 +238,14 @@ anılır; geometri her çağrıda yeniden gönderilmez.
 
 ## Sürüm notları
 
+**0.6.1 (30.10.2026)**
+- Arayüzün harç kartı sadeleşti: kod yerine işlem seçilir (satış, bağış, ipotek, şerhler, taksim,
+  ifraz/tevhit, terkin; gerisi "Diğer işlem" aramasıyla). Yalnız o işlemin hesapta istediği kutular
+  görünür; hangisinin istendiğini tarife verisi belirler (`tkgm_harc.islemler`). Döner sermaye satırı
+  parselin niteliğinden (bağımsız bölüm mü), yöresel katsayı ilçeye göre bu bilgisayarda hatırlanır.
+  Sonuç tek tabloda; dayanak ve alıntılar katlanır bölümde.
+- `tarife_kalemi` sonuçları her satırın istediği girdileri de taşır (`girdi`).
+
 **0.6.0 (30.10.2026)**
 - Tahmini 3D görünüm: `arazi_3d` çevre binaların tahmini kütlesini çizer (`kat`, `binalar`,
   `varsayilan_kat`); yanıt `uyari_3d` ve `binalar` özetini taşır. Uyarı her yüzeyde, kapatılamaz.
