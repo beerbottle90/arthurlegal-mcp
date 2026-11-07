@@ -336,7 +336,7 @@
     "kanun": {"citation": "HUKUK MUHAKEMELERİ KANUNU (Kanun No. 6100, RG sayı 27836) m. 120", "alinti": "Davacı, yargılama harçları ile her yıl Adalet Bakanlığınca çıkarılacak gider avansı tarifesinde belirlenecek olan tutarı, dava açarken mahkeme veznesine yatırmak zorundadır."}
   },
   "faiz": {
-    "kapsam": {"bas": "2006-01-01", "son": "2026-12-31", "not": "Ticari temerrüt faizi 2006 ilk yarısında 31.12.2005'te uygulanan avans oranına bağlıdır; kayıttaki ilk tebliğ 20.12.2005. 2027 yılının oranı 31.12.2026'da uygulanacak TCMB oranına bağlıdır ve henüz belirlenmedi."},
+    "kapsam": {"bas": "2006-01-01", "son": "2026-12-31", "oranlar_teyit": "2026-11-07", "not": "Ticari temerrüt faizi 2006 ilk yarısında 31.12.2005'te uygulanan avans oranına bağlıdır; kayıttaki ilk tebliğ 20.12.2005. 2027 yılının oranı 31.12.2026'da uygulanacak TCMB oranına bağlıdır ve henüz belirlenmedi."},
     "gun_esasi": 365,
     "esik_puan": 5,
     "kanuni": [

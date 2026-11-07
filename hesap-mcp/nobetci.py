@@ -56,8 +56,8 @@ def yayim_govdesi(y: Dict[str, Any]) -> str:
             "Sunucu yeni dönem verisi işlenene kadar bu kartta kesin toplam vermez (`yeni_duzenleme`).",
             "",
             "Yapılacak: yeni dönemin değerini resmî kaynaktan okuyun (SHA-256 ile), `hesap-mcp/veri/tarife_2026.json`'a "
-            "ekleyin, `izlenen.gecerlilik` tarihini ileri alın ve `hesap-mcp/tests/test_faiz_iscilik.py`'deki sabitleri "
-            "güncelleyin.",
+            "ekleyin, `izlenen.gecerlilik` tarihini (faizde `faiz.kapsam.son` ve `faiz.kapsam.oranlar_teyit` de) ileri "
+            "alın ve `hesap-mcp/tests/test_faiz_iscilik.py`'deki sabitleri güncelleyin.",
             "",
             "Bu issue'yu tarife nöbetçisi açtı; aynı dönem için yenisi açılmaz.",
         ])

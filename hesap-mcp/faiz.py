@@ -73,6 +73,13 @@ def yari_yil(yil: int, yari: int, tur: str) -> Tuple[Decimal, Dict[str, Any], st
     """3095 m. 1 ve m. 2/2: yılın ilk yarısında önceki yılın 31 Aralık oranı; ikinci yarıda 30 Haziran oranı beş puan ya
     da daha çok farklıysa o oran. Döner: (oran, tebliğ satırı, belirleme açıklaması)."""
     aralik = date(yil - 1, 12, 31)
+    teyit = (_F.get("kapsam") or {}).get("oranlar_teyit")
+    son_gun = date(yil, 6, 30) if yari == 2 else aralik
+    if not teyit or son_gun > _gun(teyit):
+        # Oranı belirleyen gün verinin teyit edildiği günden sonra: o gün uygulanacak oran henüz bilinmiyor.
+        raise HesapHatasi("%d yılının %s yarısındaki oran %s günü uygulanan TCMB oranına bağlıdır; veri %s tarihine kadar "
+                          "teyitli." % (yil, "ilk" if yari == 1 else "ikinci", _tarih(son_gun),
+                                        _tarih(_gun(teyit)) if teyit else "-"))
     r1 = tcmb_satiri(aralik)
     o1 = _d(r1[tur])
     if yari == 1:

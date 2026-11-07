@@ -158,6 +158,17 @@ class Oranlar(unittest.TestCase):
         self.assertEqual((self.yy(2026, 1), self.yy(2026, 2)), (39.75, 39.75))
         self.assertEqual(self.yy(2026, 1, "reeskont"), 38.75)
 
+    def test_belirlenmemis_oran_yok(self):
+        # 2027 ilk yarısı 31.12.2026 oranına bağlı; veri 07.11.2026'ya kadar teyitli: eski oran kesinmiş gibi verilmez.
+        for tur in ("avans", "reeskont"):
+            with self.assertRaises(faiz.HesapHatasi):
+                faiz.yari_yil(2027, 1, tur)
+        with self.assertRaises(faiz.HesapHatasi):
+            faiz.kanuni_orani(date(2027, 1, 1))
+        o = faiz.faiz("ticari", 1000, date(2026, 12, 1), date(2027, 1, 1))
+        self.assertNotIn("bitis_orani", o)
+        self.assertEqual(o["kalemler"][0]["oran"], 39.75)
+
     def test_kanuni(self):
         k = lambda g: float(faiz.kanuni_orani(g)[0])  # noqa: E731
         self.assertEqual(k(date(2006, 1, 1)), 9)
