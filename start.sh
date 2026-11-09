@@ -2,7 +2,7 @@
 # Start de-eli (the one backend that cannot be imported), then the aggregator.
 #
 # The aggregator is what answers; de-eli is a local dependency of it. If de-eli
-# fails, the aggregator still serves the other nine jurisdictions and reports the
+# fails, the aggregator still serves every other backend and reports the
 # failure through `status` -- a missing jurisdiction is announced, never silently
 # served as an empty result.
 set -e
@@ -10,7 +10,8 @@ set -e
 if command -v de-eli-mcp >/dev/null 2>&1; then
     echo "de-eli backend starting on 127.0.0.1:8790" >&2
     # Keep it alive: nothing else restarts a background process, and a dead de-eli
-    # takes all fifteen de_ tools with it. A restarted de-eli forgets its sessions;
+    # takes its fifteen de_ tools with it (de_norm_getir and de_gesetz_ara run in-process
+    # and stay). A restarted de-eli forgets its sessions;
     # the aggregator opens a new one on the first 404 (server.py, _DeEliProxy).
     ( while :; do
           TRANSPORT=http PORT=8790 de-eli-mcp >>/tmp/de-eli.log 2>&1 || true

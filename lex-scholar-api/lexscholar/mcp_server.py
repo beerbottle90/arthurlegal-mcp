@@ -4,9 +4,9 @@ Same stdlib JSON-RPC implementation as the sibling ``eqanun`` and
 ``resourcecontracts`` servers, so it runs on a stock Python 3.9 with no pip
 installs and no ``mcp`` SDK.
 
-The design point: nine upstream indexes, **one** ``/mcp`` endpoint and one
-connector. ``source`` is a tool parameter, not another deployment — adding a
-tenth index later changes nothing for the agent or the Copilot Studio connector.
+The design point: ten upstream sources, **one** ``/mcp`` endpoint and one
+connector. ``source`` is a tool parameter, not another deployment — adding
+another index later changes nothing for the agent or the Copilot Studio connector.
 
 Transports: stdio (desktop clients) and Streamable HTTP at ``/mcp`` (remote
 connectors), no authentication.
@@ -36,7 +36,7 @@ _client = LexScholarClient()
 # --------------------------------------------------------------------------- #
 # Tools                                                                        #
 # --------------------------------------------------------------------------- #
-# Nine indexes, nine relevance models, one merged list. Each source ranks
+# Eight search indexes, eight relevance models, one merged list. Each source ranks
 # sensibly against its own corpus, but "rank 1 in DOAJ" and "rank 1 in OpenAlex"
 # are not comparable, so the merged head is close to arbitrary. Pulling a wider
 # pool and scoring every candidate against the query with one model is what
@@ -146,10 +146,10 @@ def _t_server_status(args: Dict[str, Any]) -> Any:
     """What this server is, and whether semantic ranking is actually live."""
     return {
         "server": "lex-scholar-api",
-        "source": "nine open-access legal scholarship indexes - public, no auth",
+        "source": "ten open-access legal scholarship sources (eight search indexes, two DOI resolvers) - public, no auth",
         "mode": "passthrough + local reranking (no local corpus)",
         "known_upstream_quirks": [
-            'Nine indexes each rank against their own corpus, so the merged order is not comparable between sources. Results are rescored locally with one model; see `ranking.method`.',
+            'The eight search indexes each rank against their own corpus, so the merged order is not comparable between sources. Results are rescored locally with one model; see `ranking.method`.',
             "Query in the language of the target jurisdiction - these indexes match the article's own words.",
             'Scholarship is a SECONDARY source; never cite it as the law.',
         ],
@@ -161,15 +161,16 @@ TOOLS: List[Dict[str, Any]] = [
     {
         "name": "search_legal_scholarship",
         "description": (
-            "Search open-access legal scholarship across nine indexes through one "
+            "Search open-access legal scholarship across eight search indexes "
+            "(plus the Crossref and Unpaywall DOI resolvers) through one "
             "endpoint. A deterministic router picks the 2-3 sources that fit the "
             "question (language, jurisdiction, topic) instead of querying all of "
             "them, and the response always reports sources_queried, "
             "sources_skipped (with reasons) and routing_reasons. Results are "
             "normalized, deduplicated across sources and re-ranked. Use "
             "peer_reviewed_only=true when the answer must rest on peer-reviewed "
-            "work. Set source to a specific index (doaj, hal, scielo, dialnet, "
-            "openaire, lawreviewcommons, openalex) or 'all' to override routing. "
+            "work. Set source to a specific index (doaj, dergipark, hal, scielo, "
+            "dialnet, openaire, lawreviewcommons, openalex) or 'all' to override routing. "
             "IMPORTANT: query in the LANGUAGE OF THE TARGET JURISDICTION — these "
             "indexes match the article's own words, so 'force majeure' returns "
             "nothing from Brazil while 'forca maior' or 'caso fortuito' does. For "

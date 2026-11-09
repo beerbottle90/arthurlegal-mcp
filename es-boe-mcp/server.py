@@ -52,7 +52,8 @@ SEARCH SCOPE. The index holds titles, official numbers, issuing departments and
 dates, and (when built with crawl.py --backfill-text) the first 8,000 characters
 of each act's text in force: the preamble and the opening articles. Not the rest
 of the text: a phrase inside article 348 bis will not be found by searching for
-it; find the act, then read its text. `index_scope` in each response says which."""
+it; find the act, then read its text. `scope_note` in each search response (and
+`index_scope` in status) says which."""
 
 
 def _scope() -> str:
@@ -145,13 +146,15 @@ TOOLS = [
         "Search Spanish consolidated legislation by title, official number, "
         "issuing department or subject. Hybrid retrieval (BM25 + fuzzy, plus "
         "dense vectors when an embeddings backend is configured). IMPORTANT: the "
-        "index covers act METADATA, not article text — use this to identify the "
-        "act, then get_act_text to read it. Set only_in_force=true to keep only "
+        "index covers act metadata and, when built with text, the first 8,000 "
+        "characters of each act's text in force, not the rest (`scope_note` in "
+        "the response says which). Use this to identify the act, then "
+        "get_act_text to read it. Set only_in_force=true to keep only "
         "status 'vigente': it excludes acts BOE marks as spent (vigencia agotada) "
         "and acts whose consolidated text opens with an unqualified repeal or "
         "annulment already in effect (status 'derogada' / 'anulada'). A partial "
-        "repeal ('Norma derogada, salvo …') stays 'vigente' — check the text "
-        "before relying on a provision. Each result carries a "
+        "or conditional repeal ('Norma derogada, salvo …', '… sin perjuicio de …') "
+        "stays 'vigente' — check the text before relying on a provision. Each result carries a "
         "verbatim `citation` — copy it, never build a BOE id yourself.",
         {
             "type": "object",

@@ -1,17 +1,20 @@
 # ArthurLegal MCP
 
-**Fifteen jurisdictions of legal research behind one MCP endpoint.**
+**Twelve jurisdictions of legal research, plus five other sources, behind one MCP endpoint.**
 
 Türkiye - Netherlands - Poland - Austria - Ireland - Finland - Spain - United
 Kingdom - European Union - Japan - Azerbaijan - Germany - legal scholarship -
-signed resource contracts - GLEIF entity identity.
+signed resource contracts - GLEIF entity identity - Turkish land registry (TKGM) -
+Turkish fee calculator cards.
 
 130 tools, one hosted endpoint, no authentication:
 
     https://arthurlegal-mcp.fly.dev/mcp
 
 The same server also answers at `/directory/mcp` with the 107 read-only tools listed in the
-Claude connector directory: everything except the land-registry `tkgm_` and fee calculator `hesap_` tools. See
+Claude connector directory: everything except the land-registry `tkgm_` and fee calculator `hesap_` tools, the
+Official Gazette annex page reader `tr_resmi_gazete_ek_sayfa` and the desk hand-over tools `al_masada_basla` /
+`al_masaya_yaz`. See
 [Claude connector directory](#claude-connector-directory).
 
 Anyone with the URL can call every tool. Self-hosting? Deploy your own copy (see
@@ -80,8 +83,8 @@ Official Gazette annexes (tariffs, schedules, forms) are often a separate PDF of
 text layer as `taranmis_sayfalar`. `tr_resmi_gazete_ek_sayfa(url, sayfa)` returns one page: its
 text, or the page as an MCP image block that the model reads itself. A JPEG scan goes out as the
 PDF's own bytes with no extra package; other scans (JBIG2, CCITT) are rendered with `pypdfium2`,
-which only the full image installs, and otherwise answer with an UYARI line. The tool is on `/mcp`
-only, not in the directory profile.
+which the hosted image installs (both `Dockerfile` and `Dockerfile.code`); a local run without it
+answers those pages with an UYARI line. The tool is on `/mcp` only, not in the directory profile.
 
 ## Claude connector directory
 
@@ -92,12 +95,14 @@ The directory listing points at a narrower profile of the same server:
 - **107 tools, all read-only.** Every tool carries a `title` and `readOnlyHint: true`
   (`tool_titles.py`), so Claude can run them without asking each time. Nothing on this
   endpoint writes, deletes or sends anything on your behalf.
-- **No land-registry tools.** The `tkgm_` tools stay on `/mcp` only; the desk shows
+- **No land-registry or fee calculator tools.** The `tkgm_` and `hesap_` tools stay on `/mcp` only; the desk shows
   ArthurTapu as available in the ArthurLegal install.
 - **The same interactive views** as `/mcp`: the article card, the decision list and the desk
   (see [Interactive views](#interactive-views-mcp-apps)).
-- **Instructions describe the tools** (in English) instead of directing Claude; the facts
-  are the same as on `/mcp`.
+- **Instructions open with an English description of the tools** instead of the citation rule
+  that opens `/mcp`'s; each jurisdiction's own notes then follow as on `/mcp`, in their own
+  language and with their own usage rules (the Turkish notes without that citation rule). The
+  facts are the same as on `/mcp`.
 - **No account and no authentication.** Add it from the directory, or as a custom connector
   with the URL above.
 
@@ -148,8 +153,9 @@ GitHub job runs the same check and opens an issue for each new publication. Sour
 
 ## Tool naming
 
-Every tool carries its jurisdiction as a prefix -- `tr_` `nl_` `pl_` `at_` `ie_` `fi_`
-`es_` `uk_` `eu_` `jp_` `gleif_` `tkgm_` `hesap_` `az_` `de_` `scholar_` `contracts_`. Across the underlying servers
+Every research tool carries its jurisdiction or source as a prefix -- `tr_` `nl_` `pl_` `at_` `ie_` `fi_`
+`es_` `uk_` `eu_` `jp_` `gleif_` `tkgm_` `hesap_` `az_` `de_` `scholar_` `contracts_`. `status` and the desk
+tools (`al_masasi`, `al_masada_basla`, `al_masaya_yaz`) belong to the endpoint itself. Across the underlying servers
 `get_act` means six different things and `search_legislation` four, so the
 prefix is what keeps a Spanish question from being answered with Finnish law.
 
@@ -163,8 +169,9 @@ search is live. A backend that fails to load is announced there rather than
 quietly returning nothing -- "no results" and "not searched" are different
 answers. The German backend runs as a separate process, so `status` also probes
 it live (`de_live`); Azerbaijan's probe reports whether e-qanun.az answers now.
-On the hosted endpoint it also names the image that answered (`build`) and the
-memory in use (`memory`).
+On the hosted endpoint it also names the build that answered (`build`: image tag and
+region); the machine id and memory are left out of the public answer (`STATUS_DETAIL=1`
+brings them back for an operator).
 
 ## Interactive views (MCP Apps)
 
@@ -227,8 +234,8 @@ rest are queried upstream and reranked in memory. The indexes are built on a
 workstation and baked into the image at `baked/<jurisdiction>.db`:
 
     python crawl.py --embed          # in each jurisdiction directory
-    python build_bundle.py --target fly --out fly-app
-    flyctl deploy
+    # copy each finished index to baked/<directory>.db, e.g. baked/es-boe-mcp.db
+    flyctl deploy                    # full image (Dockerfile); start.sh seeds from baked/
 
 Crawling is a maintenance task, not something a booting container does. Baking
 the databases in means a machine is never healthy-but-empty, and the corpus can
