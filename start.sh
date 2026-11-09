@@ -89,6 +89,20 @@ if [ -n "$EMBEDDINGS_API_KEY" ] && [ -f "$APP/arthur-tr-hukuk-mcp/data/index.db"
     (cd "$APP/arthur-tr-hukuk-mcp" && python crawl.py --embed-only >/tmp/tr-embed.log 2>&1         && echo "arthur-tr-hukuk-mcp vectors ready" >&2 || echo "arthur-tr-hukuk-mcp embedding failed (see /tmp/tr-embed.log)" >&2) &
 fi
 
+# The other five indexes are baked with their vectors, but a refresh run on the
+# workstation (no Voyage key there) adds or rewrites documents without one. Fill
+# only the missing vectors here, one index after another, in the background; an
+# index that is complete costs one query. The server picks the new vectors up on
+# its own (`PRAGMA data_version`), and those documents are found by keyword
+# until then.
+if [ -n "$EMBEDDINGS_API_KEY" ]; then
+    (for j in pl-sejm-mcp ie-statutebook-mcp nl-rechtspraak-mcp fi-finlex-mcp es-boe-mcp; do
+        [ -f "$APP/$j/data/index.db" ] || continue
+        (cd "$APP/$j" && python -c "import sys; sys.path.insert(0, '.'); from retrieval import Index; print(Index('data/index.db').embed_missing())" >"/tmp/$j-embed.log" 2>&1) \
+            || echo "$j embedding failed (see /tmp/$j-embed.log)" >&2
+    done; echo "index vectors checked" >&2) &
+fi
+
 cd "$APP"
 
 exec python server.py
