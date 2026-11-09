@@ -605,6 +605,19 @@ def _warm_resident() -> Optional[threading.Thread]:
     return thread
 
 
+def _warm_epdk() -> Optional[threading.Thread]:
+    """Warm the EPDK decision lists once, slowly, in the background (F-067).
+
+    The first EPDK search on a cold cache fetched ~126 category lists back to back (~40 s). The
+    pacing, the on/off switch (EPDK_ISITMA; default on only under MCP_TRANSPORT=http) and the
+    refresh of stale lists live in arthur-tr-hukuk-mcp/sources/epdk.py.
+    """
+    mod = sys.modules.get("sources.epdk")
+    if mod is None or not callable(getattr(mod, "acilista_isit", None)):
+        return None
+    return mod.acilista_isit()
+
+
 def _runtime() -> Dict[str, Any]:
     """Which build answered and how much memory it holds.
 
@@ -956,6 +969,7 @@ def build_directory() -> Tuple[List[Tool], str, List[Resource]]:
 if __name__ == "__main__":
     build()
     _warm_resident()
+    _warm_epdk()
     text = INSTRUCTIONS_HEADER + "\n\n" + "\n\n".join(_instructions)
     directory_tools, directory_text, directory_views = build_directory()
     sys.stderr.write("arthurlegal-mcp: %d backend, %d araç (%s: %d)"

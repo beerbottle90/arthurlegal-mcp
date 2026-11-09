@@ -13,7 +13,8 @@ Build the search index first (~20 requests, under a minute):
 from __future__ import annotations
 
 import os
-from typing import Any, Dict
+import re
+from typing import Any, Dict, List
 
 from boe import BoeClient, BoeError
 from mcpcore import McpError, Tool, run
@@ -65,6 +66,43 @@ def _scope() -> str:
     return "act metadata (title, number, department, dates), not article text"
 
 
+# BOE's own repeal note opens the consolidated text ("Norma derogada, ..."). A partial or conditional
+# one ("sin perjuicio de ...", "salvo ...", a later date) leaves the act 'vigente' (crawl.act_status),
+# as for LO 15/1999; the note then travels with the result as `status_note` (F-197). The index is
+# not changed: the note is read from the head of the text the index already holds. The marker is
+# crawl.TEXT_MARK, copied rather than imported (another backend's crawl.py shares the module name);
+# tests/test_status.py keeps the two equal.
+_TEXT_MARK = "\n\n[texto consolidado, inicio]\n"
+_REPEAL_NOTE = re.compile(r"norma\s+(?:derogada|anulada)\b", re.I)
+
+
+def _status_note(body: str) -> str:
+    """BOE's repeal or annulment note at the top of the act's text, else ''.
+
+    Usually one line; some acts carry several in a row (Ley 30/1983: "Norma derogada para las
+    Comunidades Autónomas que ..." then "Norma derogada, excepto respecto de ..."), so every leading
+    note line is kept.
+    """
+    head = (body or "").split(_TEXT_MARK, 1)[1] if _TEXT_MARK in (body or "") else ""
+    lines = []
+    for line in head.strip().split("\n"):
+        if not _REPEAL_NOTE.match(line.strip()):
+            break
+        lines.append(line.strip())
+    return "\n".join(lines)[:1000]
+
+
+def _add_status_notes(results: List[Dict[str, Any]]) -> None:
+    refs = [r["ref"] for r in results if r.get("status") == "vigente"]
+    if not refs:
+        return
+    rows = _index.db.execute("SELECT ref, body FROM docs WHERE ref IN (%s)" % ",".join("?" * len(refs)), refs)
+    notes = {row["ref"]: _status_note(row["body"]) for row in rows}
+    for r in results:
+        if notes.get(r["ref"]):
+            r["status_note"] = notes[r["ref"]]
+
+
 def _t_search(args: Dict[str, Any]) -> Any:
     query = (args.get("query") or "").strip()
     if not query:
@@ -86,6 +124,7 @@ def _t_search(args: Dict[str, Any]) -> Any:
         limit=int(args.get("limit", 20)),
         filters=filters,
     )
+    _add_status_notes(result.get("results") or [])
     result["scope_note"] = (
         "Searches %s. Use get_act_text once you have identified the act." % _scope()
     )
@@ -154,7 +193,8 @@ TOOLS = [
         "and acts whose consolidated text opens with an unqualified repeal or "
         "annulment already in effect (status 'derogada' / 'anulada'). A partial "
         "or conditional repeal ('Norma derogada, salvo …', '… sin perjuicio de …') "
-        "stays 'vigente' — check the text before relying on a provision. Each result carries a "
+        "stays 'vigente' — check the text before relying on a provision. Such a result carries "
+        "`status_note`: BOE's repeal note from the top of the act's text. Each result carries a "
         "verbatim `citation` — copy it, never build a BOE id yourself.",
         {
             "type": "object",

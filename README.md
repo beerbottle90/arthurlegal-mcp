@@ -243,6 +243,23 @@ never drift away from the code that was tested against it. `start.sh` still
 falls back to crawling when no baked index is present, and says which it used:
 `indexes present: N/6`.
 
+What the baked indexes hold and when they were last crawled, from the live `status` of
+2026-11-10. These rows go stale: the current values are in `status` (`last_crawl`,
+`index_coverage`, `local_index`), and this table is updated with every refresh. The exact
+command line of a past run was not recorded; the command below is the `crawl.py` call that
+gives the scope `status` reports, for the Turkish index the refresh that adds new decisions
+(run in the index's directory; add `--embed` to compute vectors where a key is set, the
+Turkish index is vectorised on the machine at boot).
+
+| Index | Command | Scope | Documents | Last crawl |
+|---|---|---|---|---|
+| `arthur-tr-hukuk-mcp` | `sh tazele.sh` (new decisions per regulator, Rekabet text, `--pack`) | Rekabet, EPDK, BTK, SPK, BDDK, KVKK, Sigorta Tahkim; ranges per regulator in `local_index.by_kurum` | 19,498 | 2026-10-10 |
+| `nl-rechtspraak-mcp` | `python crawl.py --from 2026-10-05 --to 2026-10-25` | decisions 2026-10-05..2026-10-25, summaries | 7,050 | 2026-10-26 |
+| `pl-sejm-mcp` | `python crawl.py --publisher DU --from 2015 --to 2026` | Dziennik Ustaw 2015-2026: titles, type, issuer, keywords | 28,150 | 2026-10-10 |
+| `ie-statutebook-mcp` | `python crawl.py --from 2015 --to 2026` | Acts 2015-2026, as enacted, full text | 503 | 2026-10-10 |
+| `fi-finlex-mcp` | `python crawl.py --type statute-consolidated --from 2025 --to 2026` | consolidated statutes 2025-2026, Finnish and Swedish | 250 | 2026-10-26 |
+| `es-boe-mcp` | `python crawl.py --max 0`, then `python crawl.py --backfill-text` | consolidated legislation: metadata and the first 8,000 characters of the text in force | 12,439 | 2026-10-26 |
+
 ### Code-only deploys
 
 A full image carries the indexes, so every full deploy uploads about 2.3 GB of build
@@ -305,6 +322,7 @@ times faster; without it the ranking is the same.
 | `DE_ELI_URL` | env | German backend; `off` to disable |
 | `EQANUN_PROXY` | env | Azerbaijan: e-qanun.az is reached through `az-relay` (Frankfurt, private network only), because it does not answer from Amsterdam |
 | `SEMANTIC_RESIDENT_MB` | env | memory budget for vectors kept as float16 (all indexes together; `0` or unset = read from SQLite per query). Hosted: `160` on 1 GB machines (meaning searches ~30-50% faster); at 512 MB keep `0`, the SQLite page cache needs that memory more (with 141 MB of vectors, Turkish and Polish searches slowed from ~1.2 s to 7-8 s) |
+| `EPDK_ISITMA` | env | EPDK decision lists fetched once in the background after boot, one request every 4 s (~131 per machine, at most 30 a minute for two machines), so the first `tr_kurum_karari_ara(kurum="epdk")` does not wait ~40 s; a list past its 6 h lifetime is served while it is refreshed the same way. Unset: on only under `MCP_TRANSPORT=http` (the hosted image); `0` off, `1` on |
 
 A document holds exactly one vector (`vecs.doc_id` is the primary key), so
 changing `EMBEDDINGS_MODEL` does not add a second vector -- the next embedding

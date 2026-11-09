@@ -43,12 +43,17 @@ _client = LexScholarClient()
 # makes the federated list coherent.
 _POOL_MULTIPLIER = 3
 _POOL_MAX = 120
+# A small limit still reranks a real pool. DOAJ does not rank at all: it returns the matches in id order
+# (2026-11-10, "data protection": 3,732 matches, the first five ids 001e01...004b70, none on data protection).
+# limit=3 left 9 such candidates and three off-topic results; within the first 40 sit four on the topic
+# (GDPR breach notification, right to be forgotten, ...).
+_POOL_MIN = 40
 
 
 def _t_search_articles(a: Dict[str, Any]) -> Any:
     limit = int(a.get("limit", 20))
     rank = bool(a.get("rerank", True))
-    pool = min(max(limit * _POOL_MULTIPLIER, limit), _POOL_MAX) if rank else limit
+    pool = min(max(limit * _POOL_MULTIPLIER, limit, _POOL_MIN), _POOL_MAX) if rank else limit
 
     out = _client.search(
         a.get("query", ""),
