@@ -7,7 +7,7 @@
 Each item carries ``data.file_url.url`` (PDF on btk.gov.tr S3), ``decision_no``
 (e.g. ``2026/İK-THD/186``), ``decision_date`` and ``relevant_unit``.
 
-Citation contract: ``BTK, 03.08.2026 tarih ve 2026/İK-THD/186 sayılı Kurul Kararı``.
+Citation contract: ``BTK, 04.08.2026 tarih ve 2026/İK-THD/186 sayılı Kurul Kararı``.
 
 Endpoint from saidsurucu/yargi-mcp (MIT).
 """

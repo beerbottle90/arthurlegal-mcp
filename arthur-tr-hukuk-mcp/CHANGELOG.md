@@ -2,7 +2,7 @@
 
 ## 0.6.1 — 2026-11-10
 
-- **BTK karar tarihi bir gün erken okunuyordu.** btk.tr tarihi Türkiye saatiyle gece yarısının UTC karşılığı olarak veriyor (`2026-09-14T21:00:00.000Z` = 15.09.2026); ilk on karakter alındığı için `date` ve atıf (`BTK, … tarih ve … sayılı Kurul Kararı`) bir gün erkendi. Damga artık Türkiye'deki güne çevriliyor (`sources/btk.py`, `_gun`). İndeksteki eski kayıtlar ek dosyasıyla düzeltilir.
+- **BTK'nın yeni kararlarında tarih bir gün erken okunuyordu.** btk.tr Nisan 2026'dan beri girilen kararlarda tarihi Türkiye saatiyle gece yarısının UTC karşılığı olarak veriyor (`2026-09-14T21:00:00.000Z` = 15.09.2026); ilk on karakter alındığı için `date` ve atıf (`BTK, … tarih ve … sayılı Kurul Kararı`) bir gün erkendi. Damga artık Türkiye'deki güne çevriliyor (`sources/btk.py`, `_gun`). Etkilenen kayıt 8'dir (02.04.2026 ile 15.09.2026 arası kararlar; liste düzeltilmiş okumayla baştan dolaşılarak ölçüldü, kalan 1.899 kayıt aynı kaldı); bunlar ek dosyasıyla düzeltilir.
 - EPDK (F-067): soğuk önbellekte ilk `kurum_karari_ara(kurum="epdk")` beş piyasa sayfasını ve ~126 kategori listesini
   art arda çekiyordu (canlı ölçüm: 39,6 sn; aynı çağrı ikinci kez 0,4 sn). Barındırılan sunucu (`MCP_TRANSPORT=http`)
   açılıştan sonra listeleri tek bir arka plan işçisiyle bir kez çeker, iki istek arası 4 sn (makine başına ~131 istek,
