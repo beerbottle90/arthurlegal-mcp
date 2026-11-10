@@ -18,8 +18,9 @@
 #             veri/ek dalına commit'ler. master'a hiçbir şey yazılmaz (korumalı; GITHUB_TOKEN'la push yeni iş de
 #             tetiklemez).
 #   tetikle   actions: write. Fly dağıtımını workflow_dispatch ile başlatır; dağıtım daldaki ekleri imaja alır.
-# Yalnız master'da yazar ve tetikler. Elle "kuru" seçilirse ya da master dışındaki bir dalda (bu dosya ya da tarama
-# kodu değişince) yalnız tarar ve raporlar.
+# Yalnız master'da yazar ve tetikler. Elle "kuru" seçilirse yalnız tarar ve raporlar. Dal push'unda koşmaz: her
+# koşu kurum sitelerine ~160 istek atar. (10.11.2026'da bir kez dal push'uyla kuru denendi: GitHub makinelerinden
+# yedi kurumun yedisi cevap verdi, 163 istek, hata yok.)
 #
 # İş özeti kurum başına yeni karar sayısını, en yeni karar tarihini, istek sayısını ve hataları JSON olarak yazar;
 # aynı JSON "kurum-tarama-ozet" başlıklı bir not (annotation) olarak da durur. Haftalık denetim onu REST'le okur:
@@ -39,13 +40,6 @@ on:
         description: "Kuru koşu: tara ve raporla; veri dalına yazma, dağıtma"
         type: boolean
         default: false
-  push:
-    branches-ignore: [master, "veri/**"]
-    paths:
-      - ".github/workflows/kurum-taramasi.yml"
-      - ".github/dagitim/ek_getir.py"
-      - "arthur-tr-hukuk-mcp/ek_tarama.py"
-      - "indeks_ek.py"
 
 permissions:
   contents: read
@@ -58,7 +52,7 @@ jobs:
   tara:
     name: Tara
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75 # ilk GitHub koşusu 33 dk sürdü: EPDK oradan istek başına ~13 sn yanıt veriyor
     permissions:
       contents: read
     env:
