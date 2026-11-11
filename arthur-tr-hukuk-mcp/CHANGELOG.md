@@ -1,5 +1,16 @@
 # Changelog
 
+## Yayımlanmamış
+
+- `duman_testi.py`: çalışan bir MCP ucuna karşı her kaynakta bir arama ve bir getir (13 kaynak). Sonuç sınıfları
+  TAMAM, ADRES (istemci alan dışı adresi reddetti: kurum başka alana taşınmış olabilir), ERISIM (kurum o an
+  erişilemez), BOS, HATA; çıkış kodu 0/2/1. Ağ geçidinde `--onek tr_`. Yalnız standart kütüphane.
+  `.github/workflows/duman-testi.yml` bunu her gün GitHub'ın makinesinde, arka ucu yerelde başlatarak koşar.
+  EPDK tek piyasa ve üç kategoriyle denenir (piyasa verilmeyen arama soğuk önbellekte ~131 istek atar).
+- `duman_nobetci.py`: duman testinin issue adımı, tarife nöbetçisiyle aynı kalıp. ADRES, BOS ya da HATA veren
+  kaynak için tek issue; aynı kaynağa üç farklı günde üst üste erişilemezse tek issue; aynı başlıklı açık issue
+  varsa yenisi açılmaz. Sayaç Actions önbelleğinde; dallarda kuru koşu (issue açmaz, sayaca yazmaz).
+
 ## 0.7.0 — 2026-11-10
 
 - İndeks ekleri: yeni kurum kararları tam imaj (2,3 GB, ~3 saat) beklemeden canlıya gider. Tabandan bu yana eklenen ya
