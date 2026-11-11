@@ -828,8 +828,13 @@ def _attach_views() -> None:
         able.append("al_masada_basla")
     _tools.append(Tool(
         tanim["name"], tanim["description"], tanim["inputSchema"],
+        # Claude reports its own model name (the desk cannot see it, and no server can change it): the desk shows
+        # whether the chat runs on the model ArthurLegal's measurements recommend; on a model that fell short the
+        # note asks Claude to tell the user once. Older interface copies have no such parameter.
         lambda args: al_arayuz.masa_cevabi("uzak", able, REMOTE_MODULES, args.get("bolum"), args.get("baglayicilar"),
-                                           yerele_devret=args.get("uzakta_kal") is not True),
+                                           yerele_devret=args.get("uzakta_kal") is not True,
+                                           **({"model": args.get("model")}
+                                              if hasattr(al_arayuz, "model_degerlendir") else {})),
         meta=al_arayuz.arac_meta("al_masasi")))
     if teslim:
         def hand_over(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -893,7 +898,10 @@ hukukun doğru alıntılanması için gereken disiplinlerdir.
 # right after the two data rules: a host may show only the beginning of long instructions.
 if al_arayuz is not None and getattr(al_arayuz, "TESLIM_KURALI", None):
     _head, _sep, _rest = INSTRUCTIONS_HEADER.partition("\n\nArthurLegal — ")
-    INSTRUCTIONS_HEADER = _head + "\n\n" + al_arayuz.TESLIM_KURALI + _sep + _rest
+    # The model rule follows it, still inside the part every host shows: the server cannot switch the model or
+    # the effort, so a chat running on a model that fell short in the measurements says so once.
+    _model = ("\n\n" + al_arayuz.model_kurali()) if hasattr(al_arayuz, "model_kurali") else ""
+    INSTRUCTIONS_HEADER = _head + "\n\n" + al_arayuz.TESLIM_KURALI + _model + _sep + _rest
 
 
 # Directory profile header: describes what the tools return, in English, without the
