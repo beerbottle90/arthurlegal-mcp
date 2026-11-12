@@ -100,6 +100,23 @@ class DirectoryProfile(unittest.TestCase):
         self.assertLess(MAIN_TEXT.index(kural) + len(kural), 2048)
         self.assertNotIn("al_masada_basla", DIRECTORY_TEXT)
 
+    def test_model_rule_near_the_top_of_main_only(self):
+        if server.al_arayuz is None or not hasattr(server.al_arayuz, "model_kurali"):
+            self.skipTest("arayuz/ missing or older")
+        kural = server.al_arayuz.model_kurali()
+        # The server cannot switch the model: a chat on a model that fell short in the measurements says so once.
+        self.assertLess(MAIN_TEXT.index(kural) + len(kural), 2048)
+        self.assertNotIn("MODEL.", DIRECTORY_TEXT)
+        # Claude reports its model name to the desk on the main endpoint; the directory desk keeps its schema.
+        main_desk = next(t for t in server._tools if t.name == "al_masasi")
+        directory_desk = next(t for t in DIRECTORY_TOOLS if t.name == "al_masasi")
+        self.assertIn("model", main_desk.input_schema["properties"])
+        self.assertNotIn("model", directory_desk.input_schema["properties"])
+        low = main_desk.handler({"baglayicilar": [], "model": "Claude Haiku 5.5"})
+        self.assertEqual(low["model"]["duzey"], "dusuk")
+        self.assertIn("MODEL:", low["not"])
+        self.assertNotIn("MODEL:", main_desk.handler({"baglayicilar": [], "model": "Claude Opus 5.5"})["not"])
+
     def test_directory_status_leaves_land_registry_out(self):
         status = next(t for t in DIRECTORY_TOOLS if t.name == "status")
         text = json.dumps(status.handler({}), ensure_ascii=False)
