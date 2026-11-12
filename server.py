@@ -834,7 +834,10 @@ def _attach_views() -> None:
         lambda args: al_arayuz.masa_cevabi("uzak", able, REMOTE_MODULES, args.get("bolum"), args.get("baglayicilar"),
                                            yerele_devret=args.get("uzakta_kal") is not True,
                                            **({"model": args.get("model")}
-                                              if hasattr(al_arayuz, "model_degerlendir") else {})),
+                                              if hasattr(al_arayuz, "model_degerlendir") else {}),
+                                           # The desk is trilingual (tr, az, en): Claude reports the user's language.
+                                           **({"dil": args.get("dil")}
+                                              if hasattr(al_arayuz, "dil_gecerli") else {})),
         meta=al_arayuz.arac_meta("al_masasi")))
     if teslim:
         def hand_over(args: Dict[str, Any]) -> Dict[str, Any]:
