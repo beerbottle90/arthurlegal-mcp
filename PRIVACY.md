@@ -1,6 +1,6 @@
 # ArthurLegal MCP: privacy policy
 
-Effective: 3 November 2026
+Effective: 13 November 2026
 
 This policy covers the hosted ArthurLegal MCP endpoints:
 
@@ -89,7 +89,8 @@ eight regulators (Competition Authority, EPDK, SPK, BDDK, KVKK, BTK, GİB, Insur
 Commission); Rechtspraak and KOOP (Netherlands); the Sejm ELI API (Poland); RIS (Austria); the
 Irish Statute Book; Finlex (Finland); the BOE (Spain); legislation.gov.uk (United Kingdom); the
 EU Publications Office (CELLAR); e-Gov 法令API (Japan); e-qanun.az (Azerbaijan); NeuRIS,
-rechtsprechung-im-internet.de, Open Legal Data and the Bundestag DIP (Germany); GLEIF (legal
+gesetze-im-internet.de, rechtsprechung-im-internet.de, Open Legal Data and the Bundestag DIP
+(Germany); GLEIF (legal
 entity identifiers); open-access scholarship indexes, with Crossref and Unpaywall for DOIs (the
 `scholar_list_sources` tool lists every index); and ResourceContracts.org.
 
