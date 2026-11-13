@@ -60,7 +60,8 @@ Rekabet, SPK, BDDK, KVKK, BTK, GİB, Sigorta Tahkim) behind one
 `tr_kurum_karari_ara` interface, plus a locally indexed
 archive for `tr_semantik_ara`. Source: the `arthur-tr-hukuk-mcp/` folder (formerly `ArthurLegalTR/`).
 
-The archive holds the decisions' text, not just their titles: 19,498 documents, every one vectorised.
+The archive holds the decisions' text, not just their titles: 19,627 documents on 2026-11-13, every one
+vectorised (the current count is in `status`, `local_index.documents`).
 EPDK's decisions before 2016 were old Word files or scans; their text was read on the crawl
 workstation (Word files directly, scans with OCR), and when a live document yields no text
 `tr_kurum_karari_getir` answers from the archive, with a warning where the text came from OCR.
@@ -248,7 +249,7 @@ falls back to crawling when no baked index is present, and says which it used:
 `indexes present: N/6`.
 
 What the baked indexes hold and when they were last crawled, from the live `status` of
-2026-11-10. These rows go stale: the current values are in `status` (`last_crawl`,
+2026-11-13. These rows go stale: the current values are in `status` (`last_crawl`,
 `index_coverage`, `local_index`), and this table is updated with every refresh. The exact
 command line of a past run was not recorded; the command below is the `crawl.py` call that
 gives the scope `status` reports, for the Turkish index the refresh that adds new decisions
@@ -257,10 +258,10 @@ Turkish index is vectorised on the machine at boot).
 
 | Index | Command | Scope | Documents | Last crawl |
 |---|---|---|---|---|
-| `arthur-tr-hukuk-mcp` | `sh tazele.sh` (new decisions per regulator, Rekabet text, `--pack`) | Rekabet, EPDK, BTK, SPK, BDDK, KVKK, Sigorta Tahkim; ranges per regulator in `local_index.by_kurum` | 19,498 | 2026-10-10 |
+| `arthur-tr-hukuk-mcp` | `sh tazele.sh` (new decisions per regulator, Rekabet text, `--pack`) | Rekabet, EPDK, BTK, SPK, BDDK, KVKK, Sigorta Tahkim; ranges per regulator in `local_index.by_kurum` | 19,627 | 2026-11-12 |
 | `nl-rechtspraak-mcp` | `python crawl.py --from 2026-10-05 --to 2026-10-25` | decisions 2026-10-05..2026-10-25, summaries | 7,050 | 2026-10-26 |
-| `pl-sejm-mcp` | `python crawl.py --publisher DU --from 2015 --to 2026` | Dziennik Ustaw 2015-2026: titles, type, issuer, keywords | 28,150 | 2026-10-10 |
-| `ie-statutebook-mcp` | `python crawl.py --from 2015 --to 2026` | Acts 2015-2026, as enacted, full text | 503 | 2026-10-10 |
+| `pl-sejm-mcp` | `python crawl.py --publisher DU --from 2015 --to 2026` | Dziennik Ustaw 2015-2026: titles, type, issuer, keywords | 28,313 | 2026-11-09 |
+| `ie-statutebook-mcp` | `python crawl.py --from 2015 --to 2026` | Acts 2015-2026, as enacted, full text | 505 | 2026-11-09 |
 | `fi-finlex-mcp` | `python crawl.py --type statute-consolidated --from 2025 --to 2026` | consolidated statutes 2025-2026, Finnish and Swedish | 250 | 2026-10-26 |
 | `es-boe-mcp` | `python crawl.py --max 0`, then `python crawl.py --backfill-text` | consolidated legislation: metadata and the first 8,000 characters of the text in force | 12,439 | 2026-10-26 |
 

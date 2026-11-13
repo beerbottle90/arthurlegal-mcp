@@ -167,8 +167,9 @@ Ayrıntı ve endpoint'ler: [docs/SOURCES.md](docs/SOURCES.md).
 **Üretim yolu: arthurlegal-mcp aggregator'ı.** Bu repo, `beerbottle90/arthurlegal-mcp`
 içinde `tr_` önekiyle bir backend olarak yüklenir (`server.py` modül düzeyinde `TOOLS`
 verir; aggregator `status`'u kendi durumuna katlar). Tek uç: `https://arthurlegal-mcp.fly.dev/mcp`
-→ `tr_ictihat_ara`, `tr_kurum_karari_ara`, `tr_semantik_ara` … TR indeksi vektörleriyle birlikte (voyage-4-lite) imaja gömülür;
-aggregator'ın `start.sh`'ı eksik vektör kalırsa Fly'daki anahtarla tamamlar.
+→ `tr_ictihat_ara`, `tr_kurum_karari_ara`, `tr_semantik_ara` … TR indeksi belgeleriyle imaja gömülür;
+vektörler (voyage-4-lite) açılışta ağ geçidinin `start.sh`'ı tarafından Fly'daki anahtarla hesaplanır; bitene kadar
+`tr_semantik_ara` `semantic: off` döner.
 
 Tek başına: `Dockerfile` + `fly.toml` (Fly.io, `fra`). İndeks imaja gömülür; açılan konteyner
 asla crawl yapmaz. `flyctl secrets set EMBEDDINGS_API_KEY=…` semantik kanalı açar.
