@@ -49,7 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcpcore import Dispatcher, McpError, Resource, Tool, run  # noqa: E402
 from tool_titles import annotate  # noqa: E402
 
-__version__ = "1.10.1"
+__version__ = "1.11.0"
 
 # The Claude connector directory listing points here, not at /mcp. Same server,
 # narrower profile: the land-registry and fee calculator tools and the Official Gazette
@@ -782,7 +782,7 @@ except ImportError:
 MASA_TOOLS = ("tr_mevzuat_madde_getir", "tr_mevzuat_ara", "tr_mevzuat_icindekiler", "tr_ictihat_ara", "tr_ictihat_getir",
               "tr_kurum_karari_ara", "tr_kurum_karari_getir", "tr_semantik_ara", "tr_belge_getir",
               "tr_spk_bulten_icinde_ara", "status", "hesap_kalemleri", "hesap_vekalet_ucreti", "hesap_yargi_harci",
-              "hesap_faiz", "hesap_iscilik_alacagi")
+              "hesap_faiz", "hesap_iscilik_alacagi", "tr_resmi_gazete_fihrist")
 REMOTE_MODULES = {
     "tapu": {"durum": "claude"}, "beyin": {"durum": "masaustu"}, "mask": {"durum": "masaustu"},
     "uyap": {"durum": "masaustu"}, "donna": {"durum": "hazir"},
