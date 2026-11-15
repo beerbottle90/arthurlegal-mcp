@@ -37,9 +37,11 @@ import hmac
 import json
 import mimetypes
 import os
+import platform
 import re
 import secrets
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -155,7 +157,7 @@ def esri_anahtari_kaydet(anahtar: Optional[str]) -> None:
             pass
         return
     if not harita.esri_anahtari_gecerli(anahtar):
-        raise ValueError("Anahtar biçimi tanınmadı (20-600 karakter; harf, rakam, . _ ~ -).")
+        raise ValueError(_m("Anahtar biçimi tanınmadı (20-600 karakter; harf, rakam, . _ ~ -)."))
     _gizli_yaz(_ESRI_DOSYASI, anahtar)
 
 
@@ -260,6 +262,278 @@ def durum() -> Dict[str, Any]:
     return {"acik": bool(_ADRES["kendi"]), "adres": _ADRES["kendi"], "esri_anahtari": esri_anahtari() is not None}
 
 
+# --------------------------------------------------------------------------- #
+# ArthurLegal kurulumu: güncelleme denetimi, sistem bilgisi, ortak tercihler   #
+# --------------------------------------------------------------------------- #
+# Ortak üst şeridin sözleşmesi (AL v3.3.1): arayüz GitHub'a kendisi bağlanmaz; yerel sunucu AL'nin
+# `al.py guncelle` alt sürecini pencere açmadan çağırır. AL kurulu değilse (geliştirme, tek başına
+# çalıştırma) düğme yalnız kurulum sayfasını açar. Bağlantılar yalnız _BAGLANTI_ONEKI ile başlar.
+MODUL = "tapu"
+SURUM = "?"                                  # server.py __version__ ile doldurur
+ARAYUZ_ADI = "ArthurTapu"
+_BAGLANTI_ONEKI = "https://github.com/beerbottle90/"
+_PENCERESIZ = 0x08000000                     # CREATE_NO_WINDOW
+_YENI_GRUP = 0x00000200                      # CREATE_NEW_PROCESS_GROUP: arayüz kapanınca güncelleme sürer
+_DENETIM_SURESI = 90                         # sn; imzalı manifest indirilir, doğrulanır
+_TANI_SURESI = 30
+_DILLER = ("tr", "az", "en")
+_YAZILAR = ("normal", "buyuk", "cok-buyuk")
+
+
+def _m(metin: str) -> str:
+    """Arayüzde görünen sunucu metni: sözlükte (ui/dil-*.json) karşılığı olmalı; test bunları toplar."""
+    return metin
+
+
+def al_kok() -> str:
+    """KOK: ARTHURLEGAL_KOK; yoksa bu dosya kurulumun içindeyse (KOK/surumler/<sürüm>/tapu/) oradan; yoksa
+    işletim sisteminin varsayılan kurulum klasörü."""
+    ortam = (os.environ.get("ARTHURLEGAL_KOK") or "").strip()
+    if ortam:
+        return os.path.normpath(ortam)
+    burasi = os.path.dirname(os.path.abspath(__file__))
+    surumler = os.path.dirname(os.path.dirname(burasi))
+    if os.path.basename(surumler) == "surumler" and os.path.isfile(
+            os.path.join(os.path.dirname(surumler), "bin", "al.py")):
+        return os.path.dirname(surumler)
+    if sys.platform == "darwin":
+        return os.path.join(os.path.expanduser("~"), "Library", "Application Support", "ArthurLegal")
+    yerel = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Local")
+    return os.path.join(yerel, "Programs", "ArthurLegal")
+
+
+def _al_betigi() -> str:
+    return os.path.join(al_kok(), "bin", "al.py")
+
+
+def al_kurulu() -> bool:
+    return os.path.isfile(_al_betigi())
+
+
+def _al_python() -> str:
+    """AL'nin kendi Python'u (Windows'ta python.exe + CREATE_NO_WINDOW; pythonw değil). Yoksa bu süreçinki."""
+    kok = os.path.join(al_kok(), "runtime")
+    aday = os.path.join(kok, "bin", "python3") if sys.platform == "darwin" else os.path.join(kok, "python.exe")
+    return aday if os.path.isfile(aday) else sys.executable
+
+
+def _surec_ayarlari(arka_plan: bool = False) -> Dict[str, Any]:
+    """Pencere açmayan alt süreç: Windows'ta CREATE_NO_WINDOW; arka planda kalacaksa ayrı süreç grubu/oturum."""
+    if os.name == "nt":
+        return {"creationflags": _PENCERESIZ | (_YENI_GRUP if arka_plan else 0)}
+    return {"start_new_session": True} if arka_plan else {}
+
+
+def _utf8_ortam() -> Dict[str, str]:
+    return dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+
+
+def kurulum_sayfasi() -> str:
+    return "https://github.com/beerbottle90/ArthurLegal#" + ("mac" if sys.platform == "darwin" else "indir")
+
+
+def _guvenli_baglanti(url: Any) -> Optional[str]:
+    return url if isinstance(url, str) and url.startswith(_BAGLANTI_ONEKI) and not re.search(r"\s", url) else None
+
+
+def _son_json(metin: str) -> Optional[Dict[str, Any]]:
+    """stdout'taki tek JSON nesnesi; önünde günlük satırı olsa da sondaki nesne alınır."""
+    metin = (metin or "").strip()
+    for bas in [0] + [m.start() for m in re.finditer(r"\n\{", metin)]:
+        try:
+            veri = json.loads(metin[bas:].strip())
+        except ValueError:
+            continue
+        if isinstance(veri, dict):
+            return veri
+    return None
+
+
+def _al_komutu(bayraklar: List[str], sure: int) -> Dict[str, Any]:
+    """`al.py guncelle <bayraklar>`; çıktı JSON değilse (eski AL bu bayrağı tanımıyor) hata kaydı döner."""
+    try:
+        # Alt sürecin stdout'u Windows'ta borudayken yerel kod sayfasıyla (cp1254) yazılır; Türkçe JSON bozulmasın.
+        r = subprocess.run([_al_python(), "-B", _al_betigi(), "guncelle"] + bayraklar, cwd=al_kok(),
+                           stdin=subprocess.DEVNULL, capture_output=True, timeout=sure, env=_utf8_ortam(),
+                           **_surec_ayarlari())
+    except subprocess.TimeoutExpired:
+        return {"durum": "hata", "hata": _m("ArthurLegal yanıt vermedi (zaman aşımı).")}
+    except OSError:
+        return {"durum": "hata", "hata": _m("ArthurLegal başlatılamadı.")}
+    veri = _son_json(r.stdout.decode("utf-8", "replace"))
+    if veri is None:
+        return {"durum": "hata", "hata": _m("Bu ArthurLegal sürümü güncelleme denetimini desteklemiyor; "
+                                            "kurulum sayfasından yeni sürümü indirin.")}
+    return veri
+
+
+_GUNCELLEME: Dict[str, Any] = {"surec": None}
+_GUNCELLEME_KILIT = threading.Lock()
+
+
+def _surec_calisiyor() -> bool:
+    surec = _GUNCELLEME["surec"]
+    return surec is not None and surec.poll() is None
+
+
+def guncelleme_denetle(zorla: bool = False) -> Dict[str, Any]:
+    """`--denetle --json [--zorla]`; yalnız bu arayüzün modülüne (tapu) ait özetle birlikte."""
+    if not al_kurulu():
+        return {"ok": True, "al_yok": True, "kurulum_sayfasi": kurulum_sayfasi()}
+    with _GUNCELLEME_KILIT:                  # 3 sn'lik yoklamalar üst üste binmesin
+        veri = _al_komutu(["--denetle", "--json"] + (["--zorla"] if zorla else []), _DENETIM_SURESI)
+    baglanti = veri.get("baglanti") if isinstance(veri.get("baglanti"), dict) else {}
+    veri["baglanti"] = {k: v for k, v in baglanti.items() if _guvenli_baglanti(v)}
+    kurulu = veri.get("kurulu") if isinstance(veri.get("kurulu"), dict) else {}
+    son = veri.get("son") if isinstance(veri.get("son"), dict) else {}
+    yeni = veri.get("yeni") if isinstance(veri.get("yeni"), list) else []
+    guncelleme = veri.get("guncelleme") if isinstance(veri.get("guncelleme"), dict) else {}
+    surec = _GUNCELLEME["surec"]
+    return dict(veri, ok=True, al_yok=False, kurulum_sayfasi=veri["baglanti"].get("al") or kurulum_sayfasi(),
+                modul={"ad": MODUL, "kurulu": kurulu.get(MODUL), "son": son.get(MODUL), "yeni": MODUL in yeni},
+                calisiyor=bool(guncelleme.get("calisiyor")) or _surec_calisiyor(),
+                surec_kodu=None if surec is None else surec.poll())
+
+
+def guncelleme_baslat() -> Dict[str, Any]:
+    """Mevcut imzalı güncelleyici (`al.py guncelle`, bayraksız) arka planda, pencere açmadan. Çalışıyorsa ikinci
+    kez başlatılmaz: bu süreçteki alt süreç ya da AL'nin kendi kaydı (`guncelleme.calisiyor`, kilit dosyası)."""
+    if not al_kurulu():
+        return {"ok": False, "al_yok": True, "kurulum_sayfasi": kurulum_sayfasi(),
+                "hata": _m("ArthurLegal kurulumu bulunamadı")}
+    if _surec_calisiyor():
+        return {"ok": True, "zaten": True}
+    durum_ = guncelleme_denetle()
+    if durum_.get("calisiyor"):
+        return {"ok": True, "zaten": True}
+    try:
+        _GUNCELLEME["surec"] = subprocess.Popen(
+            [_al_python(), "-B", _al_betigi(), "guncelle"], cwd=al_kok(), stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True, **_surec_ayarlari(arka_plan=True))
+    except OSError:
+        return {"ok": False, "hata": _m("Güncelleme başlatılamadı.")}
+    return {"ok": True, "baslatildi": True}
+
+
+def sistem_bilgisi() -> Dict[str, Any]:
+    """`--tani --json` + arayüzün kendi bilgisi. Sayfa ikisini seçili dilde düz metne çevirip panoya koyar."""
+    kendi = {"ad": ARAYUZ_ADI, "surum": SURUM,
+             "isletim_sistemi": "%s %s" % (platform.system(), platform.version()) if os.name == "nt"
+             else platform.platform(terse=True), "mimari": platform.machine(), "python": platform.python_version()}
+    if not al_kurulu():
+        return {"ok": True, "al_yok": True, "arayuz": kendi}
+    veri = _al_komutu(["--tani", "--json"], _TANI_SURESI)
+    return {"ok": True, "al_yok": False, "arayuz": kendi, "tani": veri}
+
+
+def _aktif_surum_dizini() -> Optional[str]:
+    try:
+        with open(os.path.join(al_kok(), "aktif.txt"), encoding="utf-8") as fh:
+            aktif = fh.read().strip()
+    except OSError:
+        return None
+    return os.path.join(al_kok(), "surumler", aktif) if re.fullmatch(r"\d+(\.\d+)*", aktif) else None
+
+
+def yenilikler() -> Dict[str, Any]:
+    """Kurulu paketin yenilikleri: KOK/surumler/<aktif>/yenilikler.json ({"tr": [...]} ya da {"3.3.1": {...}})."""
+    dizin = _aktif_surum_dizini()
+    if not al_kurulu() or not dizin:
+        return {"ok": True, "al_yok": not al_kurulu(), "yenilikler": {}}
+    try:
+        with open(os.path.join(dizin, "yenilikler.json"), encoding="utf-8") as fh:
+            veri = json.load(fh)
+    except (OSError, ValueError):
+        veri = {}
+    surum = os.path.basename(dizin)
+    if isinstance(veri, dict) and not any(d in veri for d in _DILLER):
+        veri = veri.get(surum) or (veri[max(veri, key=lambda k: [int(x) for x in re.findall(r"\d+", k)] or [0])]
+                                   if veri else {})
+    temiz = {}
+    for d in _DILLER:
+        liste = veri.get(d) if isinstance(veri, dict) else None
+        if isinstance(liste, list):
+            temiz[d] = [str(x)[:400] for x in liste if isinstance(x, (str, int, float))][:5]
+    return {"ok": True, "al_yok": False, "surum": surum, "yenilikler": temiz}
+
+
+def _tercih_dosyasi() -> str:
+    return os.path.join(al_kok(), "veri", "arayuz-tercihleri.json")
+
+
+def _json_oku(yol: str) -> Dict[str, Any]:
+    try:
+        with open(yol, encoding="utf-8-sig") as fh:
+            veri = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return veri if isinstance(veri, dict) else {}
+
+
+def tercihler() -> Dict[str, Any]:
+    """Ortak tercihler. Dil sırası: tercih dosyasının `dil`i → durum.json `masa_dili` → `dil` → "tr".
+    AL kurulu değilse `kok: False`: sayfa kendi tarayıcı deposunu kullanır."""
+    if not al_kurulu():
+        return {"kok": False, "dil": None, "yazi": None, "karsitlik": None, "gorulen": None}
+    t = _json_oku(_tercih_dosyasi())
+    durum_ = _json_oku(os.path.join(al_kok(), "veri", "durum.json"))
+    dil = next((d for d in (t.get("dil"), durum_.get("masa_dili"), durum_.get("dil")) if d in _DILLER), "tr")
+    gorulen = t.get("gorulen_yenilikler") if isinstance(t.get("gorulen_yenilikler"), dict) else {}
+    return {"kok": True, "dil": dil, "yazi": t.get("yazi") if t.get("yazi") in _YAZILAR else "normal",
+            "karsitlik": t.get("karsitlik") is True, "gorulen": gorulen.get(MODUL)}
+
+
+_TERCIH_KILIT = threading.Lock()
+
+
+def tercih_yaz(istek: Dict[str, Any]) -> Dict[str, Any]:
+    """Yalnız gelen anahtarlar değişir; dosyadaki öteki anahtarlar (başka arayüzlerin) korunur. Atomik yazılır."""
+    degisen: Dict[str, Any] = {}
+    if istek.get("dil") in _DILLER:
+        degisen["dil"] = istek["dil"]
+    if istek.get("yazi") in _YAZILAR:
+        degisen["yazi"] = istek["yazi"]
+    if isinstance(istek.get("karsitlik"), bool):
+        degisen["karsitlik"] = istek["karsitlik"]
+    gorulen = istek.get("gorulen")
+    if isinstance(gorulen, str) and re.fullmatch(r"\d+(\.\d+){0,3}", gorulen):
+        degisen["gorulen"] = gorulen
+    if not al_kurulu():
+        return {"ok": True, "kok": False}
+    if not degisen:
+        return {"ok": False, "hata": _m("geçersiz istek")}
+    yol = _tercih_dosyasi()
+    with _TERCIH_KILIT:
+        veri = _json_oku(yol)
+        for k in ("dil", "yazi", "karsitlik"):
+            if k in degisen:
+                veri[k] = degisen[k]
+        if "gorulen" in degisen:
+            g = veri.get("gorulen_yenilikler") if isinstance(veri.get("gorulen_yenilikler"), dict) else {}
+            veri["gorulen_yenilikler"] = dict(g, **{MODUL: degisen["gorulen"]})
+        os.makedirs(os.path.dirname(yol), exist_ok=True)
+        gecici = yol + ".tmp"
+        with open(gecici, "w", encoding="utf-8") as fh:
+            json.dump(veri, fh, ensure_ascii=False, indent=1)
+        os.replace(gecici, yol)
+    return dict(tercihler(), ok=True)
+
+
+def sozlukler() -> Dict[str, Dict[str, str]]:
+    """ui/dil-az.json, ui/dil-en.json: anahtar Türkçe metin, değer çeviri. Okunamazsa Türkçe kalır."""
+    out = {}
+    for d in ("az", "en"):
+        veri = _json_oku(os.path.join(_UI, "dil-%s.json" % d))
+        out[d] = {k: v for k, v in veri.items() if isinstance(k, str) and isinstance(v, str)}
+    return out
+
+
+def _betik_json(veri: Any) -> bytes:
+    """<script type="application/json"> içine güvenle gömülecek JSON (</script> ve <!-- kaçışlı)."""
+    metin = json.dumps(veri, ensure_ascii=False, separators=(",", ":"))
+    return metin.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026").encode("utf-8")
+
+
 def _yerel_host(host: str) -> bool:
     ad = (host or "").rsplit(":", 1)[0].strip("[]").lower()
     return ad in ("127.0.0.1", "localhost", "::1")
@@ -294,17 +568,22 @@ def ozetler() -> List[Dict[str, Any]]:
 _KIMLIK = re.compile(r"\d{1,9}")
 
 
+def _onay_yaniti() -> Dict[str, Any]:
+    return {"ok": True, "onay_gerekli": True, "kart": canli.onay_karti(),
+            "kart_kalip": canli.ONAY_KARTI_KALIBI, "kart_degerler": canli.onay_karti_degerleri()}
+
+
 def idari(sorgu: Dict[str, List[str]]) -> Any:
     """Sorgu formunun seçim kutuları: il, `il=` ile ilçe, `ilce=` ile mahalle/köy listesi.
 
     Listeler kullanıcı yazmaz; TKGM'nin kendi kayıtlarından gelir (hız sınırlı kapı, 30 gün
     önbellek). Canlı istek olduğu için onay kartı `onay=1` gelene kadar döner."""
     if canli.onay_gerekli() and (sorgu.get("onay") or [""])[0] != "1":
-        return 200, {"ok": True, "onay_gerekli": True, "kart": canli.onay_karti()}
+        return 200, _onay_yaniti()
     il, ilce = (sorgu.get("il") or [""])[0], (sorgu.get("ilce") or [""])[0]
     for deger in (il, ilce):
         if deger and not _KIMLIK.fullmatch(deger):
-            return 400, {"ok": False, "hata": "kimlik sayı olmalı"}
+            return 400, {"ok": False, "hata": _m("kimlik sayı olmalı")}
     son = time.monotonic() + canli.CAGRI_BUTCESI_SN
     try:
         if ilce:
@@ -322,7 +601,7 @@ def idari_coz(sorgu: Dict[str, List[str]]) -> Any:
     """Sor sekmesindeki serbest metin → kutucuklara aktarılacak kimlikler. Sorgu YAPMAZ: kullanıcı
     kutucukları görüp Sorgula'ya kendisi basar."""
     if canli.onay_gerekli() and (sorgu.get("onay") or [""])[0] != "1":
-        return 200, {"ok": True, "onay_gerekli": True, "kart": canli.onay_karti()}
+        return 200, _onay_yaniti()
     metin = (sorgu.get("metin") or [""])[0][:300]
     try:
         c = canli.metin_coz(metin, time.monotonic() + canli.CAGRI_BUTCESI_SN)
@@ -381,22 +660,22 @@ def isleyici(tools: List[Tool]):
 
         def _kapi(self, belirtec: bool = False) -> bool:
             if not _yerel_host(self.headers.get("Host", "")):
-                self._json(403, {"ok": False, "hata": "yalnız localhost"})
+                self._json(403, {"ok": False, "hata": _m("yalnız localhost")})
                 return False
             koken = self.headers.get("Origin")
             if koken and not _yerel_host(urlparse(koken).netloc):
-                self._json(403, {"ok": False, "hata": "yabancı köken"})
+                self._json(403, {"ok": False, "hata": _m("yabancı köken")})
                 return False
             if belirtec:
                 if self._goruntu_gecerli():
                     return True
                 if self.headers.get("Sec-Fetch-Site") == "cross-site":
-                    self._json(403, {"ok": False, "hata": "başka siteden istek"})
+                    self._json(403, {"ok": False, "hata": _m("başka siteden istek")})
                     return False
                 verilen = self.headers.get("X-Tkgm") or \
                     (parse_qs(urlparse(self.path).query).get("t") or [""])[0]
                 if not hmac.compare_digest(verilen.encode(), BELIRTEC.encode()):
-                    self._json(403, {"ok": False, "hata": "belirteç yok ya da geçersiz — sayfayı yenileyin"})
+                    self._json(403, {"ok": False, "hata": _m("belirteç yok ya da geçersiz — sayfayı yenileyin")})
                     return False
             return True
 
@@ -407,7 +686,10 @@ def isleyici(tools: List[Tool]):
             if yol in ("/", "/index.html"):
                 with open(os.path.join(_UI, "index.html"), "rb") as fh:
                     sayfa = (fh.read().replace(b"__TKGM_BELIRTEC__", BELIRTEC.encode())
-                             .replace(_UYARI_YER_TUTUCU, html_kacis(harita.UYARI_3D, quote=True).encode("utf-8")))
+                             .replace(_UYARI_YER_TUTUCU, html_kacis(harita.UYARI_3D, quote=True).encode("utf-8"))
+                             .replace(b'"__TKGM_DIL__"', _betik_json(sozlukler()))
+                             .replace(b'"__TKGM_TERCIH__"', _betik_json(dict(tercihler(), surum=SURUM,
+                                                                            platform=sys.platform))))
                 self._gonder(200, sayfa, "text/html; charset=utf-8", dict(_SAYFA_BASLIKLARI))
             elif yol in ("/logo.png", "/favicon.ico"):
                 with open(os.path.join(_UI, "logo.png"), "rb") as fh:
@@ -428,6 +710,15 @@ def isleyici(tools: List[Tool]):
                 self._json(200, {"ok": True, "cevaplar": kaynak.cevaplar()})
             elif yol == "/api/harc_islemleri":
                 self._json(200, dict(harc.islemler(), ok=True))
+            elif yol == "/api/guncelleme":
+                zorla = (parse_qs(urlparse(self.path).query).get("zorla") or [""])[0] == "1"
+                self._json(200, guncelleme_denetle(zorla))
+            elif yol == "/api/tani":
+                self._json(200, sistem_bilgisi())
+            elif yol == "/api/yenilikler":
+                self._json(200, yenilikler())
+            elif yol == "/api/tercihler":
+                self._json(200, dict(tercihler(), ok=True))
             elif yol in ("/api/idari", "/api/idari/coz"):
                 kod, veri = (idari if yol == "/api/idari" else idari_coz)(parse_qs(urlparse(self.path).query))
                 self._json(kod, veri)
@@ -437,7 +728,7 @@ def isleyici(tools: List[Tool]):
                 # Düz ad şartı: ayraç ya da üst dizin içeren hiçbir istek klasörün dışına çıkamaz.
                 if ad != os.path.basename(ad) or not ad.lower().endswith(_GALERI_UZANTILARI) \
                         or not os.path.isfile(tam):
-                    self._json(404, {"ok": False, "hata": "dosya yok"})
+                    self._json(404, {"ok": False, "hata": _m("dosya yok")})
                     return
                 tur = mimetypes.guess_type(ad)[0] or "application/octet-stream"
                 # Yalnız köken gider: OSM karoyu Referer'sız vermez, belirteç (?t=, ?g=) adreste kalır.
@@ -456,7 +747,7 @@ def isleyici(tools: List[Tool]):
                         govde = harita.esri_anahtari_ekle(govde.decode("utf-8", "replace"), anahtar).encode("utf-8")
                 self._gonder(200, govde, tur, ek)
             else:
-                self._json(404, {"ok": False, "hata": "yol yok"})
+                self._json(404, {"ok": False, "hata": _m("yol yok")})
 
         def do_POST(self):  # noqa: N802
             # Gövde, HER ŞEYDEN ÖNCE okunur — reddedilecek olsa bile. İstemci gövdeyi
@@ -475,7 +766,7 @@ def isleyici(tools: List[Tool]):
                     if not parca:
                         break
                     kalan -= len(parca)
-                self._json(413, {"ok": False, "hata": "dosya 8 MB sınırını aşıyor"})
+                self._json(413, {"ok": False, "hata": _m("dosya 8 MB sınırını aşıyor")})
                 return
             if not self._kapi(belirtec=True):
                 return
@@ -483,8 +774,21 @@ def isleyici(tools: List[Tool]):
             if yol == "/api/ayar":
                 self._ayar(ham)
                 return
+            if yol in ("/api/tercihler", "/api/guncelleme/baslat"):
+                try:
+                    istek = json.loads(ham.decode("utf-8")) if ham else {}
+                except (ValueError, UnicodeDecodeError):
+                    istek = None
+                if not isinstance(istek, dict):
+                    self._json(400, {"ok": False, "hata": _m("geçersiz istek")})
+                elif yol == "/api/tercihler":
+                    sonuc = tercih_yaz(istek)
+                    self._json(200 if sonuc.get("ok") else 400, sonuc)
+                else:
+                    self._json(200, guncelleme_baslat())
+                return
             if yol != "/api/cagir":
-                self._json(404, {"ok": False, "hata": "yol yok"})
+                self._json(404, {"ok": False, "hata": _m("yol yok")})
                 return
             try:
                 if not ham:
@@ -492,7 +796,7 @@ def isleyici(tools: List[Tool]):
                 istek = json.loads(ham.decode("utf-8"))
                 arac = by_ad[istek["arac"]]
             except (ValueError, KeyError, UnicodeDecodeError):
-                self._json(400, {"ok": False, "hata": "geçersiz istek ya da bilinmeyen araç"})
+                self._json(400, {"ok": False, "hata": _m("geçersiz istek ya da bilinmeyen araç")})
                 return
             try:
                 sonuc = arac.handler(istek.get("args") or {})
@@ -511,32 +815,32 @@ def isleyici(tools: List[Tool]):
             try:
                 istek = json.loads(ham.decode("utf-8")) if ham else {}
             except (ValueError, UnicodeDecodeError):
-                self._json(400, {"ok": False, "hata": "geçersiz istek"})
+                self._json(400, {"ok": False, "hata": _m("geçersiz istek")})
                 return
             anahtar = istek.get("esri_anahtari") if isinstance(istek, dict) else None
             if not (anahtar is None or isinstance(anahtar, str)):
-                self._json(400, {"ok": False, "hata": "esri_anahtari metin olmalı"})
+                self._json(400, {"ok": False, "hata": _m("esri_anahtari metin olmalı")})
                 return
             if (os.environ.get("TKGM_ESRI_ANAHTARI") or "").strip():
-                self._json(409, {"ok": False, "hata": "Anahtar TKGM_ESRI_ANAHTARI ortam değişkeninden geliyor; "
-                                                      "değiştirmek için o değişkeni düzenleyin."})
+                self._json(409, {"ok": False, "hata": _m("Anahtar TKGM_ESRI_ANAHTARI ortam değişkeninden geliyor; "
+                                                         "değiştirmek için o değişkeni düzenleyin.")})
                 return
             anahtar = (anahtar or "").strip()
             sinama = None
             if anahtar:
                 if not harita.esri_anahtari_gecerli(anahtar):
-                    self._json(400, {"ok": False, "hata": "Anahtar biçimi tanınmadı (20-600 karakter; harf, "
-                                                          "rakam, . _ ~ -)."})
+                    self._json(400, {"ok": False, "hata": _m("Anahtar biçimi tanınmadı (20-600 karakter; harf, "
+                                                             "rakam, . _ ~ -).")})
                     return
                 sinama = esri_sina(anahtar)
                 if sinama is False:
-                    self._json(400, {"ok": False, "hata": "Esri bu anahtarı reddetti. Anahtarın 'Basemaps' "
-                                                          "yetkisi açık mı, süresi dolmuş mu?"})
+                    self._json(400, {"ok": False, "hata": _m("Esri bu anahtarı reddetti. Anahtarın 'Basemaps' "
+                                                             "yetkisi açık mı, süresi dolmuş mu?")})
                     return
             try:
                 esri_anahtari_kaydet(anahtar or None)
             except (OSError, ValueError) as exc:
-                self._json(500, {"ok": False, "hata": "Anahtar kaydedilemedi: %s" % type(exc).__name__})
+                self._json(500, {"ok": False, "hata": _m("Anahtar kaydedilemedi."), "ayrinti": type(exc).__name__})
                 return
             self._json(200, {"ok": True, "esri": bool(anahtar), "sinanamadi": bool(anahtar) and sinama is None})
 
