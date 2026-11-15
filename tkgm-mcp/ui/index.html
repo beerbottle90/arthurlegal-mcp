@@ -1010,14 +1010,15 @@ function gBitisMetni() { const g = (G.veri && G.veri.guncelleme) || {};
   return g.yeniden_baslat ? cev("Yeni sürüm indi; Claude Desktop'u yeniden açınca devreye girer") : cev("Güncelleme bitti."); }
 function gDugmeCiz() {
   const m = gModul(), d = G.durum, b = $("#s-guncelle");
-  const yazi = { bosta: cev("Güncellemeleri denetle"), denetleniyor: cev("Denetleniyor…"),
+  const yeni = d === "yeni" || (!!m.yeni && !["guncelleniyor", "bitti"].includes(d));
+  // Dört arayüzde aynı: yeni sürümde görünen yazı "Yeni sürüm var" + altın nokta; sürüm numarası yalnız ipucunda.
+  const yazi = { bosta: yeni ? cev("Yeni sürüm var") : cev("Güncellemeleri denetle"), denetleniyor: cev("Denetleniyor…"),
     guncel: cev("Güncelsiniz (v{0}) · son denetim {1}", m.kurulu || SURUM, saat(G.veri && G.veri.denetim)),
-    yeni: cev("Güncellemeleri denetle"), guncelleniyor: cev("Güncelleniyor… pencereyi kapatabilirsiniz"),
+    yeni: cev("Yeni sürüm var"), guncelleniyor: cev("Güncelleniyor… pencereyi kapatabilirsiniz"),
     bitti: gBitisMetni(), hata: cev("Denetlenemedi") }[d] || cev("Güncellemeleri denetle");
   $("#s-guncelle-yazi").textContent = yazi;
   b.disabled = d === "denetleniyor";
   b.classList.toggle("donuyor", d === "denetleniyor" || d === "guncelleniyor");
-  const yeni = d === "yeni" || (!!m.yeni && !["guncelleniyor", "bitti"].includes(d));
   $("#s-guncelle-nokta").hidden = !yeni;
   b.setAttribute("aria-label", G.alYok ? cev("ArthurLegal kurulumu bulunamadı; kurulum sayfasını açar")
     : yeni ? cev("Yeni sürüm var: v{0}. Ayrıntılar için tıklayın.", m.son || "") : yazi);
