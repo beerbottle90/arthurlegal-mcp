@@ -256,6 +256,9 @@ anılır; geometri her çağrıda yeniden gönderilmez.
 
 ## Sürüm notları
 
+**0.7.1 (15.11.2026)**
+- Kullanılabilirlik düzeltmeleri: orta genişlikte TKGM durum panosu ekrandan taşmıyor; yüksek karşıtlıkta seçili parsel kartı okunur; soluk gri yazılar ≥ 4,5:1 (3D uyarısı dahil); parsel kartı Boşluk tuşuyla seçilir, odak kaybolmaz; yeni sürüm hâlinde düğme "Yeni sürüm var" der.
+
 **0.7.0 (15.11.2026)**
 - Arayüzde ortak üst şerit: TKGM durum noktası, sürüm, güncelleme denetimi ve Şimdi güncelle
   (ArthurLegal'in güncelleyicisiyle, pencere açmadan), yazı boyutu ve yüksek karşıtlık, Yenilikler,
