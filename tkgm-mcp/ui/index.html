@@ -16,6 +16,9 @@
   yüksek karşıtlık), yardım ve dil. Dil, yazı ve karşıtlık AL kuruluysa ortak tercih dosyasında
   (KOK/veri/arayuz-tercihleri.json), değilse bu tarayıcıda durur.
 
+  Tek ayrım --soluk: masadaki gri (#808a99 / #7c889c) küçük yazıda 4.5:1'in altında kalıyordu (alt bilgideki 3D
+  uyarısı dahil); burada bir ton koyu (açıkta #646d7b, koyuda #909cb0), ArthurMask'le aynı.
+
   Dil: kaynak metin Türkçedir ve sözlüğün anahtarıdır (ui/dil-az.json, ui/dil-en.json; sunucu sayfayı verirken
   #tkgm-dil'e gömer). Sabit metinler data-cev (metin), data-cev-ph (yer tutucu), data-cev-title, data-cev-aria
   ile işaretlidir; betikteki metinler cev("…") ile. Eksik çeviride test düşer. Araçların Claude'a giden
@@ -51,7 +54,7 @@
   --cizgi-guclu: rgb(13 24 38 / 0.18);
   --metin: #0d1117;
   --ikincil: #4b5565;
-  --soluk: #808a99;
+  --soluk: #646d7b;
   --altin: #f7c948;
   --altin-metin: #8a6400;
   --lacivert: #12285a;
@@ -94,7 +97,7 @@
   --cizgi-guclu: rgb(255 255 255 / 0.16);
   --metin: #f2f4f8;
   --ikincil: #a7b3c6;
-  --soluk: #7c889c;
+  --soluk: #909cb0;
   --altin-metin: #f7cd55;
   --lacivert: #e8e4da;
   --birincil: #f7c948;
@@ -128,6 +131,8 @@
 .karsitlik button, .karsitlik a.d, .karsitlik input, .karsitlik select, .karsitlik textarea,
 .karsitlik .kart, .karsitlik .grup, .karsitlik .uyari, .karsitlik .pk, .karsitlik .pano, .karsitlik .ayar { border: 1px solid #12285a; }
 .karsitlik .segment button[aria-pressed="true"], .karsitlik .sekmeler button.acik, .karsitlik .pk.secili { background: #12285a; color: #ffffff; }
+/* Seçili parsel kartının alt satırı (nitelik · alan) lacivert zeminde siyah kalıyordu: karttaki bütün yazı beyaz. */
+.karsitlik .pk.secili small, .karsitlik .pk.secili b { color: #ffffff; }
 .karsitlik button.d, .karsitlik a.d { background: #12285a; color: #ffffff; }
 .karsitlik button.d.ikincil, .karsitlik a.d.ikincil { background: #ffffff; color: #12285a; }
 .karsitlik a, .karsitlik .bag, .karsitlik code { color: #12285a; text-decoration: underline; }
@@ -641,7 +646,8 @@ denetle(); koordinatDenetle();
 function listeCiz() {
   const l = $("#liste"); l.replaceChildren();
   for (const p of durum.parseller) l.append(el("div", { class: "pk" + (p.ref === durum.secili ? " secili" : ""), role: "button", tabindex: "0",
-    onclick: () => { durum.secili = p.ref; listeCiz(); ciz(aktif()); }, onkeydown: e => { if (e.key === "Enter") { durum.secili = p.ref; listeCiz(); ciz(aktif()); } } },
+    onclick: () => { durum.secili = p.ref; listeCiz(); ciz(aktif()); }, onkeydown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); durum.secili = p.ref; listeCiz(); ciz(aktif());
+      const k = $("#liste .pk.secili"); if (k) k.focus(); } } },
     el("b", {}, p.parsel), el("small", {}, (p.nitelik || "").slice(0, 60) + " · " + tr(p.dosyadaki_alan_m2 ?? p.alan_m2) + " m²")));
 }
 const secili = () => durum.parseller.find(p => p.ref === durum.secili);
@@ -938,11 +944,22 @@ function surumKucuk(a, b) { const x = surumDemeti(a), y = surumDemeti(b);
 const PANOLAR = { durum: ["#s-durum", "#s-durum-pano"], guncelle: ["#s-guncelle", "#s-guncelle-pano"], aa: ["#s-aa", "#s-aa-pano"],
   bilgi: ["#s-bilgi", "#s-bilgi-pano"], yenilik: ["#s-bilgi", "#s-yenilik-pano"] };
 let acikPano = null;
+// Şerit iki satıra inince (yaklaşık 600–1100 px) düğmeye sağdan hizalı pano ekranın solundan taşıyordu: ekrana kaydırılır.
+function panoyuSigdir(pano) {
+  pano.style.left = ""; pano.style.right = "";
+  const kenar = 8, r = pano.getBoundingClientRect();
+  if (r.left >= kenar && r.right <= innerWidth - kenar) return;
+  const kap = pano.parentElement.getBoundingClientRect();
+  pano.style.right = "auto";
+  pano.style.left = (Math.max(kenar, Math.min(r.left, innerWidth - kenar - r.width)) - kap.left) + "px";
+}
 function panoAc(ad) {
   if (acikPano && acikPano !== ad) panoKapat(false);
   const [d, p] = PANOLAR[ad]; $(p).hidden = false; $(d).setAttribute("aria-expanded", "true"); acikPano = ad;
+  panoyuSigdir($(p));
   const ilk = $(p).querySelector("button, a, [tabindex]"); if (ilk && ad !== "durum") ilk.focus();
 }
+window.addEventListener("resize", () => { if (acikPano) panoyuSigdir($(PANOLAR[acikPano][1])); });
 function panoKapat(odak = true) {
   if (!acikPano) return;
   const ad = acikPano, [d, p] = PANOLAR[ad]; $(p).hidden = true; $(d).setAttribute("aria-expanded", "false"); acikPano = null;
@@ -993,14 +1010,15 @@ function gBitisMetni() { const g = (G.veri && G.veri.guncelleme) || {};
   return g.yeniden_baslat ? cev("Yeni sürüm indi; Claude Desktop'u yeniden açınca devreye girer") : cev("Güncelleme bitti."); }
 function gDugmeCiz() {
   const m = gModul(), d = G.durum, b = $("#s-guncelle");
-  const yazi = { bosta: cev("Güncellemeleri denetle"), denetleniyor: cev("Denetleniyor…"),
+  const yeni = d === "yeni" || (!!m.yeni && !["guncelleniyor", "bitti"].includes(d));
+  // Dört arayüzde aynı: yeni sürümde görünen yazı "Yeni sürüm var" + altın nokta; sürüm numarası yalnız ipucunda.
+  const yazi = { bosta: yeni ? cev("Yeni sürüm var") : cev("Güncellemeleri denetle"), denetleniyor: cev("Denetleniyor…"),
     guncel: cev("Güncelsiniz (v{0}) · son denetim {1}", m.kurulu || SURUM, saat(G.veri && G.veri.denetim)),
-    yeni: cev("Güncellemeleri denetle"), guncelleniyor: cev("Güncelleniyor… pencereyi kapatabilirsiniz"),
+    yeni: cev("Yeni sürüm var"), guncelleniyor: cev("Güncelleniyor… pencereyi kapatabilirsiniz"),
     bitti: gBitisMetni(), hata: cev("Denetlenemedi") }[d] || cev("Güncellemeleri denetle");
   $("#s-guncelle-yazi").textContent = yazi;
   b.disabled = d === "denetleniyor";
   b.classList.toggle("donuyor", d === "denetleniyor" || d === "guncelleniyor");
-  const yeni = d === "yeni" || (!!m.yeni && !["guncelleniyor", "bitti"].includes(d));
   $("#s-guncelle-nokta").hidden = !yeni;
   b.setAttribute("aria-label", G.alYok ? cev("ArthurLegal kurulumu bulunamadı; kurulum sayfasını açar")
     : yeni ? cev("Yeni sürüm var: v{0}. Ayrıntılar için tıklayın.", m.son || "") : yazi);
@@ -1029,6 +1047,7 @@ function gPanoCiz() {
   } else {
     p.replaceChildren(el("h3", { id: "s-guncelle-baslik" }, cev("Güncelsiniz (v{0}) · son denetim {1}", m.kurulu || SURUM, saat(v.denetim))), el("div", { class: "dugmeler" }, kapatDugmesi()));
   }
+  if (acikPano === "guncelle") panoyuSigdir(p);   // açıkken içerik değişti (durum, dil): genişlik de değişir
 }
 function gDurum(d, hata) { G.durum = d; if (hata !== undefined) G.hata = hata; gDugmeCiz(); if (acikPano === "guncelle") gPanoCiz(); }
 async function gDenetle(zorla, sessiz) {
@@ -1089,6 +1108,7 @@ function yenilikPanoCiz(j) {
     y.length ? el("ul", {}, y.slice(0, 5).map(x => el("li", {}, String(x))))
       : el("div", { class: "kucuk" }, j.al_yok ? cev("Yenilikler ArthurLegal kurulumundan okunur; bu bilgisayarda kurulum bulunamadı.") : cev("Bu sürüm için yenilik notu yok.")),
     el("div", { class: "dugmeler" }, kapatDugmesi()));
+  if (acikPano === "yenilik") panoyuSigdir($("#s-yenilik-pano"));
 }
 $("#s-yenilikler").addEventListener("click", async () => { panoKapat(false); yenilikPanoCiz(await yeniliklerAl()); panoAc("yenilik"); });
 // Güncellemeden sonraki ilk açılışta yenilikler bir kez gösterilir; kapatınca bu sürüm "görüldü" yazılır.

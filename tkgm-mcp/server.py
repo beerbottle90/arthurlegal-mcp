@@ -41,7 +41,7 @@ from tkgm_aktar import BICIMLER, aktar
 from tkgm_analiz import olc, tr_bicim
 from tkgm_kroki import ciz
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 canli.SURUM = __version__
 arayuz.SURUM = __version__
 
