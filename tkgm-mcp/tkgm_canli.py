@@ -272,6 +272,10 @@ class Devre:
         self._neden = ""
         self._hata = 0
         self._kademe = 0
+        # Arayüzün durum noktası için: son yanıt ve son arıza (duvar saati). Ölçülmemiş bir şey
+        # "bağlı" gösterilmesin diye ikisi de başta yoktur.
+        self._son_basari: Optional[float] = None
+        self._son_ariza: Optional[Tuple[float, str]] = None
 
     def kalan(self) -> float:
         with self._kilit:
@@ -285,6 +289,7 @@ class Devre:
 
     def basari(self) -> None:
         with self._kilit:
+            self._son_basari = time.time()
             self._hata = 0
             self._kademe = max(0, self._kademe - 1)
 
@@ -298,6 +303,7 @@ class Devre:
 
     def yavasla(self, retry_after: Optional[float], neden: str) -> None:
         with self._kilit:
+            self._son_ariza = (time.time(), neden)
             sure = self._geri_cekil()
             if retry_after:
                 sure = max(sure, min(float(retry_after), 6 * 3600.0))
@@ -305,6 +311,7 @@ class Devre:
 
     def hata(self, neden: str) -> None:
         with self._kilit:
+            self._son_ariza = (time.time(), neden)
             self._hata += 1
             if self._hata >= self.ESIK:
                 self._hata = 0
@@ -312,13 +319,19 @@ class Devre:
 
     def reddedildi(self, neden: str) -> None:
         with self._kilit:
+            self._son_ariza = (time.time(), neden)
             self._ac(self.RET_SN, neden)
 
     def durum(self) -> Dict[str, Any]:
         kalan = self.kalan()
-        if kalan <= 0:
-            return {"durum": "çalışıyor"}
-        return {"durum": "duraklatıldı", "kalan": _sure_metni(kalan), "neden": self._neden}
+        out: Dict[str, Any] = {"durum": "çalışıyor"} if kalan <= 0 else {
+            "durum": "duraklatıldı", "kalan": _sure_metni(kalan), "kalan_sn": int(math.ceil(kalan)),
+            "neden": self._neden}
+        if self._son_basari is not None:
+            out["son_basari"] = int(self._son_basari)
+        if self._son_ariza is not None:
+            out["son_ariza"] = {"zaman": int(self._son_ariza[0]), "neden": self._son_ariza[1]}
+        return out
 
 
 class GunlukSayac:
@@ -1022,16 +1035,26 @@ def metin_coz(metin: Any, son: Optional[float] = None, ada: Any = None,
 # --------------------------------------------------------------------------- #
 # Onay kartı ve durum                                                          #
 # --------------------------------------------------------------------------- #
+# Kartın kalıbı: {0} dakikalık istek tavanı, {1} manifesto adresi. Claude'a giden kart Türkçedir; yerel
+# arayüz aynı kalıbı sözlüğünden (ui/dil-*.json, anahtar bu metin) seçili dile çevirip doldurur.
+ONAY_KARTI_KALIBI = (
+    "TKGM canlı sorgu · bu sohbet için tek onay\n\n"
+    "ArthurLegal açık kaynaklı, ticari olmayan bir projedir. Parsel bilgisi TKGM Parsel Sorgu'nun "
+    "herkese açık verisinden, sizin adınıza getirilir; yer adları OpenStreetMap'te aranır.\n\n"
+    "· İstekler sıraya alınır, TKGM'ye tek tek gider (dakikada en çok {0})\n"
+    "· Aynı parsel bir gün önbellekten gelir\n"
+    "· Bilgi amaçlıdır; malik, şerh, rehin içermez\n\n"
+    "Nasıl tasarlandı: {1}\n\n"
+    "Devam edilsin mi? (evet / hayır)")
+
+
+def onay_karti_degerleri() -> List[str]:
+    return [str(dakikada_toplam()), MANIFESTO]
+
+
 def onay_karti() -> str:
-    return (
-        "TKGM canlı sorgu · bu sohbet için tek onay\n\n"
-        "ArthurLegal açık kaynaklı, ticari olmayan bir projedir. Parsel bilgisi TKGM Parsel Sorgu'nun "
-        "herkese açık verisinden, sizin adınıza getirilir; yer adları OpenStreetMap'te aranır.\n\n"
-        "· İstekler sıraya alınır, TKGM'ye tek tek gider (dakikada en çok %d)\n"
-        "· Aynı parsel bir gün önbellekten gelir\n"
-        "· Bilgi amaçlıdır; malik, şerh, rehin içermez\n\n"
-        "Nasıl tasarlandı: %s\n\n"
-        "Devam edilsin mi? (evet / hayır)" % (dakikada_toplam(), MANIFESTO))
+    a, b = onay_karti_degerleri()
+    return ONAY_KARTI_KALIBI.replace("{0}", a).replace("{1}", b)
 
 
 def onay_gerekli() -> bool:

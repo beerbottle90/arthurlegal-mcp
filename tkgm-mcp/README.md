@@ -90,6 +90,24 @@ Görünüm AL Masası'yla aynı dildedir: açık tema varsayılan (beyaz zemin, 
 laciverti, Otomatik sistem temasına uyar; sol panelde sorgu formu ve parseller, sağda sekmeler. Renkler
 `arthurlegal-app4all` ortak tasarımından (`al.css`), arma ve simge ArthurLegal simge üreticisinden gelir.
 
+**Üst şerit** (AL Masası, ArthurMask ve UYAP Dashboard'la aynı sıra): TKGM durumu (yeşil Bağlı / sarı
+Kısıtlı / gri Çevrimdışı ya da Denenmedi; `server_status`'taki son TKGM yanıtından, ölçülmemiş bağlantı
+"bağlı" gösterilmez), sürüm, **Güncellemeleri denetle**, **Aa** (yazı boyutu Normal / %115 / %130, yüksek
+karşıtlık), **ⓘ** (Yenilikler, Sistem bilgisini kopyala, Kullanıcı rehberi) ve bayraklı dil seçici.
+Güncelleme düğmesi GitHub'a kendisi bağlanmaz: yerel sunucu ArthurLegal'in `al.py guncelle --denetle
+--json` komutunu pencere açmadan çalıştırır (`GET /api/guncelleme`, düğmeye basınca `?zorla=1`); **Şimdi
+güncelle** mevcut imzalı güncelleyiciyi (`al.py guncelle`) arka planda başlatır (`POST
+/api/guncelleme/baslat`), sayfa 3 saniyede bir yoklar. Kurulum kökü `ARTHURLEGAL_KOK`, yoksa kurulumun
+varsayılan klasörü; `KOK/bin/al.py` yoksa (geliştirme, tek başına çalıştırma) düğme yalnız kurulum
+sayfasını açar. Bağlantılar yalnız `https://github.com/beerbottle90/` önekiyle açılır.
+
+**Dil.** Bütün ekran metinleri Türkçe, Azerbaycanca ve İngilizcedir: anahtar Türkçe metin, değer çeviri
+(`ui/dil-az.json`, `ui/dil-en.json`); eksik çeviride `tests/test_dil.py` düşer. Dil, yazı boyutu ve
+karşıtlık ArthurLegal kuruluysa ortak tercih dosyasında (`KOK/veri/arayuz-tercihleri.json`; yalnız kendi
+anahtarları yazılır, öteki arayüzlerinkiler korunur), değilse tarayıcıda durur. Araçların Claude'a giden
+çıktıları, mevzuat ve tarife alıntıları ve yer adları Türkçe kalır; 3D uyarısı ekranda seçili dildeki
+karşılığıyla, anlamı aynen korunarak gösterilir.
+
 Arayüz ayrı bir API değildir; MCP araç listesini `POST /api/cagir` üzerinden açar. Yalnız 127.0.0.1'e
 bağlanır. Kilitler: yabancı `Host` ret (DNS rebinding); süreç başına **rastgele belirteç** — her POST
 `X-Tkgm: <belirteç>`, her `/api` ve `/dosya` GET'i `?t=<belirteç>` taşır ve belirteç yalnız sayfaya gömülür;
@@ -237,6 +255,16 @@ Görsel ve dışa aktarım dosyaya yazılır; modele yol ve birkaç satır özet
 anılır; geometri her çağrıda yeniden gönderilmez.
 
 ## Sürüm notları
+
+**0.7.0 (15.11.2026)**
+- Arayüzde ortak üst şerit: TKGM durum noktası, sürüm, güncelleme denetimi ve Şimdi güncelle
+  (ArthurLegal'in güncelleyicisiyle, pencere açmadan), yazı boyutu ve yüksek karşıtlık, Yenilikler,
+  Sistem bilgisini kopyala, Kullanıcı rehberi, bayraklı dil seçici.
+- Arayüzün bütün metinleri TR/AZ/EN (`ui/dil-az.json`, `ui/dil-en.json`); 3D uyarısı ve onay kartı da
+  seçili dilde. MCP araçlarının Claude'a giden çıktıları Türkçe kalır.
+- `server_status` → `canli.tkgm.devre`: son TKGM yanıtı (`son_basari`) ve son arıza (`son_ariza`).
+- Yeni uçlar: `/api/guncelleme`, `/api/guncelleme/baslat`, `/api/tani`, `/api/yenilikler`, `/api/tercihler`
+  (hepsi belirteçli).
 
 **0.6.1 (30.10.2026)**
 - Arayüzün harç kartı sadeleşti: kod yerine işlem seçilir (satış, bağış, ipotek, şerhler, taksim,
