@@ -142,9 +142,19 @@ class ServerViewsTest(unittest.TestCase):
         self.assertIn("araç menüsünde", devir["not"])
         kaldi = desk.handler({"baglayicilar": yerel, "uzakta_kal": True})
         self.assertIn("araç menüsünde", kaldi["not"])
-        self.assertNotIn("araç menüsünde", desk.handler({"baglayicilar": [{"ad": "Gmail"}]})["not"])
-        # No install in the chat, an install that is not connected, or the user staying here: the desk opens.
-        for args in ({"baglayicilar": [{"ad": "Gmail"}]}, {"baglayicilar": []}, {},
+        # 15.11.2026: Claude does not always list arthurlegal-yerel, so after an update the desk opened here and the
+        # lawyer's history (on their disk) looked lost. With no install in the list the endpoint still tries the
+        # local desk first ("yoklama"): Claude calls the local al_masasi if it has it, otherwise (web, phone) it calls
+        # this tool again at once with uzakta_kal=true.
+        for args in ({"baglayicilar": [{"ad": "Gmail"}]}, {"baglayicilar": []}, {}):
+            with self.subTest(yoklama=args):
+                yoklama = desk.handler(args)
+                self.assertEqual(yoklama["yonlendir"], {"sunucu": "arthurlegal-yerel", "arac": "al_masasi"})
+                self.assertIs(yoklama["yoklama"], True)
+                self.assertIn("uzakta_kal=true", yoklama["not"])
+                self.assertNotIn("araç menüsünde", yoklama["not"])
+        # An install reported as not connected, or the user staying here: the desk opens.
+        for args in ({"baglayicilar": [{"ad": "Gmail"}], "uzakta_kal": True},
                      {"baglayicilar": [{"ad": "arthurlegal-yerel", "durum": "hata"}]},
                      {"baglayicilar": yerel, "uzakta_kal": True}):
             with self.subTest(args=args):

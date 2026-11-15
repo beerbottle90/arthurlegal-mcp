@@ -112,10 +112,12 @@ class DirectoryProfile(unittest.TestCase):
         directory_desk = next(t for t in DIRECTORY_TOOLS if t.name == "al_masasi")
         self.assertIn("model", main_desk.input_schema["properties"])
         self.assertNotIn("model", directory_desk.input_schema["properties"])
-        low = main_desk.handler({"baglayicilar": [], "model": "Claude Haiku 5.5"})
+        # The desk opens here only with uzakta_kal (otherwise the local install is tried first and its desk warns).
+        low = main_desk.handler({"baglayicilar": [], "model": "Claude Haiku 5.5", "uzakta_kal": True})
         self.assertEqual(low["model"]["duzey"], "dusuk")
         self.assertIn("MODEL:", low["not"])
-        self.assertNotIn("MODEL:", main_desk.handler({"baglayicilar": [], "model": "Claude Opus 5.5"})["not"])
+        self.assertNotIn("MODEL:", main_desk.handler({"baglayicilar": [], "model": "Claude Opus 5.5",
+                                                      "uzakta_kal": True})["not"])
 
     def test_directory_status_leaves_land_registry_out(self):
         status = next(t for t in DIRECTORY_TOOLS if t.name == "status")
