@@ -29,6 +29,7 @@ import tool_titles  # noqa: E402
 server.build()
 DIRECTORY_TOOLS, DIRECTORY_TEXT, DIRECTORY_VIEWS = server.build_directory()
 MAIN_TEXT = server.INSTRUCTIONS_HEADER + "\n\n" + "\n\n".join(server._instructions)
+OPENAI_TOOLS, OPENAI_TEXT, OPENAI_VIEWS = server.build_openai()
 
 
 class Annotations(unittest.TestCase):
@@ -246,6 +247,121 @@ class HttpRoutes(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as caught:
             self.post("/elsewhere", "tools/list")
         self.assertEqual(caught.exception.code, 404)
+
+
+
+HINTS = ("readOnlyHint", "destructiveHint", "openWorldHint")
+
+
+class ExplicitHints(unittest.TestCase):
+    """OpenAI's directory review rejects a tool whose three hints are not explicit booleans."""
+
+    def test_every_tool_on_every_path_has_three_booleans(self):
+        for tool in server._tools + DIRECTORY_TOOLS + OPENAI_TOOLS:
+            hints = tool.public().get("annotations", {})
+            for key in HINTS:
+                self.assertIsInstance(hints.get(key), bool, (tool.name, key))
+
+    def test_research_reaches_the_open_world_and_the_desk_does_not(self):
+        hints = {t.name: t.annotations for t in server._tools}
+        self.assertTrue(hints["tr_mevzuat_madde_getir"]["openWorldHint"])
+        self.assertFalse(hints["status"]["openWorldHint"])
+        if "al_masasi" in hints:
+            self.assertFalse(hints["al_masasi"]["openWorldHint"])
+            self.assertTrue(hints["al_masaya_yaz"]["readOnlyHint"])
+
+
+class OpenAIProfile(unittest.TestCase):
+    def test_no_tool_asks_for_a_precise_location(self):
+        names = {t.name for t in OPENAI_TOOLS}
+        self.assertFalse(names & server.OPENAI_EXCLUDED_TOOLS)
+        for tool in OPENAI_TOOLS:
+            props = (tool.input_schema or {}).get("properties") or {}
+            for key in server.OPENAI_STRIPPED_INPUTS.get(tool.name, ()):
+                self.assertNotIn(key, props, (tool.name, key))
+                self.assertNotIn(key, (tool.input_schema or {}).get("required") or [], (tool.name, key))
+            for key in ("enlem", "boylam", "noktalar", "hat"):
+                self.assertNotIn(key, props, (tool.name, key))
+        main = {t.name for t in server._tools}
+        for name in server.OPENAI_EXCLUDED_TOOLS | set(server.OPENAI_STRIPPED_INPUTS):
+            self.assertIn(name, main, "the profile names a tool /mcp does not have: " + name)
+
+    def test_parcels_and_calculators_stay(self):
+        names = {t.name for t in OPENAI_TOOLS}
+        for name in ("tkgm_parsel_sorgula", "tkgm_parsel_raporu", "hesap_yargi_harci", "tr_mevzuat_madde_getir", "status"):
+            self.assertIn(name, names)
+
+    def test_stripped_input_is_ignored_when_sent(self):
+        seen = []
+        tool = next(t for t in OPENAI_TOOLS if t.name == "tkgm_parsel_sorgula")
+        original = next(t for t in server._tools if t.name == "tkgm_parsel_sorgula").handler
+        wrapped = server._openai_handler("tkgm_parsel_sorgula", lambda args: seen.append(args) or {})
+        wrapped({"metin": "41.0, 29.0", "il": "İstanbul"})
+        self.assertEqual(seen, [{"il": "İstanbul"}])
+        self.assertIsNot(tool.handler, original)
+
+    def test_first_512_characters_carry_the_trigger_and_the_rule(self):
+        head = OPENAI_TEXT[:512]
+        self.assertIn("al_masasi", head)
+        self.assertIn("ArthurLegal Masası'nı aç", head)
+        self.assertIn("tr_mevzuat_madde_getir", head)
+        self.assertIn("UYARI: veri çekilemedi", head)
+
+    def test_host_neutral_text(self):
+        self.assertNotIn("Claude", OPENAI_TEXT)
+        self.assertNotIn("MODEL.", OPENAI_TEXT)
+        for tool in OPENAI_TOOLS:
+            self.assertNotIn("Claude", json.dumps(tool.public(), ensure_ascii=False), tool.name)
+
+    def test_only_the_desk_and_the_hand_over_carry_the_view(self):
+        if server.al_arayuz is None:
+            self.skipTest("arayuz/ missing")
+        with_view = sorted(t.name for t in OPENAI_TOOLS if (t.meta or {}).get("ui", {}).get("resourceUri"))
+        self.assertEqual(with_view, ["al_masasi", "al_masaya_yaz"])
+        names = {t.name for t in OPENAI_TOOLS}
+        self.assertIn("al_masada_basla", names)
+        desk = next(t for t in OPENAI_TOOLS if t.name == "al_masasi")
+        self.assertNotIn("model", desk.input_schema["properties"])
+        self.assertNotIn("uzakta_kal", desk.input_schema["properties"])
+        state = desk.handler({})
+        self.assertEqual(state["ev"], "chatgpt")
+        self.assertNotIn("yonlendir", state)
+        for view in OPENAI_VIEWS:
+            self.assertEqual(view.meta["ui"]["domain"], server.OPENAI_DOMAIN)
+        self.assertNotIn("domain", server._resources[0].meta["ui"], "/mcp views keep no domain")
+
+
+class OpenAIRoute(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        main = mcpcore.Dispatcher(server._tools, "arthurlegal-mcp", server.__version__, MAIN_TEXT,
+                                  resources=server._resources)
+        openai = mcpcore.Dispatcher(OPENAI_TOOLS, "arthurlegal-mcp", server.__version__, OPENAI_TEXT,
+                                    resources=OPENAI_VIEWS)
+        handler = mcpcore._make_handler(main, {server.OPENAI_PATH: openai})
+        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        cls.base = "http://127.0.0.1:%d" % cls.httpd.server_address[1]
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+
+    def post(self, path, method, params=None):
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}).encode("utf-8")
+        req = urllib.request.Request(self.base + path, data=body, method="POST",
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    def test_openai_path_serves_its_profile(self):
+        tools = self.post(server.OPENAI_PATH, "tools/list")["result"]["tools"]
+        self.assertEqual(len(tools), len(OPENAI_TOOLS))
+        init = self.post(server.OPENAI_PATH, "initialize", {"protocolVersion": "2025-06-18"})["result"]
+        self.assertTrue(init["instructions"].startswith("ArthurLegal: legal research"))
+        out = self.post(server.OPENAI_PATH, "tools/call", {"name": "tkgm_konumdan_parsel", "arguments": {}})
+        self.assertEqual(out.get("error", {}).get("code"), -32602, out)
 
 
 if __name__ == "__main__":

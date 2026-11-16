@@ -207,11 +207,20 @@ def title_for(name: str) -> str:
     return name.replace("_", " ")
 
 
+# Tools that never leave this server: the desk tools and the health report. Every other tool
+# queries an official public source, which OpenAI counts as the open world even when the call
+# only reads ("openWorldHint: true when a tool accesses the public internet ... including
+# through read-only actions"). All three hints are explicit booleans on every tool: the OpenAI
+# directory rejects a listing with a missing one.
+CLOSED_WORLD = {"status", "al_masasi", "al_masaya_yaz", "al_masada_basla"}
+
+
 def annotations_for(name: str) -> Dict[str, Any]:
     title = title_for(name)
+    open_world = name not in CLOSED_WORLD
     if name in NOT_READ_ONLY:
-        return {"title": title, "readOnlyHint": False, "destructiveHint": False}
-    return {"title": title, "readOnlyHint": True}
+        return {"title": title, "readOnlyHint": False, "destructiveHint": False, "openWorldHint": open_world}
+    return {"title": title, "readOnlyHint": True, "destructiveHint": False, "openWorldHint": open_world}
 
 
 def annotate(tool: Any) -> None:

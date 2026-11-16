@@ -17,6 +17,13 @@ Official Gazette annex page reader `tr_resmi_gazete_ek_sayfa` and the desk hand-
 `al_masaya_yaz`. See
 [Claude connector directory](#claude-connector-directory).
 
+A third profile for the OpenAI (ChatGPT) plugin directory answers at `/openai/mcp` (in preparation, not listed yet):
+the tools of `/mcp` except those that take a precise location (`tkgm_konumdan_parsel`, `tkgm_yer_bul`,
+`tkgm_koordinat_donustur`, `tkgm_koridor_kesisim`, `tkgm_parsel_oku`; the free-text and coordinate inputs of
+`tkgm_parsel_sorgula`, `tkgm_parsel_raporu` and `tkgm_baglanti` are dropped) and the annex page reader. Parcels are
+found by province, district, neighbourhood, block and parcel. Only the desk and the answer hand-over open a view, and
+the instructions name no client.
+
 Anyone with the URL can call every tool. Self-hosting? Deploy your own copy (see
 [Indexes](#indexes)) and use `https://<your-app>.fly.dev/mcp` instead.
 
@@ -93,8 +100,8 @@ The directory listing points at a narrower profile of the same server:
 
     https://arthurlegal-mcp.fly.dev/directory/mcp
 
-- **107 tools, all read-only.** Every tool carries a `title` and `readOnlyHint: true`
-  (`tool_titles.py`), so Claude can run them without asking each time. Nothing on this
+- **107 tools, all read-only.** Every tool carries a `title` and explicit `readOnlyHint: true`,
+  `destructiveHint: false` and `openWorldHint` (`tool_titles.py`), so Claude can run them without asking each time. Nothing on this
   endpoint writes, deletes or sends anything on your behalf.
 - **No land-registry or fee calculator tools.** The `tkgm_` and `hesap_` tools stay on `/mcp` only; the desk shows
   ArthurTapu as available in the ArthurLegal install.

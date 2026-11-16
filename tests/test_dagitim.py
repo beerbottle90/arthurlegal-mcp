@@ -115,14 +115,20 @@ class WorkflowGuardsTest(unittest.TestCase):
 class LiveCheckDecisionsTest(unittest.TestCase):
     def test_fewer_tools_is_an_error_unless_allowed(self) -> None:
         once = {"/mcp": 130, "/directory/mcp": 107}
-        self.assertEqual(canli_denetim.karsilastir(once, {"/mcp": 130, "/directory/mcp": 107}, False), [])
-        self.assertEqual(canli_denetim.karsilastir(once, {"/mcp": 131, "/directory/mcp": 107}, False), [])
-        self.assertEqual(len(canli_denetim.karsilastir(once, {"/mcp": 129, "/directory/mcp": 107}, False)), 1)
-        self.assertEqual(canli_denetim.karsilastir(once, {"/mcp": 129, "/directory/mcp": 107}, True), [])
+        self.assertEqual(canli_denetim.karsilastir(once, {"/mcp": 130, "/directory/mcp": 107, "/openai/mcp": 125}, False), [])
+        self.assertEqual(canli_denetim.karsilastir(once, {"/mcp": 131, "/directory/mcp": 107, "/openai/mcp": 125}, False), [])
+        self.assertEqual(len(canli_denetim.karsilastir(once, {"/mcp": 129, "/directory/mcp": 107, "/openai/mcp": 125}, False)), 1)
+        self.assertEqual(canli_denetim.karsilastir(once, {"/mcp": 129, "/directory/mcp": 107, "/openai/mcp": 125}, True), [])
 
     def test_empty_list_is_an_error_even_without_a_before(self) -> None:
-        self.assertEqual(len(canli_denetim.karsilastir({}, {"/mcp": 0, "/directory/mcp": 107}, True)), 1)
-        self.assertEqual(canli_denetim.karsilastir({}, {"/mcp": 130, "/directory/mcp": 107}, False), [])
+        self.assertEqual(len(canli_denetim.karsilastir({}, {"/mcp": 0, "/directory/mcp": 107, "/openai/mcp": 125}, True)), 1)
+        self.assertEqual(canli_denetim.karsilastir({}, {"/mcp": 130, "/directory/mcp": 107, "/openai/mcp": 125}, False), [])
+
+    def test_new_endpoint_may_be_missing_before_but_not_after(self) -> None:
+        once = {"/mcp": 130, "/directory/mcp": 107}   # /openai/mcp first arrives with this deploy
+        hatalar = canli_denetim.karsilastir(once, {"/mcp": 130, "/directory/mcp": 107}, False)
+        self.assertEqual(len(hatalar), 1)
+        self.assertIn("/openai/mcp", hatalar[0])
 
     def test_every_started_machine_must_run_the_new_image(self) -> None:
         def makine(i, durum, etiket):
