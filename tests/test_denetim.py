@@ -412,6 +412,8 @@ class KapaliykenTest(_Temel):
             "_resources": gorunumler, "build": lambda: None, "_warm_resident": lambda: None,
             "_warm_epdk": lambda: None,
             "build_directory": lambda: (dizin_araclari, "dizin talimatı", list(gorunumler)),
+            "OPENAI_PATH": "/openai/mcp",
+            "build_openai": lambda: (dizin_araclari, "openai talimatı", list(gorunumler)),
             "run": lambda tools, **kw: cagrilar.append((list(tools), kw)),
         }
         ortam = {k: v for k, v in os.environ.items() if k not in ("AUDIT_LOG", "FLY_APP_NAME")}
@@ -437,7 +439,7 @@ class KapaliykenTest(_Temel):
                     self.assertEqual(kw["routes"], {})
                     self.assertTrue(err.endswith(ACIK_SATIRLARI), err)
                 else:                                              # master'daki davranış
-                    self.assertEqual(list(kw["routes"]), ["/directory/mcp"])
+                    self.assertEqual(list(kw["routes"]), ["/directory/mcp", "/openai/mcp"])
                     dizin = kw["routes"]["/directory/mcp"]
                     self.assertIs(dizin.tools, dizin_araclari)
                     self.assertEqual((dizin.instructions, dizin.resources),

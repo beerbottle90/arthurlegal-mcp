@@ -49,7 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcpcore import Dispatcher, McpError, Resource, Tool, run  # noqa: E402
 from tool_titles import annotate  # noqa: E402
 
-__version__ = "1.11.2"
+__version__ = "1.12.0"
 
 # The Claude connector directory listing points here, not at /mcp. Same server,
 # narrower profile: the land-registry and fee calculator tools and the Official Gazette
@@ -61,6 +61,24 @@ DIRECTORY_EXCLUDED_PREFIXES: Tuple[str, ...] = ("tkgm", "hesap")
 DIRECTORY_EXCLUDED_TOOLS = frozenset(("tr_resmi_gazete_ek_sayfa",))
 # Result keys that name a tool the directory does not list; its copy of the tool drops them.
 DIRECTORY_DROPPED_KEYS: Dict[str, Tuple[str, ...]] = {"tr_resmi_gazete_getir": ("ek_okuma",)}
+
+# The OpenAI (ChatGPT) plugin directory listing points here. Same server and tools as /mcp,
+# except what OpenAI's submission rules do not allow: no tool input may ask for a precise
+# location (coordinates, a street address, a geometry file), so the land-registry tools that
+# take one stay on /mcp and parcels are found by province, district, neighbourhood, block and
+# parcel number. Views follow ChatGPT, which opens every view-bearing call as a new card:
+# only the desk and the answer hand-over carry the desk view, every other tool answers in text.
+OPENAI_PATH = "/openai/mcp"
+OPENAI_DOMAIN = "https://arthurlegal-mcp.fly.dev"   # the views' own origin (MCP Apps ui.domain)
+OPENAI_EXCLUDED_TOOLS = frozenset((
+    "tkgm_konumdan_parsel", "tkgm_yer_bul", "tkgm_koordinat_donustur", "tkgm_koridor_kesisim", "tkgm_parsel_oku",
+    "tr_resmi_gazete_ek_sayfa",
+))
+# Inputs dropped from tools that otherwise stay: free text that may carry a coordinate or an
+# address. The schema loses them and the handler ignores them if a client sends them anyway.
+OPENAI_STRIPPED_INPUTS: Dict[str, Tuple[str, ...]] = {
+    "tkgm_parsel_sorgula": ("metin",), "tkgm_parsel_raporu": ("metin",), "tkgm_baglanti": ("enlem", "boylam"),
+}
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Deployed bundle: every backend sits next to this file.
@@ -989,6 +1007,100 @@ def build_directory() -> Tuple[List[Tool], str, List[Resource]]:
     return tools, DIRECTORY_INSTRUCTIONS_HEADER + "\n\n" + "\n\n".join(sections), list(_resources)
 
 
+# OpenAI profile header. ChatGPT reads the first 512 characters most closely, so they carry
+# the desk trigger and the citation rule on their own; the rest describes the tools. Host
+# neutral: no client name, no model advice (ChatGPT models are not measured yet).
+OPENAI_INSTRUCTIONS_HEADER = """ArthurLegal: legal research for lawyers in Türkiye, twelve jurisdictions behind one endpoint. If the user says "ArthurLegal Masası'nı aç", "masayı aç" or names a desk module, call al_masasi. Before writing any Turkish statutory article, fetch it with tr_mevzuat_madde_getir and quote its `citation` verbatim; never cite from memory. If a source cannot be reached, write "UYARI: veri çekilemedi, teyidiniz gerekli: <official source URL>" and do not fill the gap.
+
+DESK. Once al_masasi has opened the desk in this chat, answer every later question this way: call al_masada_basla with the question, research, then deliver the full answer with al_masaya_yaz; in the chat write only "Cevap masada." The desk checks the article citations of the answer against the official text itself.
+
+TOOL PREFIXES. Each tool name starts with the jurisdiction or source it answers for:
+`tr_` Türkiye (case law, legislation, Constitutional Court, Official Gazette, eight regulators, a local semantic archive) · `nl_` Netherlands · `pl_` Poland · `at_` Austria · `ie_` Ireland · `fi_` Finland · `es_` Spain · `uk_` United Kingdom · `eu_` EU law (CELLAR) · `jp_` Japan · `az_` Azerbaijan · `de_` Germany · `gleif_` legal-entity identity (LEI) · `scholar_` open-access legal scholarship · `contracts_` petroleum and mining contracts · `tkgm_` Turkish land registry (parcel by province, district, neighbourhood, block and parcel; the first live call returns a consent card) · `hesap_` Turkish fee and interest calculators (the code computes; quote the freshness line as returned).
+The prefix is part of the meaning: `get_act` is a different operation in different jurisdictions.
+
+UNAVAILABLE SOURCES. An error (`error`, `error_code`) or a result marked `unavailable` / `upstream_blocked` means the answer is missing, not that no such law or decision exists. `status` shows which jurisdictions are loaded.
+
+ENTRY POINTS. `tr_hukuk_arastirma_rehberi` maps Turkish research questions to the right tools; `tr_kurum_listesi` lists the regulators and their filters.
+
+Each section below describes one jurisdiction's sources and citation conventions."""
+
+OPENAI_MODULES = dict(REMOTE_MODULES)
+
+
+def _openai_schema(name: str, schema: Dict[str, Any]) -> Dict[str, Any]:
+    drop = OPENAI_STRIPPED_INPUTS.get(name)
+    if not drop:
+        return schema
+    out = json.loads(json.dumps(schema))
+    for key in drop:
+        (out.get("properties") or {}).pop(key, None)
+    if isinstance(out.get("required"), list):
+        out["required"] = [r for r in out["required"] if r not in drop]
+    return out
+
+
+def _openai_handler(name: str, handler: Callable[[Dict[str, Any]], Any]) -> Callable[[Dict[str, Any]], Any]:
+    handler = _directory_handler(name, handler)   # the gazette reader drops its pointer to the annex tool
+    drop = OPENAI_STRIPPED_INPUTS.get(name)
+    if not drop:
+        return handler
+
+    def without(args: Dict[str, Any]) -> Any:
+        return handler({k: v for k, v in (args or {}).items() if k not in drop})
+    return without
+
+
+def build_openai() -> Tuple[List[Tool], str, List[Resource]]:
+    """Tools, instructions and views for OPENAI_PATH. Call after build()."""
+    tools = [Tool(t.name, t.description, _openai_schema(t.name, t.input_schema), _openai_handler(t.name, t.handler),
+                  title=t.title, annotations=t.annotations)
+             for t in _tools
+             if t.name not in ("status", "al_masasi", "al_masaya_yaz", "al_masada_basla")
+             and t.name not in OPENAI_EXCLUDED_TOOLS]
+    main_status = next(t for t in _tools if t.name == "status")
+    status = Tool("status", main_status.description, main_status.input_schema,
+                  lambda args: _status((), exposed=len(tools)))
+    annotate(status)
+    tools.append(status)
+    views: List[Resource] = []
+    web = getattr(al_arayuz, "CHATGPT_WEB", None) if al_arayuz is not None else None
+    if web is not None and any(t.name == "al_masasi" for t in _tools):
+        able = [t.name for t in tools if t.name in MASA_TOOLS] + ["al_masaya_yaz", "al_masada_basla"]
+
+        def desk_state(args: Dict[str, Any]) -> Dict[str, Any]:
+            return al_arayuz.masa_cevabi("uzak", able, OPENAI_MODULES, args.get("bolum"), args.get("baglayicilar"),
+                                         dil=args.get("dil"), ev=web)
+        tanim = al_arayuz.masa_araci("openai")
+        tools.append(Tool(tanim["name"], tanim["description"], tanim["inputSchema"], desk_state,
+                          meta=al_arayuz.arac_meta("al_masasi", web)))
+
+        def hand_over(args: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                return al_arayuz.teslim_cevabi(args, desk_state({}))
+            except al_arayuz.TeslimHatasi as exc:
+                raise McpError(str(exc)) from None
+        tanim = al_arayuz.teslim_araci()
+        tools.append(Tool(tanim["name"], tanim["description"], tanim["inputSchema"], hand_over,
+                          meta=al_arayuz.arac_meta("al_masaya_yaz", web)))
+
+        def start(args: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                return al_arayuz.baslangic_cevabi(args, desk_state({}))
+            except al_arayuz.TeslimHatasi as exc:
+                raise McpError(str(exc)) from None
+        tanim = al_arayuz.baslangic_araci()
+        tanim["inputSchema"]["properties"].pop("model", None)   # ChatGPT models are not measured (K7)
+        tools.append(Tool(tanim["name"], tanim["description"], tanim["inputSchema"], start,
+                          meta=al_arayuz.arac_meta("al_masada_basla", web)))
+        for t in tools[-3:]:
+            annotate(t)
+        for k in al_arayuz.kaynaklar(OPENAI_DOMAIN):
+            views.append(Resource(k["uri"], k["name"], k["text"], mime_type=k["mimeType"],
+                                  description=k["description"], meta=k["_meta"]))
+    sections = [_directory_section(prefix, text) for prefix, text in _instruction_parts]
+    return tools, OPENAI_INSTRUCTIONS_HEADER + "\n\n" + "\n\n".join(sections), views
+
+
 if __name__ == "__main__":
     build()
     _warm_resident()
@@ -1003,7 +1115,11 @@ if __name__ == "__main__":
     sys.stderr.write("\n")
     directory = Dispatcher(directory_tools, name="arthurlegal-mcp", version=__version__,
                            instructions=directory_text, resources=directory_views)
-    routes = {DIRECTORY_PATH: directory}
+    openai_tools, openai_text, openai_views = build_openai()
+    sys.stderr.write("arthurlegal-mcp: %s: %d araç\n" % (OPENAI_PATH, len(openai_tools)))
+    openai = Dispatcher(openai_tools, name="arthurlegal-mcp", version=__version__,
+                        instructions=openai_text, resources=openai_views)
+    routes = {DIRECTORY_PATH: directory, OPENAI_PATH: openai}
     # Denetim logu yalnız ayrı test uygulamasında açılır (README: "Denetim logu"). AUDIT_LOG=1
     # değilken bu blok hiç çalışmaz: araçlar sarılmaz, oturum kimliği verilmez, yanıtlar aynı
     # kalır. Canlı uygulamada AUDIT_LOG=1 yok sayılır. Açıkken dizin yolu sunulmaz: oradaki

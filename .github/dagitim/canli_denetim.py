@@ -20,10 +20,11 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.request
 
 KOK = os.environ.get("CANLI_KOK", "https://arthurlegal-mcp.fly.dev")
-UCLAR = ("/mcp", "/directory/mcp")
+UCLAR = ("/mcp", "/directory/mcp", "/openai/mcp")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -71,9 +72,16 @@ def _dene(islev, kez: int = 6, bekle: int = 20):
 
 
 def olc() -> dict[str, int]:
+    """Her ucun araç sayısı. Henüz açılmamış uç (404: bu dağıtımla ilk kez gelen profil) ölçülmez; dağıtımdan sonra
+    yine yoksa karsilastir onu boş liste sayar."""
     sayilar = {}
     for yol in UCLAR:
-        oturum = _baglan(yol)
+        try:
+            oturum = _baglan(yol)
+        except urllib.error.HTTPError as hata:
+            if hata.code == 404:
+                continue
+            raise
         sayilar[yol] = len(_sonuc(yol, oturum, "tools/list")["tools"])
     return sayilar
 
