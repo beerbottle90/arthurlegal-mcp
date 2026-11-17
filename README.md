@@ -17,7 +17,9 @@ Official Gazette annex page reader `tr_resmi_gazete_ek_sayfa` and the desk hand-
 `al_masaya_yaz`. See
 [Claude connector directory](#claude-connector-directory).
 
-A third profile for the OpenAI (ChatGPT) plugin directory answers at `/openai/mcp` (in preparation, not listed yet):
+ArthurLegal's installer (v3.4.0 and later) connects the ChatGPT desktop app through the local `arthurlegal-yerel`
+server, which bridges `/mcp`. A third profile for the OpenAI (ChatGPT) plugin directory, for ChatGPT on the web and on
+a phone, answers at `/openai/mcp` (not listed in the directory yet):
 the tools of `/mcp` except those that take a precise location (`tkgm_konumdan_parsel`, `tkgm_yer_bul`,
 `tkgm_koordinat_donustur`, `tkgm_koridor_kesisim`, `tkgm_parsel_oku`; the free-text and coordinate inputs of
 `tkgm_parsel_sorgula`, `tkgm_parsel_raporu` and `tkgm_baglanti` are dropped) and the annex page reader. Parcels are
