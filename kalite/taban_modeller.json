@@ -1,0 +1,33 @@
+{
+  "aciklama": "Model bekçisinin tabanı: önceki koşu kaydı (Actions önbelleği) yoksa bununla karşılaştırılır. Kaynak: https://platform.claude.com/docs/en/models/overview.md, 18.11.2026.",
+  "tarih": "2026-11-18",
+  "guncel": [
+    "claude-fable-5-2",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-haiku-5-5"
+  ],
+  "modeller": {
+    "Claude Fable 5.2": "aktif",
+    "Claude Opus 5.5": "aktif",
+    "Claude Sonnet 5.5": "aktif",
+    "Claude Haiku 5.5": "aktif",
+    "Claude Mythos 5.2": "sınırlı erişim",
+    "Claude Fable 5.1": "aktif",
+    "Claude Mythos 5.1": "sınırlı erişim",
+    "Claude Fable 5": "aktif",
+    "Claude Mythos 5": "sınırlı erişim",
+    "Claude Opus 5": "aktif",
+    "Claude Opus 4.8": "aktif",
+    "Claude Opus 4.7": "aktif",
+    "Claude Opus 4.6": "aktif",
+    "Claude Opus 4.5": "aktif",
+    "Claude Opus 4.1": "emekli",
+    "Claude Opus 4": "emekli",
+    "Claude Sonnet 5": "aktif",
+    "Claude Sonnet 4.6": "aktif",
+    "Claude Sonnet 4.5": "aktif",
+    "Claude Sonnet 4": "emekli",
+    "Claude Haiku 4.5": "aktif"
+  }
+}
