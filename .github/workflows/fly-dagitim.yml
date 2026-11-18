@@ -18,6 +18,12 @@
 # taşır (gh-<commit>-ek-<veri>): aynı koda yeni veriyle yapılan dağıtım ayrı etiket alır. Kurum kararı taraması
 # (kurum-taramasi.yml) yeni ek yazınca bu işi workflow_dispatch ile başlatır. Canlı denetim yerel indekslerin
 # belge sayısının düşmediğine de bakar.
+#
+# Arama doğruluğu kapısı (kalite süreci 1): derlemeden önce TR arka ucu bu commit'in koduyla bu makinede açılır
+# ve arthur-tr-hukuk-mcp/arama_dogrulugu.py cevabı bilinen sorularda beklenen karar ve maddelerin ilk sıralarda
+# geldiğini ölçer. Kaynak cevap verdi ama beklenen kayıt yoksa (KALDI) dağıtım başlamaz, canlı uç değişmez ve issue
+# açılır; kaynak o an cevap vermediyse (ERISIM) uyarı yazılır, dağıtım sürer. Bilerek geçmek için elle koşuda
+# "arama_kabul" alanına gerekçe yazılır. Sır almaz.
 
 name: Fly dağıtımı
 
@@ -41,6 +47,10 @@ on:
         description: "Bir indeksin belge sayısı bilerek azaldı (denetim düşüşü hata saymasın)"
         type: boolean
         default: false
+      arama_kabul:
+        description: "Arama doğruluk testi düşse de dağıt: gerekçe yazın (boş = kapı kapalı)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -82,6 +92,43 @@ jobs:
         if: steps.son.outputs.atla != '1'
         with:
           python-version: "3.11" # Dockerfile: python:3.11-slim
+
+      # Sır almaz: bu commit'in TR arka ucunu 127.0.0.1'de açar, bilinen sorularda sıralamayı ölçer.
+      - name: Arama doğruluğu (dağıtım kapısı)
+        id: arama
+        if: steps.son.outputs.atla != '1'
+        working-directory: arthur-tr-hukuk-mcp
+        env:
+          KABUL: ${{ inputs.arama_kabul }}
+        run: |
+          pip install --quiet "pypdf==6.21.4"
+          python server.py --transport http --host 127.0.0.1 --port 8000 > "$RUNNER_TEMP/arama-sunucu.log" 2>&1 &
+          hazir=0
+          for i in $(seq 1 30); do
+            if python -c "import socket; socket.create_connection(('127.0.0.1', 8000), 1)" 2>/dev/null; then hazir=1; break; fi
+            sleep 1
+          done
+          if [ "$hazir" -ne 1 ]; then echo "TR arka ucu 30 sn içinde açılmadı"; tail -50 "$RUNNER_TEMP/arama-sunucu.log"; exit 1; fi
+          set +e
+          python arama_dogrulugu.py --url http://127.0.0.1:8000/mcp --json "$RUNNER_TEMP/arama.json"
+          kod=$?
+          set -e
+          {
+            echo "## Arama doğruluğu (dağıtım kapısı)"
+            echo
+            echo '```json'
+            cat "$RUNNER_TEMP/arama.json" 2>/dev/null || echo "sonuç dosyası yok"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$kod" -eq 2 ]; then
+            echo "::warning::Arama doğruluğu ölçülemedi: kaynak o an cevap vermedi. Dağıtım sürüyor."
+            exit 0
+          fi
+          if [ "$kod" -ne 0 ] && [ -n "$KABUL" ]; then
+            echo "::warning::Arama doğruluk testi düştü, gerekçeyle geçildi: $KABUL"
+            exit 0
+          fi
+          exit $kod
 
       # Sır almaz: yalnız veri dalından ek dosyalarını getirir ve denetler.
       - name: İndeks ekleri (veri/ek dalı)
@@ -154,8 +201,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
           GERI: ${{ steps.geri.outcome }}
           SAGLIK: ${{ steps.saglik.outcome }}
+          ARAMA: ${{ steps.arama.outcome }}
           KOSU: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          if [ "$ARAMA" = "failure" ]; then
+            gh issue create --title "Fly dağıtımı durdu: arama doğruluğu (${SHA::7})" \
+              --body "$(printf 'Commit %s dağıtılmadı: arama doğruluk testi (bilinen sorularda beklenen karar ya da madde ilk sıralarda) düştü. Canlı uç değişmedi.\n\nAyrıntı koşu özetinde. Düzeltip yeniden birleştirin; bilerek dağıtmak için Actions > Fly dağıtımı > Run workflow, arama_kabul alanına gerekçe.\n\nKoşu: %s' "$SHA" "$KOSU")"
+            exit 0
+          fi
           case "$GERI/$SAGLIK" in
             success/success) durum="Önceki imaja dönüldü ve canlı uç cevap veriyor." ;;
             success/*) durum="Önceki imaja dönüldü ama canlı uç denetimi tutmadı: elle bakılmalı." ;;
