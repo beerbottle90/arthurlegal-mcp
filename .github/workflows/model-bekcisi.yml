@@ -1,0 +1,69 @@
+# Model ve platform bekçisi (kalite süreci 8).
+#
+# Her Pazartesi dört resmî sayfayı okur ve önceki koşuyla karşılaştırır: Claude model listesi
+# (platform.claude.com), Claude uygulamaları sürüm notları (Claude Desktop dahil, support.claude.com), ChatGPT
+# sürüm notları (help.openai.com; yalnız model, masaüstü, MCP, bağlayıcı, eklenti kayıtları) ve ChatGPT uygulama
+# (MCP) değişiklik günlüğü (developers.openai.com). Her değişiklik için "Model/platform değişikliği: …" başlıklı bir
+# issue açar (aylık durum e-postası başlıktan okur; aynı başlıklı issue varsa yenisi açılmaz). Ayrıntı:
+# kalite/model_bekcisi.py.
+#
+# Önceki koşunun kaydı Actions önbelleğinde (.bekci/model-platform.json). Önbellek silinirse model listesi depodaki
+# tabanla (kalite/taban_modeller.json), sürüm notları son 8 günle karşılaştırılır. Sayfa okunamazsa sessiz geçmez:
+# "Model/platform bekçisi uyarısı: …" issue'su ve Actions uyarısı; o kaynağın önceki kaydı korunur.
+# Kısa tanıtım, istek arası en az 2 sn, koşu başına 4 sayfa. Sır kullanmaz. Dallarda yalnız dener: issue açmaz,
+# kaydı yazmaz.
+
+name: Model ve platform bekçisi
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # her Pazartesi 06.00 UTC (09.00 TSİ), aylık bakım saatinden (10.00) önce
+  workflow_dispatch:
+  push:
+    branches-ignore: [master]
+    paths:
+      - ".github/workflows/model-bekcisi.yml"
+      - "kalite/ortak.py"
+      - "kalite/model_bekcisi.py"
+      - "kalite/taban_modeller.json"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: model-bekcisi-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  izle:
+    name: Model listesi ve sürüm notları
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11" # Dockerfile: python:3.11-slim
+
+      - name: Önceki koşunun kaydı
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .bekci
+          key: model-bekcisi-${{ github.run_id }}
+          restore-keys: model-bekcisi-
+
+      - name: Oku, karşılaştır, issue aç
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KURU: ${{ github.ref != 'refs/heads/master' && '--kuru' || '' }}
+        run: python kalite/model_bekcisi.py --durum .bekci/model-platform.json $KURU
+
+      - name: Kaydı sakla
+        if: github.ref == 'refs/heads/master'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .bekci
+          key: model-bekcisi-${{ github.run_id }}

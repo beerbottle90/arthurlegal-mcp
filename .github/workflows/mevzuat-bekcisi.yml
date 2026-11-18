@@ -1,0 +1,83 @@
+# Mevzuat bekçisi (kalite süreci 7).
+#
+# Her Pazartesi Resmî Gazete'nin son 7 günlük fihristini (mükerrer dahil) tarar; kanun, Cumhurbaşkanlığı
+# kararnamesi, Cumhurbaşkanı kararı, yönetmelik ve içtihadı birleştirme kararlarını seçer, metinlerinden dokunulan
+# mevzuatı çıkarır ve beerbottle90/ArthurLegal paketlerinde (ArthurLegal-*-Public-Release/knowledge/) o mevzuata
+# atıf yapan rehberleri listeler. Her değişiklik için "Mevzuat değişikliği: …" başlıklı bir issue açar (aylık
+# durum e-postası başlıktan okur; aynı başlıklı issue varsa yenisi açılmaz). Ayrıntı: kalite/mevzuat_bekcisi.py.
+#
+# Resmî Gazete'ye ulaşılamaz ya da paketler okunamazsa "Mevzuat bekçisi uyarısı: …" issue'su ve Actions uyarısı.
+# İstekler nazik: kısa tanıtım, istek arası en az 1,5 sn, koşu başına en çok 80 istek. Sır kullanmaz; paketler
+# public depodan salt okunur çekilir. Dallarda yalnız dener (issue açmaz). Kaçan haftayı kapatmak için elle
+# çalıştırırken `gun` en çok 14.
+
+name: Mevzuat bekçisi
+
+on:
+  schedule:
+    - cron: "30 5 * * 1" # her Pazartesi 05.30 UTC (08.30 TSİ), aylık bakım saatinden (10.00) önce
+  workflow_dispatch:
+    inputs:
+      gun:
+        description: "Bugün dahil kaç gün geriye bakılsın (1-14)"
+        required: false
+        default: "7"
+  push:
+    branches-ignore: [master]
+    paths:
+      - ".github/workflows/mevzuat-bekcisi.yml"
+      - "kalite/ortak.py"
+      - "kalite/mevzuat_bekcisi.py"
+      - "kalite/kanunlar.json"
+      - "hesap-mcp/tazelik.py"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: mevzuat-bekcisi-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tara:
+    name: Resmî Gazete ve paket rehberleri
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: ArthurLegal paketleri (yalnız knowledge/)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: beerbottle90/ArthurLegal
+          ref: main
+          path: al-paketler
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /ArthurLegal-*-Public-Release/knowledge/
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11" # Dockerfile: python:3.11-slim
+
+      - name: PDF okuyucu (kararname ve karar metinleri; sürüm testlerle aynı)
+        run: pip install "pypdf==6.21.4"
+
+      - name: Tara ve issue aç
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GUN: ${{ github.event.inputs.gun || '7' }}
+          KURU: ${{ github.ref != 'refs/heads/master' && '--kuru' || '' }}
+        run: python kalite/mevzuat_bekcisi.py --paketler al-paketler --gun "$GUN" --cikti .bekci/mevzuat.json $KURU
+
+      - name: Sonucu sakla (35 gün; issue'ya sığmayan tam rehber listesi)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mevzuat-bekcisi-sonuc
+          path: .bekci/mevzuat.json
+          retention-days: 35
+          if-no-files-found: ignore
