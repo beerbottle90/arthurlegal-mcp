@@ -1,0 +1,69 @@
+{
+  "aciklama": "Arama doğruluk testinin kalemleri (arama_dogrulugu.py). Her kalem: bir araç çağrısı ve ilk_n sonuçta görünmesi gereken kayıtlar; en_az kadarı görünmezse kalem KALDI. Beklenen her kayıt, sonuçtaki bir satırın alanlarıyla birebir eşleşmelidir (büyük/küçük harf ve boşluk farkı yok sayılır). Beklenen kayıt yalnız insanın doğruladığı ya da başlığından nesnel olarak anlaşılan kayıttır; ezberden yazılmaz. Yeni kalem önce canlı ölçülür, 'olcum' alanına tarih ve sıra yazılır. Arama sırasından doğan her hata düzeltmesi en az bir kalem ekler.",
+  "kalemler": [
+    {
+      "id": "ictihat-haciz-takas",
+      "arac": "ictihat_ara",
+      "argumanlar": {"query": "dosya alacağına haciz takas"},
+      "ilk_n": 10,
+      "en_az": 2,
+      "beklenen": [
+        {"chamber": "8. Hukuk Dairesi", "esas_no": "2014/14976"},
+        {"chamber": "8. Hukuk Dairesi", "esas_no": "2014/27629"},
+        {"chamber": "8. Hukuk Dairesi", "esas_no": "2017/10953"}
+      ],
+      "kaynak": "mcp #70: içtihat araması kaynağa tarihe göre sıralatıyordu; konuyu çözen kararlar ilk 10'a girmiyordu.",
+      "olcum": "2026-11-18: sıralar 2, 3, 4. Karşı deneme sort=yeni: üçü de ilk 10'da yok."
+    },
+    {
+      "id": "ictihat-esas-no",
+      "arac": "ictihat_ara",
+      "argumanlar": {"query": "2014 14976", "chamber": "H8"},
+      "ilk_n": 3,
+      "en_az": 1,
+      "beklenen": [{"chamber": "8. Hukuk Dairesi", "esas_no": "2014/14976"}],
+      "kaynak": "Esas numarasıyla bulma ve daire kodu (mcp #70).",
+      "olcum": "2026-11-18: sıra 2 (1. sırada karar no'su aynı olan başka karar)."
+    },
+    {
+      "id": "mevzuat-smk-120",
+      "arac": "mevzuat_icinde_ara",
+      "argumanlar": {"number": "6769", "query": "çalışan önalım hakkı"},
+      "ilk_n": 3,
+      "en_az": 1,
+      "beklenen": [{"madde_no": "120"}],
+      "kaynak": "Mevzuat içi arama terim sayılarını topluyor, nadir terimi gömüyordu; başlığı eşleşen madde öne gelmeli.",
+      "olcum": "2026-11-18: sıra 1, başlık 'Çalışanın önalım hakkı'."
+    },
+    {
+      "id": "mevzuat-tbk-344",
+      "arac": "mevzuat_icinde_ara",
+      "argumanlar": {"number": "6098", "query": "kira bedelinin belirlenmesi"},
+      "ilk_n": 3,
+      "en_az": 1,
+      "beklenen": [{"madde_no": "344"}],
+      "kaynak": "Başlık eşleşmesi: TBK m.344 kira bedelinin belirlenmesi.",
+      "olcum": "2026-11-18: sıra 1, başlık 'II. BELİRLENMESİ'."
+    },
+    {
+      "id": "mevzuat-iik-72",
+      "arac": "mevzuat_icinde_ara",
+      "argumanlar": {"number": "2004", "query": "menfi tespit ve istirdat davaları"},
+      "ilk_n": 3,
+      "en_az": 1,
+      "beklenen": [{"madde_no": "72"}],
+      "kaynak": "Başlık eşleşmesi: İİK m.72 menfi tespit ve istirdat davaları.",
+      "olcum": "2026-11-18: sıra 1, başlık 'Menfi tesbit ve istirdat davaları'."
+    },
+    {
+      "id": "mevzuat-hmk-389",
+      "arac": "mevzuat_icinde_ara",
+      "argumanlar": {"number": "6100", "query": "ihtiyati tedbir şartları"},
+      "ilk_n": 3,
+      "en_az": 1,
+      "beklenen": [{"madde_no": "389"}],
+      "kaynak": "Başlık eşleşmesi: HMK m.389 ihtiyati tedbirin şartları.",
+      "olcum": "2026-11-18: sıra 1, başlık 'İhtiyati tedbirin şartları'."
+    }
+  ]
+}

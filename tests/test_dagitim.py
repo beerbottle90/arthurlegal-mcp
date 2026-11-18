@@ -341,5 +341,36 @@ class ScanWorkflowTest(unittest.TestCase):
         self.assertIn('"!veri/**"', _akis(os.path.join(ROOT, ".github", "workflows", "testler.yml")))
 
 
+class SearchAccuracyGateTest(unittest.TestCase):
+    """Arama doğruluğu kapısı (kalite süreci 1): derlemeden önce, sırsız; düşerse dağıtım başlamaz."""
+
+    def _kapi(self) -> str:
+        return next(a for a in _adimlar(_akis()) if "arama_dogrulugu.py" in a)
+
+    def test_gate_runs_before_the_build_and_before_the_rollback_point(self) -> None:
+        metin = _akis()
+        self.assertLess(metin.index("arama_dogrulugu.py"), metin.index("bash .github/dagitim/dagit.sh"))
+        self.assertLess(metin.index("arama_dogrulugu.py"), metin.index("canli_denetim.py olc"))
+
+    def test_gate_has_no_secret(self) -> None:
+        kapi = self._kapi()
+        self.assertNotIn("secrets.", kapi)
+        self.assertNotIn("FLY_API_TOKEN", kapi)
+
+    def test_only_unreachable_source_or_a_written_reason_lets_it_pass(self) -> None:
+        kapi = self._kapi()
+        self.assertIn('if [ "$kod" -eq 2 ]', kapi)
+        self.assertIn('[ -n "$KABUL" ]', kapi)
+        self.assertIn("exit $kod", kapi)
+        self.assertIn("KABUL: ${{ inputs.arama_kabul }}", kapi)
+
+    def test_daily_workflow_is_pinned_and_secretless(self) -> None:
+        metin = _akis(os.path.join(ROOT, ".github", "workflows", "arama-dogrulugu.yml"))
+        for satir in re.findall(r"uses:\s*(\S+)", metin):
+            self.assertRegex(satir, r"@[0-9a-f]{40}$")
+        self.assertNotIn("secrets.", metin)
+        self.assertIn("python arama_dogrulugu.py", metin)
+
+
 if __name__ == "__main__":
     unittest.main()
