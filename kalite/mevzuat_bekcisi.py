@@ -15,6 +15,7 @@ rehberleri listeler. Her değişiklik için bir issue açar; başlık "Mevzuat d
 e-postası başlıktan okur). Aynı başlıklı issue (açık ya da kapalı) varsa yenisi açılmaz.
 
 * Kanun, kararname ve içtihadı birleştirme kararı her zaman issue açar (rehber eşleşmese de: yeni konu olabilir).
+  İstisna: uluslararası anlaşmanın onaylanmasını uygun bulan kanunlar yalnız rehber eşleşirse.
 * Yönetmelik ve Cumhurbaşkanı kararı yalnız bir rehber eşleşirse issue açar. Yere özgü kararlar (acele
   kamulaştırma, özelleştirme, sit alanı, "… İli, … İlçesinde"), üniversite yönetmelikleri `GURULTU` ile elenir
   ve yalnız koşu özetinde sayılır.
@@ -98,6 +99,8 @@ TURLER: Dict[str, Dict[str, Any]] = {
                   "her_zaman": False, "sira": 4},
 }
 IBK = re.compile(r"ictiha[dt]\w* birlestirme")
+# Uluslararası anlaşmanın onayını uygun bulan kanunlar rehberlere nadiren dokunur: yalnız rehber eşleşirse issue.
+UYGUN_BULMA = re.compile(r"onaylanmasinin uygun bulundugu")
 # Yere ya da kuruma özgü, rehberleri etkilemeyen yayımlar (katlanmış başlıkta). Elenenler özette sayılır.
 GURULTU = re.compile(
     r"kamulastir|ozellestirme idaresi|arazi toplulastirma|universitesi|"
@@ -149,14 +152,14 @@ def tara(gunler: List[date], getir: Callable[..., Tuple[int, bytes]]) -> Dict[st
     """Günlerin fihristleri (mükerrer dahil). Hata o günü 'hata' yapar, diğer günler sürer."""
     kayit: Dict[str, Dict[str, Any]] = {}
     kalemler: List[Dict[str, Any]] = []
-    hatalar: List[str] = []
-    for g in gunler:
+
+    def oku(g: date) -> None:
         url = tz.gun_url(g)
         try:
             durum, govde = getir(url, FIHRIST_ZAMAN_ASIMI)
             if durum == 404:
                 kayit[g.isoformat()] = {"durum": "yok", "url": url}
-                continue
+                return
             if durum != 200:
                 raise ortak.ErisimHatasi("HTTP %d: %s" % (durum, url))
             f = fihrist(tz._coz(govde), url, g)
@@ -169,12 +172,18 @@ def tara(gunler: List[date], getir: Callable[..., Tuple[int, bytes]]) -> Dict[st
                 hepsi += [dict(k, mukerrer=n) for k in fihrist(tz._coz(g2), murl, g)["kalemler"]]
             for k in hepsi:
                 k.update(tarih=g.isoformat(), sayi=f["sayi"])
-            kalemler += hepsi
+            kalemler.extend(hepsi)
             kayit[g.isoformat()] = {"durum": "tamam", "sayi": f["sayi"], "mukerrerler": f["mukerrerler"],
                                     "kalem": len(hepsi), "url": url}
         except (ortak.ErisimHatasi, tz.ErisimHatasi) as exc:
             kayit[g.isoformat()] = {"durum": "hata", "neden": str(exc), "url": url}
-            hatalar.append("%s: %s" % (ortak.tr_tarih(g.isoformat()), exc))
+
+    for g in gunler:
+        oku(g)
+    for g in gunler:                                  # zaman aşımı çoğu kez geçicidir: sonda bir kez daha
+        if kayit[g.isoformat()]["durum"] == "hata" and not (hasattr(getir, "neden") and getir.neden()):
+            oku(g)
+    hatalar = ["%s: %s" % (ortak.tr_tarih(g), k["neden"]) for g, k in sorted(kayit.items()) if k["durum"] == "hata"]
     if kayit and all(k["durum"] == "yok" for k in kayit.values()):
         hatalar.append("Taranan günlerin hiçbirinde Resmî Gazete fihristi bulunamadı (HTTP 404)")
     return {"gunler": kayit, "kalemler": kalemler, "hatalar": hatalar}
@@ -493,8 +502,11 @@ def issue_govdesi(k: Dict[str, Any]) -> str:
          "- Künye: %s" % _kunye(k),
          "- Başlık: %s" % k["baslik"],
          "- Metin: %s" % (k.get("url") or "-"),
-         "- Metin okuma: %s" % k.get("metin_durumu", "-"),
-         "", "## Dokunduğu mevzuat", ""]
+         "- Metin okuma: %s" % k.get("metin_durumu", "-")]
+    if k["rehberler"] and all(d["nasil"] == "atıf (dayanak)" for d in k["dokunulan"] if d.get("rehber")):
+        s.append("- Eşleşme yalnız dayanak kanunundan: düzenleme rehberlerdeki konuya dokunmuyor olabilir, önce "
+                 "başlığa bakın.")
+    s += ["", "## Dokunduğu mevzuat", ""]
     if k["dokunulan"]:
         for d in k["dokunulan"]:
             ad = "%s sayılı %s" % (d["no"], d["ad"]) if d["no"] else d["ad"]
@@ -580,7 +592,8 @@ def calis(bugun: date, gun: int, paketler: Paketler, getir: Callable[..., Tuple[
             metin, durum = metin_getir(k.get("url") or "", getir)
         k["metin_durumu"] = durum
         k.update(degerlendir(k, metin, paketler, tablo))
-        k["issue"] = TURLER[k["tur"]]["her_zaman"] or bool(k["rehberler"])
+        her_zaman = TURLER[k["tur"]]["her_zaman"] and not UYGUN_BULMA.search(katla(k["baslik"]))
+        k["issue"] = her_zaman or bool(k["rehberler"])
     return {"aralik": [gunler[0].isoformat(), gunler[-1].isoformat()], "gunler": tarama["gunler"],
             "hatalar": tarama["hatalar"], "secilen": secilen, "elenen": elenen,
             "paket_dosyasi": len(paketler.dosyalar), "istek": getattr(getir, "sayi", None)}

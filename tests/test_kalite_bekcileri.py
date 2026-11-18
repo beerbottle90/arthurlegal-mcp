@@ -296,6 +296,43 @@ class Akis(unittest.TestCase):
         uyari = [x for x in mb.adaylar(s, self.d.name) if x["tur"] == "uyari"]
         self.assertEqual([x["title"] for x in uyari], [mb.UYARI_TARAMA])
 
+    def test_zaman_asimi_sonda_bir_kez_daha_denenir(self):
+        sayac = {"n": 0}
+
+        def getir(url, zaman_asimi=10, **kw):
+            if url.endswith("/20250724.htm"):
+                sayac["n"] += 1
+                if sayac["n"] == 1:
+                    raise ortak.ErisimHatasi("URLError: timed out")
+                return 200, RG_GUN
+            return 404, b""
+        s, _ = _calis(getir, self.d.name, gun=2)
+        self.assertEqual(s["hatalar"], [])
+        self.assertEqual(s["gunler"]["2025-07-24"]["durum"], "tamam")
+        self.assertEqual(sayac["n"], 2)
+
+    def test_uygun_bulma_kanunu_eslesmezse_issue_yok(self):
+        g0 = date(2026, 11, 14)
+        sayfa = ("<html><body><p><b>14 Kasım 2026 Tarihli ve 33430 Sayılı Resmî Gazete</b></p><p><b>YASAMA BÖLÜMÜ</b>"
+                 "</p><p><b>KANUN</b></p><p><a href=\"20261114-1.htm\">7597 Türkiye Cumhuriyeti ile X Arasında Bir "
+                 "Anlaşmanın Onaylanmasının Uygun Bulunduğuna Dair Kanun</a></p><p><a href=\"20261114-2.htm\">7598 "
+                 "Hukuk Muhakemeleri Kanunu ile Bazı Kanunlarda Değişiklik Yapılmasına Dair Kanun</a></p>"
+                 "</body></html>").encode("cp1254")
+        s, _ = _calis(SahteGetirici({"/20261114.htm": (200, sayfa)}), self.d.name, bugun=g0)
+        sec = {k["baslik"][:4]: k for k in s["secilen"]}
+        self.assertFalse(sec["7597"]["issue"])
+        self.assertTrue(sec["7598"]["issue"])                 # metin okunamadı, başlıktaki adla HMK bulundu
+        self.assertIn("references/hmk-rehberi.md", sec["7598"]["rehberler"])
+
+    def test_yalniz_dayanak_eslesmesi_govdede_yazar(self):
+        g0 = date(2026, 11, 13)
+        sayfa = rg_sayfa(g0, [("YÖNETMELİKLER", "Diyaliz Merkezleri Hakkında Yönetmelik", "20261113-1.htm")])
+        metin = ("<html><body><p>Dayanak MADDE 2- 6183 sayılı Amme Alacaklarının Tahsil Usulü Hakkında Kanuna "
+                 "dayanılarak hazırlanmıştır.</p></body></html>").encode("cp1254")
+        s, _ = _calis(SahteGetirici({"/20261113.htm": (200, sayfa), "-1.htm": (200, metin)}), self.d.name, bugun=g0)
+        self.assertTrue(s["secilen"][0]["issue"])
+        self.assertIn("Eşleşme yalnız dayanak kanunundan", mb.issue_govdesi(s["secilen"][0]))
+
     def test_hepsi_404_hata(self):
         s, _ = _calis(SahteGetirici(), self.d.name, gun=3)
         self.assertTrue(s["hatalar"])
