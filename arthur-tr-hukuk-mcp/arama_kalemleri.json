@@ -26,6 +26,20 @@
       "olcum": "2026-11-18: sıra 2 (1. sırada karar no'su aynı olan başka karar)."
     },
     {
+      "id": "ictihat-ibk-tarih-isaret",
+      "arac": "ictihat_ara",
+      "argumanlar": {"query": "muris muvazaası 01.04.1974 1/2 içtihadı birleştirme"},
+      "ilk_n": 10,
+      "en_az": 2,
+      "beklenen": [
+        {"chamber": "11. Hukuk Dairesi", "esas_no": "2011/11969"},
+        {"chamber": "1. Hukuk Dairesi", "esas_no": "2012/11274"},
+        {"chamber": "1. Hukuk Dairesi", "esas_no": "2013/16686"}
+      ],
+      "kaynak": "TR 0.8.1: sorgudaki nokta ve eğik çizgi Bedesten'de 'Sadece harf ve rakam' doğrulama hatası veriyordu; işaretler artık boşluğa çevrilir. Üç kararın metni muris muvazaası bağlamında 01.04.1974 (ikisinde 01/04/1974) tarihli 1/2 sayılı İçtihadı Birleştirme Kararı'na atıf yapar (metinden okundu).",
+      "olcum": "2026-11-19: sıralar 1, 2, 3 (149 karar, her kelime zorunlu basamağı). Düzeltme öncesi aynı sorgu: Bedesten doğrulama hatası (HATA)."
+    },
+    {
       "id": "mevzuat-smk-120",
       "arac": "mevzuat_icinde_ara",
       "argumanlar": {"number": "6769", "query": "çalışan önalım hakkı"},

@@ -12,8 +12,9 @@ clear of it; a 429 pauses the bucket for the server's Retry-After.
 
 Search syntax accepted by ``phrase``: bare words (OR -- measured, see
 ``_ladder``), ``"tam cümle"``, ``+zorunlu``, ``-hariç``, ``AND``/``OR``/``NOT``.
-No wildcards. Only letters and digits: ``2014/27629`` is refused, ``2014 27629``
-is searched (see ``_ESAS``).
+No wildcards. Only letters, digits and a few query signs: ``2014/27629`` and
+``01.04.1974`` are refused, ``2014 27629`` and ``01 04 1974`` are searched (see
+``_temizle``).
 
 Ordering: Bedesten sorts by date only when a sort field is sent. Without one
 it answers in its own relevance order (see ``_SIRALAMA``), which is the default
@@ -32,6 +33,7 @@ from __future__ import annotations
 import base64
 import os
 import re
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
 from net import Http, HttpError, TokenBucket
@@ -111,11 +113,49 @@ _OPERATOR = re.compile(r'"|(?:^|\s)[+-]\S|\b(?:AND|OR|NOT)\b')
 _SIRALAMA = {"ilgi": None, "yeni": "desc", "eski": "asc", "desc": "desc", "asc": "asc"}
 _SIRALAMA_ADI = {None: "ilgi", "desc": "yeni", "asc": "eski"}
 
-# Bedesten refuses anything but letters and digits ("Sadece harf ve rakam içeren
-# aramalar yapılabilir"), so a docket number typed the way it is cited fails.
-_ESAS = re.compile(r"(?<!\d)(\d{4})/(\d{1,6})(?!\d)")
+# Bedesten refuses every query that holds a sign outside a short list ("Sadece harf
+# ve rakam içeren aramalar yapılabilir"), so a docket number, a date or an İBK
+# number typed the way it is cited fails. Measured 2026-11-19 (Yargıtay +
+# Danıştay), one request per sign: accepted are the letters of the Turkish and
+# English alphabets, digits, spaces and the query signs " + - ( ) ! & |; refused
+# are . / , ' ’ : ; ? * % § _ – “ ” and letters such as â and é. The index splits
+# on those signs, so a space in their place finds the same text: the phrase
+# "01 04 1974" -> 193 decisions, "+muris +muvazaası +01 +04 +1974" -> 169,
+# "+muris +muvazaası +01041974" -> 0.
+_HARFLER = frozenset("abcçdefgğhıijklmnoöprsştuüvyzqwx" "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZQWX")
+_KABUL = _HARFLER | frozenset('0123456789"+-()!&|')
+_TIRNAK = {"“": '"', "”": '"', "„": '"'}     # Word's quotes: the writer meant a phrase
 _TERIM = re.compile(r'([+-]?)("[^"]*"|\S+)')
+_OLDUGU_GIBI = "olduğu gibi"
 _LADDER_LABELS = {"ifade": "tam ifade", "hepsi": "kelimelerin hepsi", "herhangi": "kelimelerden herhangi biri"}
+
+
+def _temizle(phrase: str) -> Tuple[str, List[Tuple[str, str]]]:
+    """``phrase`` with every sign Bedesten refuses replaced, and what was replaced.
+
+    A refused sign becomes a space; a letter outside the alphabet loses its
+    accent (``zekâ`` -> ``zeka``); Word's curly quotes become straight ones. The
+    second value lists (sign, replacement) pairs in order of first appearance; it
+    is empty, and ``phrase`` is returned untouched, when nothing was refused.
+    """
+    out: List[str] = []
+    degisen: Dict[str, str] = {}
+    for ch in phrase:
+        if ch in _KABUL or ch.isspace():
+            out.append(ch)
+            continue
+        if ch in _TIRNAK:
+            yeni = _TIRNAK[ch]
+        elif unicodedata.combining(ch):
+            yeni = ""                      # a loose accent mark, e.g. the dot "İ".lower() leaves behind
+        else:
+            taban = "".join(c for c in unicodedata.normalize("NFD", ch) if not unicodedata.combining(c))
+            yeni = taban if taban and all(c in _HARFLER for c in taban) else " "
+        out.append(yeni)
+        degisen.setdefault(ch, yeni)
+    if not degisen:
+        return phrase, []
+    return " ".join("".join(out).split()), list(degisen.items())
 
 
 def _ladder(phrase: str, mode: str) -> List[Tuple[str, str]]:
@@ -129,16 +169,29 @@ def _ladder(phrase: str, mode: str) -> List[Tuple[str, str]]:
     plain multi-word query is tried as a phrase first and widened only when the
     stricter rung returns nothing -- the same precision-first ladder the local
     index uses.
+
+    ``hepsi`` is a request, not a starting point: it is the every-word rung alone.
+    Until 0.8.1 it fell through to the bare query when no decision held every
+    word, and "decisions with all four words" came back as 146,718 decisions with
+    any of them (measured 2026-11-19: ``yapay zeka performans fesih``, Yargıtay +
+    Danıştay + istinaf). Zero is the honest answer there; the default ``ifade``
+    ladder still widens, and says so in the response.
     """
     words = phrase.split()
     if mode == "herhangi" or len(words) < 2 or _OPERATOR.search(phrase):
-        return [(phrase, "olduğu gibi")]
-    steps: List[Tuple[str, str]] = []
-    if mode == "ifade":
-        steps.append(('"%s"' % phrase, _LADDER_LABELS["ifade"]))
-    steps.append((" ".join("+" + w for w in words), _LADDER_LABELS["hepsi"]))
-    steps.append((phrase, _LADDER_LABELS["herhangi"]))
-    return steps
+        return [(phrase, _OLDUGU_GIBI)]
+    hepsi = (" ".join("+" + w for w in words), _LADDER_LABELS["hepsi"])
+    if mode == "hepsi":
+        return [hepsi]
+    return [('"%s"' % phrase, _LADDER_LABELS["ifade"]), hepsi, (phrase, _LADDER_LABELS["herhangi"])]
+
+
+def _isaret_notu(degisen: List[Tuple[str, str]], phrase: str) -> str:
+    parcalar = ['"%s" -> %s' % (eski, "boşluk" if yeni == " " else '"%s"' % yeni if yeni else "silindi")
+                for eski, yeni in degisen]
+    return ("Bedesten yalnız harf, rakam ve arama işaretlerini (\" + - ( )) kabul eder; dizinde bu işaretler kelime "
+            "ayırıcıdır, boşluklu yazım aynı metni bulur. Çevrilenler: %s. Çevrilen sorgu: %s "
+            "(Bedesten'e giden biçim uygulanan_sorgu'da)." % (", ".join(parcalar), phrase))
 
 
 def _veya_onerisi(phrase: str) -> str:
@@ -163,8 +216,10 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
     phrase = (args.get("query") or "").strip()
     if not phrase:
         return {"error": "query gerekli. Örnek: 'lisans iptali \"hizmet kusuru\" -tazminat'"}
-    yazilan = phrase
-    phrase = _ESAS.sub(r"\1 \2", phrase)
+    phrase, degisen = _temizle(phrase)
+    if not phrase:
+        return {"error": "query yalnız Bedesten'in kabul etmediği işaretlerden oluşuyor (%s). Kelime ya da "
+                         "rakam yazın." % " ".join(eski for eski, _ in degisen)}
     sira = (args.get("sort") or "ilgi").strip().lower()
     if sira not in _SIRALAMA:
         return {"error": "sort: ilgi, yeni ya da eski."}
@@ -243,23 +298,40 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
             "İlgiye göre sıralı; eski tarihli karar öne çıkabilir. Güncel uygulama için aynı sorguyu "
             "sort='yeni' ile de çalıştırın." if not yon else
             "Tarihe göre sıralı: konuyu çözen karar ilk sayfada olmayabilir. Konu araması için sort='ilgi'.")
-    if phrase != yazilan:
-        out["sorgu_notu"] = ("Bedesten yalnız harf ve rakam kabul eder; esas/karar numarasındaki eğik çizgi "
-                             "boşluğa çevrildi: %s" % phrase)
+    if degisen:
+        out["sorgu_notu"] = _isaret_notu(degisen, phrase)
     oneri = _veya_onerisi(phrase)
     if oneri:
         out["onerilen_sorgu"] = oneri
         out["arama_notu"] = ("Tırnaklı ifadenin yanındaki işaretsiz terimleri Bedesten VEYA ile birleştirir; "
                              "toplam bu yüzden büyük olabilir. Hepsi geçsin istiyorsanız onerilen_sorgu'yu kullanın.")
-    if len(steps) > 1:
+    merdiven = steps[0][1] != _OLDUGU_GIBI
+    if merdiven or degisen:
         out["uygulanan_sorgu"] = data["phrase"]
+    if merdiven:
         out["arama_modu"] = tried[-1]["mod"]
         out["denenenler"] = tried
+    if merdiven and mode == "hepsi":
+        out["arama_notu"] = (
+            "Yalnız kelimelerin hepsini birlikte içeren kararlar arandı (kelime_modu='hepsi'); sonuç yoksa "
+            "VEYA'ya genişletilmez.")
+        if not out["total"]:
+            out["sonuc_notu"] = (
+                "Seçilen mahkemelerde bu kelimelerin hepsini birlikte içeren karar yok. Bu, konuda karar "
+                "olmadığını göstermez: kelime sayısını azaltın, eş anlamlısını ya da başka çekimini deneyin "
+                "(fesih/feshi, zekâ yerine zeka); kelimelerden herhangi birini içeren geniş tarama için "
+                "kelime_modu='herhangi'.")
+    elif merdiven:
         out["arama_notu"] = (
             "Tırnaksız çok kelimeli sorgu en dar biçimden başlanarak arandı. Bedesten "
             "çıplak kelimeleri VEYA ile birleştirir; tırnaksız arama milyonlarca ilgisiz "
-            "karar getirir. Değiştirmek için kelime_modu: 'hepsi' (her kelime geçsin) ya da "
+            "karar getirir. Değiştirmek için kelime_modu: 'hepsi' (her kelime geçsin, yoksa 0) ya da "
             "'herhangi' (Bedesten'in ham davranışı).")
+        if tried[-1]["mod"] == _LADDER_LABELS["herhangi"] and out["total"]:
+            out["genisleme_notu"] = (
+                "Hiçbir kararda bu kelimelerin hepsi birlikte geçmiyor; bu sonuçlar kelimelerden HERHANGİ "
+                "BİRİNİ içeren kararlardır ve toplam, konuyla ilgili karar sayısı değildir. Her kelime şart "
+                "olsun diye kelime_modu='hepsi' (sonuç yoksa 0 döner).")
     return out
 
 
@@ -321,9 +393,9 @@ def _http_error(exc: HttpError) -> Dict[str, Any]:
 SEARCH_SCHEMA = {
     "type": "object",
     "properties": {
-        "query": {"type": "string", "description": "Arama ifadesi. Tırnaksız çok kelime önce tam ifade olarak aranır (bkz. kelime_modu). \"tam cümle\", +zorunlu, -hariç, AND/OR/NOT olduğu gibi gönderilir; tırnaklı ifadenin yanındaki işaretsiz kelime VEYA ile birleşir, hepsi geçsin diye +\"ifade\" +kelime yazın. Joker yok. Esas ya da karar numarası: 2014 27629."},
+        "query": {"type": "string", "description": "Arama ifadesi. Tırnaksız çok kelime önce tam ifade olarak aranır (bkz. kelime_modu). \"tam cümle\", +zorunlu, -hariç, AND/OR/NOT olduğu gibi gönderilir; tırnaklı ifadenin yanındaki işaretsiz kelime VEYA ile birleşir, hepsi geçsin diye +\"ifade\" +kelime yazın. Joker yok. Nokta, eğik çizgi, kesme gibi işaretler boşluğa çevrilir (2014/27629 → 2014 27629, 01.04.1974 → 01 04 1974); gönderilen biçim uygulanan_sorgu'da."},
         "kelime_modu": {"type": "string", "enum": ["ifade", "hepsi", "herhangi"], "default": "ifade",
-                        "description": "Tırnaksız çok kelimeli sorgu: ifade = önce tam ifade, sonuç yoksa her kelime, o da yoksa herhangi biri; hepsi = her kelime geçsin; herhangi = Bedesten'in ham davranışı (VEYA, çok geniş)."},
+                        "description": "Tırnaksız çok kelimeli sorgu: ifade = önce tam ifade, sonuç yoksa her kelime, o da yoksa herhangi biri (yanıtta genisleme_notu); hepsi = yalnız her kelimenin geçtiği kararlar, yoksa 0 döner, VEYA'ya genişletilmez; herhangi = Bedesten'in ham davranışı (VEYA, çok geniş)."},
         "courts": {"type": "array", "items": {"type": "string", "enum": list(COURT_TYPES)},
                    "description": "Mahkeme türleri. Varsayılan: Yargıtay + Danıştay."},
         "chamber": {"type": "string", "description": "Daire/kurul kodu: H1-H23, C1-C23, HGK, CGK, D1-D17, IDDK, VDDK, IBK … veya tam Türkçe adı. Boş = tümü."},

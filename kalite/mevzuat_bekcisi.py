@@ -114,7 +114,11 @@ _HARF = "A-Za-zÇĞİÖŞÜçğıöşüÂâÎîÛû0-9"
 
 # --------------------------------------------------------------------------- fihrist
 def fihrist(metin: str, url: str, gun: date) -> Dict[str, Any]:
-    """tazelik.fihrist_ayristir + Yasama Bölümü'ndeki kanun kalemleri (numarayla başlar, "––" yok)."""
+    """tazelik.fihrist_ayristir + Yasama Bölümü'ndeki kanun kalemleri (numarayla başlar, "––" yok).
+
+    mcp #75'ten beri tazelik de kanunları okur; buradaki okuma yalnız onun kaçırdığı kalemi ekler (aynı URL iki kez
+    girmez), tazelik ileride yine kanun kaçırırsa bekçi körleşmesin diye durur.
+    """
     ana = tz.fihrist_ayristir(metin, url, gun)
     govde = re.sub(r"<script.*?</script>|<style.*?</style>", " ", metin or "", flags=re.S | re.I)
     bolum = ""

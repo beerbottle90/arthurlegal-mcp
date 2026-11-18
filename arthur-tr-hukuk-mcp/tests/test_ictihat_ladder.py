@@ -73,12 +73,61 @@ class LadderTest(unittest.TestCase):
 
     def test_modes(self):
         out, sent = self.run_search({}, query="kira tespit", kelime_modu="hepsi")
-        self.assertEqual(sent, ["+kira +tespit", "kira tespit"])
+        self.assertEqual(sent, ["+kira +tespit"])
         out, sent = self.run_search({}, query="kira tespit", kelime_modu="herhangi")
         self.assertEqual(sent, ["kira tespit"])
         out, sent = self.run_search({}, query="kira tespit", kelime_modu="yanlis")
         self.assertIn("error", out)
         self.assertEqual(sent, [])
+
+
+class EveryWordModeTest(unittest.TestCase):
+    """kelime_modu='hepsi' is a request: no decision with every word is an honest zero, not an OR search.
+
+    Measured 2026-11-19 (Yargıtay + Danıştay + istinaf): ``yapay zeka performans
+    fesih`` with every word required -> 0; the tool then sent the bare query and
+    returned 146,718 decisions holding any one of the four words.
+    """
+
+    QUERY = "yapay zeka performans fesih"
+    HEPSI = "+yapay +zeka +performans +fesih"
+    run_search = LadderTest.run_search
+
+    def test_no_decision_with_every_word_returns_zero_and_never_widens(self):
+        out, sent = self.run_search({self.QUERY: 146718}, query=self.QUERY, kelime_modu="hepsi")
+        self.assertEqual(sent, [self.HEPSI])
+        self.assertEqual(out["total"], 0)
+        self.assertEqual(out["results"], [])
+        self.assertEqual(out["arama_modu"], "kelimelerin hepsi")
+        self.assertEqual(out["uygulanan_sorgu"], self.HEPSI)
+        self.assertEqual(out["denenenler"], [{"sorgu": self.HEPSI, "mod": "kelimelerin hepsi", "total": 0}])
+        self.assertIn("genişletilmez", out["arama_notu"])
+        self.assertIn("karar olmadığını göstermez", out["sonuc_notu"])
+        self.assertNotIn("genisleme_notu", out)
+
+    def test_decisions_with_every_word_are_returned_without_a_zero_note(self):
+        out, sent = self.run_search({self.HEPSI: 3}, query=self.QUERY, kelime_modu="hepsi")
+        self.assertEqual(sent, [self.HEPSI])
+        self.assertEqual(out["total"], 3)
+        self.assertNotIn("sonuc_notu", out)
+
+    def test_default_ladder_still_widens_and_says_so(self):
+        out, sent = self.run_search({self.QUERY: 146718}, query=self.QUERY)
+        self.assertEqual(sent, ['"%s"' % self.QUERY, self.HEPSI, self.QUERY])
+        self.assertEqual(out["arama_modu"], "kelimelerden herhangi biri")
+        self.assertIn("HERHANGİ BİRİNİ", out["genisleme_notu"])
+        self.assertIn("kelime_modu='hepsi'", out["genisleme_notu"])
+
+    def test_no_widening_note_when_a_narrow_rung_answered(self):
+        out, _ = self.run_search({self.HEPSI: 3}, query=self.QUERY)
+        self.assertEqual(out["arama_modu"], "kelimelerin hepsi")
+        self.assertNotIn("genisleme_notu", out)
+        self.assertNotIn("sonuc_notu", out)
+
+    def test_schema_says_every_word_mode_does_not_widen(self):
+        aciklama = bedesten_ictihat.SEARCH_SCHEMA["properties"]["kelime_modu"]["description"]
+        self.assertIn("yoksa 0 döner", aciklama)
+        self.assertIn("genişletilmez", aciklama)
 
 
 if __name__ == "__main__":

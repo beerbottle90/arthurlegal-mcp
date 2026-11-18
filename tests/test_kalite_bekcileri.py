@@ -107,9 +107,11 @@ class Fihrist(unittest.TestCase):
         self.assertEqual([k["baslik"].split()[0] for k in kanunlar], ["7554", "7555", "7557"])
         self.assertEqual(kanunlar[0]["url"], "https://www.resmigazete.gov.tr/eskiler/2025/07/20250724-1.htm")
         self.assertEqual(kanunlar[0]["bolum"], "KANUNLAR")
-        # Ortak ayrıştırıcı (tazelik) kanunları görmez; bekçi ekler, tekrarlamaz.
+        # mcp #75'ten beri ortak ayrıştırıcı (tazelik) da kanunları okur; bekçinin kendi okuması yalnız
+        # eksik kalemi ekler, aynı kalemi iki kez eklemez.
         tz_kalemler = mb.tz.fihrist_ayristir(mb.tz._coz(RG_GUN), mb.tz.gun_url(GUN), GUN)["kalemler"]
-        self.assertEqual(len(f["kalemler"]), len(tz_kalemler) + 3)
+        self.assertEqual(len(f["kalemler"]), len(tz_kalemler))
+        self.assertEqual({k["url"] for k in tz_kalemler if mb.tur_bul(k) == "kanun"}, {k["url"] for k in kanunlar})
         self.assertEqual(len({k["url"] for k in f["kalemler"]}), len(f["kalemler"]))
 
     def test_turler_ve_gurultu(self):
