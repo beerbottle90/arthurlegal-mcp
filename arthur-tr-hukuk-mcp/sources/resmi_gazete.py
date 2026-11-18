@@ -4,8 +4,9 @@
 
 The page is the day's table of contents: section headings in capitals
 (``YÜRÜTME VE İDARE BÖLÜMÜ``, ``YÖNETMELİKLER``, ``KURUL KARARI`` …) and items
-prefixed ``––``, each linking to ``<yyyymmdd>-<n>.htm`` or ``.pdf``. Mükerrer
-issues live at ``<yyyymmdd>M1.htm``.
+prefixed ``––``, each linking to ``<yyyymmdd>-<n>.htm`` or ``.pdf``. Laws under
+``KANUN``/``KANUNLAR`` (Yasama Bölümü) carry no dash: they start with the law's
+number (``7554 Bazı Kanunlarda …``). Mükerrer issues live at ``<yyyymmdd>M1.htm``.
 
 This is the authoritative place to see that a regulator's Kurul kararı was
 actually published (EPDK, BDDK, SPK tebliğleri, Rekabet Kurumu tebliğleri),
@@ -92,6 +93,36 @@ def _day_url(d: _date, mukerrer: int = 0) -> str:
                                                           "M%d" % mukerrer if mukerrer else "")
 
 
+_TIRE = ("––", "--", "–", "—")
+_KANUN_BOLUMU = re.compile(r"^kanun(lar)?$")
+_KANUN_KALEMI = re.compile(r"^(\d{3,5})\s+\S")
+
+
+def _kalemler(body: str, url: str) -> List[Dict[str, Any]]:
+    """Fihrist kalemleri: "––" ile başlayan satırlar ve KANUN/KANUNLAR başlığı altında kanun numarasıyla
+    başlayan satırlar. Kanun kaleminde başlık sayfadaki gibidir ("7554 Bazı …"), numara ayrıca kanun_no."""
+    section = ""
+    items: List[Dict[str, Any]] = []
+    for tag, attrs, inner in re.findall(r"<(p|div|h\d|b|strong)([^>]*)>(.*?)</\1>", body, re.S):
+        txt = strip_tags(inner)
+        if not txt:
+            continue
+        tire = txt.startswith(_TIRE)
+        kanun = None if tire else _KANUN_KALEMI.match(txt)
+        if kanun and not _KANUN_BOLUMU.match(tr_fold(section)):
+            kanun = None
+        if tire or kanun:
+            link = re.search(r'href="([^"]+)"', inner)
+            item: Dict[str, Any] = {"section": section, "title": txt.lstrip("–—- ").strip() if tire else txt,
+                                    "url": urljoin(url, link.group(1)) if link else ""}
+            if kanun:
+                item["kanun_no"] = kanun.group(1)
+            items.append(item)
+        elif txt.isupper() and len(txt) < 80 and "GAZETE" not in txt:
+            section = txt
+    return items
+
+
 def fihrist(args: Dict[str, Any]) -> Dict[str, Any]:
     ds = str(args.get("date") or "").strip()
     try:
@@ -108,25 +139,14 @@ def fihrist(args: Dict[str, Any]) -> Dict[str, Any]:
     body = re.sub(r"<script.*?</script>", "", html, flags=re.S)
     m = re.search(r"Tarihli ve (\d+) Sayılı", body)
     number = m.group(1) if m else ""
-    section = ""
-    items: List[Dict[str, Any]] = []
-    for tag, attrs, inner in re.findall(r"<(p|div|h\d|b|strong)([^>]*)>(.*?)</\1>", body, re.S):
-        txt = strip_tags(inner)
-        if not txt:
-            continue
-        if txt.startswith(("––", "--", "–", "—")):
-            title = txt.lstrip("–—- ").strip()
-            link = re.search(r'href="([^"]+)"', inner)
-            href = urljoin(url, link.group(1)) if link else ""
-            items.append({"section": section, "title": title, "url": href})
-        elif txt.isupper() and len(txt) < 80 and "GAZETE" not in txt:
-            section = txt
+    items = _kalemler(body, url)
     q = (args.get("query") or "").strip()
     if q:
         items = [i for i in items if all(count_hits(i["title"] + " " + i["section"], t) for t in q.split())]
     out = {"date": d.isoformat(), "number": number, "citation": "RG %s, S. %s" % (d.strftime("%d.%m.%Y"), number or "?"),
            "url": url, "total": len(items), "items": items,
-           "note": "Belge metni: resmi_gazete_getir(url). Kurul kararları 'KURUL KARARI/KARARLARI' bölümündedir."}
+           "note": "Belge metni: resmi_gazete_getir(url). Kanunlar 'KANUN/KANUNLAR' bölümündedir (kanun_no); "
+                   "kurul kararları 'KURUL KARARI/KARARLARI' bölümündedir."}
 
     konu = (args.get("konu") or "").strip()
     if konu:
