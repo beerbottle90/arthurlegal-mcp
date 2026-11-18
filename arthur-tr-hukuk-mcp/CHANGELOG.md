@@ -11,6 +11,23 @@
   kaynak için tek issue; aynı kaynağa üç farklı günde üst üste erişilemezse tek issue; aynı başlıklı açık issue
   varsa yenisi açılmaz. Sayaç Actions önbelleğinde; dallarda kuru koşu (issue açmaz, sayaca yazmaz).
 
+## 0.8.1 — 2026-11-19
+
+- **`ictihat_ara` `kelime_modu="hepsi"` artık VEYA'ya düşmez.** Hiçbir karar kelimelerin hepsini içermeyince araç
+  sorguyu sessizce "kelimelerden herhangi biri" kipine genişletiyordu; şema ise "hepsi = her kelime geçsin" diyordu.
+  Ölçüm (19.11.2026, Yargıtay + Danıştay + istinaf, `yapay zeka performans fesih`): hepsi 0, araç VEYA ile 146.718
+  ilgisiz karar döndürdü. Artık yalnız her kelimenin geçtiği kararlar aranır; sonuç yoksa `total` 0 ve yanıt
+  `sonuc_notu` taşır ("karar olmadığını göstermez": daha az kelime, eş anlamlı ya da başka çekim, geniş tarama için
+  `kelime_modu="herhangi"`). Varsayılan `ifade` kipi tam ifade → her kelime → herhangi biri merdivenini korur; son
+  basamağa inince yanıt `genisleme_notu` taşır (toplam konuyla ilgili karar sayısı değildir).
+- **Sorgudaki işaretler Bedesten'e gitmeden çevrilir.** Bedesten yalnız harf, rakam, boşluk ve `" + - ( ) ! & |`
+  kabul eder; `.`, `/`, `,`, `'`, `:` vb. içeren her sorguyu "Sadece harf ve rakam içeren aramalar yapılabilir"
+  hatasıyla reddediyordu (ör. `muris muvazaası 01.04.1974 1/2 içtihadı birleştirme`). Reddedilen işaret boşluğa,
+  alfabe dışı harf aksansız biçimine (`zekâ` → `zeka`), Word'ün eğri tırnağı düz tırnağa çevrilir. Dizin bu
+  işaretlerde kelimeyi böler: tırnaklı `"01 04 1974"` 193 karar, `+muris +muvazaası +01 +04 +1974` 169 karar bulur
+  (19.11.2026). Gönderilen biçim `uygulanan_sorgu`da, çevrilenler `sorgu_notu`nda. 0.8.0'daki esas numarası çevirisi
+  (`2014/27629` → `2014 27629`) bu kuralın bir hâli olarak sürer.
+
 ## 0.8.0 — 2026-11-18
 
 - **`ictihat_ara` artık ilgiye göre sıralar** (`sort="ilgi"`, varsayılan). 0.7.0'a kadar her arama Bedesten'e
