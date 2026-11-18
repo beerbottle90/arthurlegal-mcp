@@ -159,10 +159,17 @@ _OGE = re.compile(r"<(p|div|h\d|b|strong)(\s[^>]*)?>(.*?)</\1\s*>", re.S | re.I)
 _BAGLANTI = re.compile(r"""href\s*=\s*["']([^"']+)["']""", re.I)
 _SAYI = re.compile(r"tarihli ve (\d+) sayili resmi")
 _MUKERRER = re.compile(r"^(\d{8})M(\d{1,2})\.htm$", re.I)
+_TIRE = ("––", "--", "–", "—")
+# Yasama Bölümü'nde kanunlar "––" ile değil kanun numarasıyla başlar ("7554 Bazı Kanunlarda …").
+_KANUN_BOLUMU = re.compile(r"^kanun(lar)?$")
+_KANUN_KALEMI = re.compile(r"^\d{3,5}\s+\S")
 
 
 def fihrist_ayristir(metin: str, url: str, gun: date) -> Dict[str, Any]:
     """Günlük fihrist: sayı, kalemler (bölüm, başlık, bağlantı) ve sayfada bağlantısı olan mükerrer sayılar.
+
+    Kalem: "––" ile başlayan satır ya da KANUN/KANUNLAR başlığı altında kanun numarasıyla başlayan satır
+    (başlık numarasıyla birlikte: "7554 Bazı Kanunlarda Değişiklik Yapılmasına Dair Kanun").
 
     Sayfada "… Tarihli ve N Sayılı Resmî Gazete" başlığı yoksa sayfa fihrist sayılmaz (hata sayfası,
     erişim engeli): ErisimHatasi. Böylece tanınmayan bir sayfa "yeni düzenleme yok" diye okunmaz."""
@@ -176,9 +183,10 @@ def fihrist_ayristir(metin: str, url: str, gun: date) -> Dict[str, Any]:
         yazi = _duz(ic)
         if not yazi:
             continue
-        if yazi.startswith(("––", "--", "–", "—")):
+        tire = yazi.startswith(_TIRE)
+        if tire or (_KANUN_KALEMI.match(yazi) and _KANUN_BOLUMU.match(katla(bolum))):
             b = _BAGLANTI.search(ic)
-            kalemler.append({"bolum": bolum, "baslik": yazi.lstrip("–—- ").strip(),
+            kalemler.append({"bolum": bolum, "baslik": yazi.lstrip("–—- ").strip() if tire else yazi,
                              "url": rg_normal(urljoin(url, _html.unescape(b.group(1)))) if b else ""})
         elif yazi.isupper() and len(yazi) < 80 and "GAZETE" not in yazi:
             bolum = yazi

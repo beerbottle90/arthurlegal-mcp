@@ -46,6 +46,13 @@ def sayfa(gun, kalemler=(), mukerrerler=(), mukerrer=0, sayi="33423"):
     return "\n".join(p).encode("cp1254")
 
 
+def gercek_fihrist():
+    """RG 24.07.2025, S. 32965 fihristi, sitedeki gibi (windows-1254). Yasama Bölümü'nde 7554, 7555 ve 7557
+    sayılı kanunlar "––" ile değil numarayla başlar."""
+    with open(os.path.join(KOK, "tests", "fixtures", "rg_20250724.htm"), "rb") as f:
+        return f.read()
+
+
 SIRADAN = [("YÖNETMELİKLER", "Orman Köylülerine Yapılacak Dağıtımın Uygulamasına Dair Yönetmelik", "X-1.htm"),
            ("TEBLİĞLER", "Yurt Dışına Çıkış Harcı Uygulama Genel Tebliğinde Değişiklik Yapılmasına Dair Tebliğ",
             "X-2.pdf"),
@@ -111,6 +118,29 @@ class Fihrist(unittest.TestCase):
         self.assertEqual(a["kalemler"], [{"bolum": "TEBLİĞLER", "baslik": AAUT_DEGISIKLIK,
                                           "url": "https://www.resmigazete.gov.tr/eskiler/2026/11/20261108-4.htm"}])
 
+    def test_kanunlar_numarayla_baslar(self):
+        g = date(2025, 7, 24)
+        a = tazelik.fihrist_ayristir(tazelik._coz(gercek_fihrist()), tazelik.gun_url(g), g)
+        self.assertEqual(a["sayi"], "32965")
+        kanunlar = [k for k in a["kalemler"] if k["bolum"] == "KANUNLAR"]
+        self.assertEqual(kanunlar[0], {"bolum": "KANUNLAR",
+                                       "baslik": "7554 Bazı Kanunlarda Değişiklik Yapılmasına Dair Kanun",
+                                       "url": "https://www.resmigazete.gov.tr/eskiler/2025/07/20250724-1.htm"})
+        self.assertEqual([k["baslik"].split()[0] for k in kanunlar], ["7554", "7555", "7557"])
+        self.assertEqual([k["url"].rsplit("/", 1)[1] for k in kanunlar],
+                         ["20250724-1.htm", "20250724-2.htm", "20250724-3.htm"])
+        # "––" kalemleri olduğu gibi: 15 kalem (İlân Bölümü'ndeki döviz kurları satırı dahil), hepsi kanunlardan sonra
+        self.assertEqual(len(a["kalemler"]), 18)
+        self.assertTrue(all(not k["baslik"].startswith("–") for k in a["kalemler"]))
+        self.assertEqual(a["kalemler"][3]["bolum"], "MİLLETLERARASI ANDLAŞMA")
+
+    def test_kanun_disi_bolumde_numarali_satir_kalem_sayilmaz(self):
+        g = date(2026, 11, 8)
+        govde = sayfa(g, [("TEBLİĞLER", AAUT_DEGISIKLIK, "20261108-4.htm")]).decode("cp1254").replace(
+            "</body>", '<p class="MsoNormal"><a href="20261108-9.htm">2026 Yılı Yatırım Programı</a></p></body>')
+        a = tazelik.fihrist_ayristir(govde, tazelik.gun_url(g), g)
+        self.assertEqual([k["baslik"] for k in a["kalemler"]], [AAUT_DEGISIKLIK])
+
     def test_tanınmayan_sayfa_fihrist_sayilmaz(self):
         g = date(2026, 11, 8)
         with self.assertRaises(tazelik.ErisimHatasi):
@@ -175,6 +205,23 @@ class Durumlar(unittest.TestCase):
         self.assertEqual(t["yeni"][0]["url"], bag)
         self.assertEqual(n.tazelik("harc")["durum"], "guncel")        # AAÜT harç kartını kilitlemez
         self.assertEqual(len(rg.istenen), 2)
+
+    def test_harclar_kanunu_degisikligi_kilitler(self):
+        """Kanun kalemi "––" taşımaz; gerçek fihristin düzeninde bir Harçlar Kanunu değişikliği harç kartını kilitler."""
+        g = date(2026, 11, 7)
+        govde = gercek_fihrist().decode("cp1254").replace(
+            "7554&nbsp;Bazı Kanunlarda", "7600&nbsp;Harçlar Kanunu ile Bazı Kanunlarda").replace(
+            "20250724-1.htm", "20261107-1.htm").encode("cp1254")
+        rg = SahteRG({tazelik.gun_url(g): (200, govde)})
+        n, _ = kur(rg)
+        t = n.tazelik("harc")
+        self.assertEqual(t["durum"], "yeni_duzenleme")
+        self.assertEqual(t["toplam"], "verilmedi")
+        self.assertEqual(t["yeni"][0]["url"], "https://www.resmigazete.gov.tr/eskiler/2026/11/20261107-1.htm")
+        self.assertEqual(n.tazelik("vekalet")["durum"], "guncel")
+        # Harçlar Kanunu'nu anmayan kanunlar (gerçek sayfadaki 7554, 7555, 7557) harç kartını kilitlemez
+        self.assertEqual(kur(SahteRG({tazelik.gun_url(g): (200, gercek_fihrist())}))[0].tazelik("harc")["durum"],
+                         "guncel")
 
     def test_bilinen_yayim_kilitlemez(self):
         g = date(2026, 11, 3)
