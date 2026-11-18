@@ -49,7 +49,7 @@ import sources  # noqa: E402
 from sources import bedesten_ictihat, bedesten_mevzuat, anayasa, uyusmazlik, resmi_gazete, spk  # noqa: E402
 from textx import HAS_PYPDF  # noqa: E402
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 INDEX_PATH = os.environ.get("INDEX_PATH") or os.path.join(HERE, "data", "index.db")
 
 _index: Optional[retrieval.Index] = None
@@ -224,7 +224,10 @@ def t_ictihat_semantik(args: Dict[str, Any]) -> Any:
 
     Bedesten allows ~1 request / 3.5 s, and result rows carry no text, so each
     candidate costs a fetch. ``max_docs`` therefore defaults to 5 (≈20 s) and
-    caps at 10. This is a precision tool for a shortlist, not a discovery tool.
+    caps at 10. This is a precision tool for a shortlist, not a discovery tool,
+    and the answer says so whenever candidates were left unread: a caller that
+    sees ranked decisions and a similarity score otherwise takes "nothing
+    relevant here" for "no such decision".
     """
     q = (args.get("query") or "").strip()
     kw = (args.get("initial_keyword") or "").strip()
@@ -246,12 +249,18 @@ def t_ictihat_semantik(args: Dict[str, Any]) -> Any:
         body = r.pop("body", "")
         r["snippet"] = body[:500]
     method = ranked.get("method") if isinstance(ranked, dict) else "none"
-    return {"query": q, "initial_keyword": kw, "candidates_total": res.get("total"),
-            "fetched": len(docs), "results": results,
-            "retrieval": {"method": method,
-                          "semantic": "on" if method == "semantic" else "off",
-                          **{k: v for k, v in (ranked.items() if isinstance(ranked, dict) else []) if k not in ("results", "method")}},
-            "note": "Adaylar Bedesten anahtar kelime aramasının ilk sayfasından; anlamsal sıralama yalnız çekilen metinler üzerinde."}
+    out = {"query": q, "initial_keyword": kw, "candidates_total": res.get("total"),
+           "fetched": len(docs), "results": results,
+           "retrieval": {"method": method,
+                         "semantic": "on" if method == "semantic" else "off",
+                         **{k: v for k, v in (ranked.items() if isinstance(ranked, dict) else []) if k not in ("results", "method")}},
+           "note": "Adaylar Bedesten anahtar kelime aramasının ilgiye göre ilk sayfasından; anlamsal sıralama yalnız çekilen metinler üzerinde."}
+    toplam = res.get("total") or 0
+    if toplam > len(docs):
+        out["uyari"] = ("%d adaydan yalnız ilk %d karar okundu. Bu araç külliyatın tamamını aramaz: burada çıkmaması "
+                        "karar olmadığını göstermez. Keşif için ictihat_ara'yı farklı ifadelerle kullanın."
+                        % (toplam, len(docs)))
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -330,7 +339,19 @@ GUIDE = """arthur-tr-hukuk-mcp — hangi soru için hangi araç
    Yargıtay/Danıştay/BAM/yerel/KYB: ictihat_ara(query, courts, chamber, date_from) → ictihat_getir(document_id)
    AYM: aym_ara(query, kind="norm"|"bireysel") → aym_getir
    Görev uyuşmazlığı: uyusmazlik_ara
-   Kavramsal soru + kısa liste: ictihat_semantik_ara(query, initial_keyword)
+   Kısa listeyi soruya göre yeniden sıralama: ictihat_semantik_ara(query, initial_keyword). Keşif aracı DEĞİLDİR:
+     yalnız ilk 5-10 adayı okur, külliyatı aramaz.
+   ARAMA YÖNTEMİ (bir hukuki soruya içtihatla cevap verirken):
+     a) ictihat_ara ilgiye göre sıralar (sort="ilgi"). Güncel uygulama için aynı sorguyu sort="yeni" ile de çalıştırın.
+     b) Soruyu mahkemenin kendi diliyle kurun, en az üç farklı ifadeyle arayın. Kullanıcı "haciz takası engeller mi"
+        der; Yargıtay "takas mahsup talebinden önce" yazar. İlgili ilk kararı bulunca kalıp cümlesini tırnak içinde
+        yeniden aratın: aynı kuralı söyleyen öteki kararlar öyle gelir.
+     c) İstenen sonucu destekleyen kararla yetinmeyin; aksi yöndeki kararı ayrıca arayın ve bulduğunuzu yazın.
+        Karşı sonucu ima eden tek cümle bile (onanan hükümdeki bir kayıt) okunup peşine düşülecek bir izdir.
+     d) İcra ve iflas işlerine 12. Hukuk Dairesi yanında bir dönem 8. Hukuk Dairesi de baktı; daireye
+        daraltırken konunun geçmişte hangi dairelerde görüldüğünü hesaba katın ya da daire süzgecini bırakın.
+     e) "Karar bulunamadı" derken kaç sorgu, hangi ifadeler, kaç adaydan kaçının okunduğunu yazın. Bulunamaması
+        kararın olmadığını göstermez. Kıyasla ya da genel hükümden varılan sonuç yerleşik içtihat gibi sunulmaz.
 
 3. DÜZENLEYİCİ KURUM KARARLARI — kurum_karari_ara(kurum=…)
    rekabet · epdk · spk · bddk · kvkk · btk · gib · sigorta_tahkim
@@ -389,11 +410,14 @@ def build_tools() -> List[Tool]:
                    "description": "Kuruma özel diğer filtreler (kurum_listesi.search_params)"},
     }
     tools = [
-        Tool("ictihat_ara", "Yargıtay, Danıştay, BAM (istinaf), yerel hukuk mahkemesi ve KYB kararlarını Bedesten'de arar. "
+        Tool("ictihat_ara", "Yargıtay, Danıştay, BAM (istinaf), yerel hukuk mahkemesi ve KYB kararlarını Bedesten'de arar; "
+             "sonuçlar ilgiye göre sıralanır (en yeni için sort='yeni'). Soruyu mahkemenin kendi diliyle ve birkaç farklı "
+             "ifadeyle arayın; aksi yöndeki kararı da arayın. İlk sayfada çıkmaması karar olmadığını göstermez. "
              "Liste metin içermez; ictihat_getir ile okuyun. Hız sınırı 10 istek/30 sn.", ic.SEARCH_SCHEMA, _wrap(ic.search)),
         Tool("ictihat_getir", "Bedesten karar metnini getirir (sayfalı). document_id ictihat_ara'dan.", ic.GET_SCHEMA, _wrap(ic.get)),
-        Tool("ictihat_semantik_ara", "Anahtar kelimeyle bulunan ilk kararları (≤10) çekip doğal dil sorusuna göre anlamsal sıralar. "
-             "Yavaştır (~4 sn/karar); kısa liste doğrulama aracıdır.",
+        Tool("ictihat_semantik_ara", "KEŞİF ARACI DEĞİLDİR: külliyatı aramaz. initial_keyword ile ilgiye göre gelen ilk kararları "
+             "(≤10) okuyup doğal dil sorusuna göre yeniden sıralar. Burada sonuç çıkmaması karar olmadığını göstermez; "
+             "keşif için ictihat_ara. Yavaştır (~4 sn/karar).",
              {"type": "object", "properties": {
                  "query": {"type": "string", "description": "Doğal dil soru"},
                  "initial_keyword": {"type": "string", "description": "Bedesten'e gidecek anahtar kelime(ler)"},
@@ -506,6 +530,13 @@ Sigorta Tahkim https://www.sigortatahkim.org.tr/. Derin bağlantı tahminle kuru
 ALINTI. Her sonuçtaki `citation` alanı birebir kullanılır; esas/karar numarası, tarih ve RG künyesi ezberden
 yazılmaz. `source_url` olmayan belgeler için URL uydurulmaz. Özelge bağlayıcı değildir. Karar listeleri metin
 içermez: yorum yapmadan önce `*_getir` ile metni okuyun.
+
+İÇTİHAT ARAMASI. `ictihat_ara` ilgiye göre sıralar; güncel uygulama için aynı sorguyu sort="yeni" ile de çalıştırın.
+Soruyu mahkemenin kendi diliyle kurun ve en az üç farklı ifadeyle arayın; bulduğunuz ilgili kararın kalıp cümlesini
+tırnak içinde yeniden aratın. İstenen sonucu destekleyen kararla yetinmeyin, aksi yöndeki kararı da arayın ve yazın.
+`ictihat_semantik_ara` keşif aracı değildir, yalnız ilk ≤10 adayı okur. "Karar bulunamadı" derken kaç sorgu, hangi
+ifadeler ve kaç adaydan kaçının okunduğunu yazın: bulunamaması kararın olmadığını göstermez. Kıyasla ya da genel
+hükümden varılan sonucu yerleşik içtihat gibi sunmayın. Ayrıntı: `hukuk_arastirma_rehberi`.
 
 HIZ. Bedesten (içtihat + mevzuat) 10 istek / 30 sn; aynı turda 5'ten fazla çağrı göndermeyin, bu bir tempo kuralıdır, doğrulanacak madde sayısına sınır değildir; `retry: true`
 gelirse birkaç saniye bekleyip yineleyin. ictihat_semantik_ara karar başına ~4 sn sürer.

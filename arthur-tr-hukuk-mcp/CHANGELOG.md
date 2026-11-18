@@ -11,6 +11,29 @@
   kaynak için tek issue; aynı kaynağa üç farklı günde üst üste erişilemezse tek issue; aynı başlıklı açık issue
   varsa yenisi açılmaz. Sayaç Actions önbelleğinde; dallarda kuru koşu (issue açmaz, sayaca yazmaz).
 
+## 0.8.0 — 2026-11-18
+
+- **`ictihat_ara` artık ilgiye göre sıralar** (`sort="ilgi"`, varsayılan). 0.7.0'a kadar her arama Bedesten'e
+  `sortFields=KARAR_TARIHI` ile gidiyordu: soruya, kelimeleri paylaşan en yeni kararlar geliyor, meseleyi çözen karar
+  yüzlerce satır aşağıda kalıyordu. Bedesten sıralama alanı gönderilmeyince kendi ilgi sırasını verir. Ölçüm
+  (18.11.2026, Yargıtay + Danıştay, tek bir icra hukuku sorusu için altı düz kelimeli sorgu, toplamlar 13 ile 1.230
+  arası): tarihe göre sıralıyken belirleyici kararlardan biri altı sorgunun hiçbirinde ilk onda değildi; sıralama
+  alanı olmadan beşinde ilk ondaydı, dördünde birinci sıradaydı. En yeni karar için `sort="yeni"`, en eski için
+  `sort="eski"`; eski `desc` ve `asc` değerleri kabul edilir. Yanıt `siralama` alanını ve sonuç tek sayfaya
+  sığmıyorsa öteki sıralamayı hatırlatan `siralama_notu`nu taşır.
+- **`ictihat_semantik_ara` adayları aynı ilgi sayfasından alır**; önceden en yeni beş kararı sıralıyordu. Okunmayan
+  aday kaldığında yanıt `uyari` taşır ("1230 adaydan yalnız ilk 5 karar okundu... burada çıkmaması karar olmadığını
+  göstermez"). Araç açıklaması ve ağ geçidindeki başlığı keşif vaat etmez: "re-rank a case-law shortlist by meaning".
+- Esas ya da karar numarası atıftaki gibi yazılabilir: `2014/27629` → `2014 27629` (Bedesten yalnız harf ve rakam
+  kabul eder; önceden "Lütfen Arama Kriterlerini Kontrol Ediniz" hatası dönüyordu). Çevrilen sorgu `sorgu_notu`nda.
+- Tırnaklı ifadenin yanında işaretsiz terim varsa (`"takas mahsup" "dosya alacağı" haciz`) yanıt `arama_notu` ve
+  `onerilen_sorgu` (`+"takas mahsup" +"dosya alacağı" +haciz`) taşır: Bedesten bu terimleri VEYA ile birleştirir
+  (ölçüm: 1.290.298'e karşı 395). Sorgu yazıldığı gibi gönderilir; açık AND/OR/NOT içeren sorguya dokunulmaz.
+- Sunucu talimatına ve `hukuk_arastirma_rehberi`ne içtihat arama yöntemi eklendi: mahkemenin kendi diliyle ve en az
+  üç ifadeyle arama, bulunan kararın kalıp cümlesini tırnak içinde yeniden aratma, aksi yöndeki kararı ayrıca arama,
+  "karar bulunamadı" derken kaç sorgu ve kaç adaydan kaçının okunduğunu yazma, kıyasla varılan sonucu yerleşik
+  içtihat gibi sunmama.
+
 ## 0.7.0 — 2026-11-10
 
 - İndeks ekleri: yeni kurum kararları tam imaj (2,3 GB, ~3 saat) beklemeden canlıya gider. Tabandan bu yana eklenen ya

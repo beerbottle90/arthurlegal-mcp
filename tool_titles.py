@@ -34,7 +34,7 @@ TITLES: Dict[str, str] = {
     # Türkiye
     "tr_ictihat_ara": "Türkiye: search case law",
     "tr_ictihat_getir": "Türkiye: get a court decision",
-    "tr_ictihat_semantik_ara": "Türkiye: rank case law by meaning",
+    "tr_ictihat_semantik_ara": "Türkiye: re-rank a case-law shortlist by meaning",
     "tr_aym_ara": "Türkiye: search Constitutional Court decisions",
     "tr_aym_getir": "Türkiye: get a Constitutional Court decision",
     "tr_uyusmazlik_ara": "Türkiye: search Court of Jurisdictional Disputes decisions",

@@ -12,7 +12,12 @@ clear of it; a 429 pauses the bucket for the server's Retry-After.
 
 Search syntax accepted by ``phrase``: bare words (OR -- measured, see
 ``_ladder``), ``"tam cümle"``, ``+zorunlu``, ``-hariç``, ``AND``/``OR``/``NOT``.
-No wildcards.
+No wildcards. Only letters and digits: ``2014/27629`` is refused, ``2014 27629``
+is searched (see ``_ESAS``).
+
+Ordering: Bedesten sorts by date only when a sort field is sent. Without one
+it answers in its own relevance order (see ``_SIRALAMA``), which is the default
+here.
 
 Citation contract: cite as ``Yargıtay 9. HD, E. 2023/1234, K. 2024/567,
 12.03.2024`` using the *esasNo/kararNo/kararTarihiStr* fields verbatim; the
@@ -92,6 +97,24 @@ def _iso(d: Optional[str], end: bool = False) -> Optional[str]:
 # A query the user already shaped (a quote, a +/- prefixed word, a boolean
 # operator) is sent as written; only plain multi-word queries get the ladder.
 _OPERATOR = re.compile(r'"|(?:^|\s)[+-]\S|\b(?:AND|OR|NOT)\b')
+
+# Ordering. Until 0.8.0 every search was sent with sortFields=KARAR_TARIHI, so a
+# question got the newest decisions that happened to share its words and the
+# decision that settles it sat hundreds of rows down. Measured 2026-11-18,
+# Yargıtay + Danıştay, six plain-word queries on one enforcement-law question
+# (totals 13 to 1,230): sorted by date, a controlling decision was in the first
+# ten for 0 of the 6; with no sort field, for 5 of the 6 and first in 4. The
+# shortlist reranker (ictihat_semantik_ara) reads this same first page, so it
+# was ranking the newest five, not the most relevant five. Newest-first stays
+# one argument away: it is the right order for "what did the chamber say last".
+# "desc" and "asc" are the pre-0.8.0 spellings of yeni and eski.
+_SIRALAMA = {"ilgi": None, "yeni": "desc", "eski": "asc", "desc": "desc", "asc": "asc"}
+_SIRALAMA_ADI = {None: "ilgi", "desc": "yeni", "asc": "eski"}
+
+# Bedesten refuses anything but letters and digits ("Sadece harf ve rakam içeren
+# aramalar yapılabilir"), so a docket number typed the way it is cited fails.
+_ESAS = re.compile(r"(?<!\d)(\d{4})/(\d{1,6})(?!\d)")
+_TERIM = re.compile(r'([+-]?)("[^"]*"|\S+)')
 _LADDER_LABELS = {"ifade": "tam ifade", "hepsi": "kelimelerin hepsi", "herhangi": "kelimelerden herhangi biri"}
 
 
@@ -118,10 +141,34 @@ def _ladder(phrase: str, mode: str) -> List[Tuple[str, str]]:
     return steps
 
 
+def _veya_onerisi(phrase: str) -> str:
+    """The every-term-required form of a query that mixes a quoted phrase with unsigned terms, or "".
+
+    Measured 2026-11-18 (Yargıtay): ``"takas mahsup" "dosya alacağı" haciz`` -> 1,290,298
+    hits, because unsigned terms beside a quote are still joined with OR;
+    ``+"takas mahsup" +"dosya alacağı" +haciz`` -> 395. A query with an explicit
+    AND/OR/NOT is left alone: its author chose the joins.
+    """
+    if '"' not in phrase:
+        return ""
+    terimler = _TERIM.findall(phrase)
+    if len(terimler) < 2 or any(t in ("AND", "OR", "NOT") for _, t in terimler):
+        return ""
+    if all(isaret for isaret, _ in terimler):
+        return ""
+    return " ".join((isaret or "+") + t for isaret, t in terimler)
+
+
 def search(args: Dict[str, Any]) -> Dict[str, Any]:
     phrase = (args.get("query") or "").strip()
     if not phrase:
         return {"error": "query gerekli. Örnek: 'lisans iptali \"hizmet kusuru\" -tazminat'"}
+    yazilan = phrase
+    phrase = _ESAS.sub(r"\1 \2", phrase)
+    sira = (args.get("sort") or "ilgi").strip().lower()
+    if sira not in _SIRALAMA:
+        return {"error": "sort: ilgi, yeni ya da eski."}
+    yon = _SIRALAMA[sira]
     mode = (args.get("kelime_modu") or "ifade").strip().lower()
     if mode not in _LADDER_LABELS:
         return {"error": "kelime_modu: ifade, hepsi ya da herhangi."}
@@ -137,9 +184,10 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
         "pageNumber": max(1, int(args.get("page") or 1)),
         "itemTypeList": courts,
         "phrase": phrase,
-        "sortFields": ["KARAR_TARIHI"],
-        "sortDirection": "desc" if (args.get("sort") or "desc") == "desc" else "asc",
     }
+    if yon:
+        data["sortFields"] = ["KARAR_TARIHI"]
+        data["sortDirection"] = yon
     chamber = (args.get("chamber") or "").strip()
     if chamber and chamber.upper() != "ALL":
         data["birimAdi"] = CHAMBERS.get(chamber.upper(), chamber)
@@ -186,10 +234,23 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
         })
     out = {
         "query": phrase, "courts": courts, "page": data["pageNumber"], "page_size": page_size,
-        "total": d.get("total", 0), "results": items,
+        "total": d.get("total", 0), "siralama": _SIRALAMA_ADI[yon], "results": items,
         "note": "Metin için ictihat_getir(document_id). Karar listesi metin içermez; "
                 "alıntı için citation alanını birebir kullanın.",
     }
+    if out["total"] > len(items):       # tek sayfaya sığan sonuçta sıra bir şey gizlemez
+        out["siralama_notu"] = (
+            "İlgiye göre sıralı; eski tarihli karar öne çıkabilir. Güncel uygulama için aynı sorguyu "
+            "sort='yeni' ile de çalıştırın." if not yon else
+            "Tarihe göre sıralı: konuyu çözen karar ilk sayfada olmayabilir. Konu araması için sort='ilgi'.")
+    if phrase != yazilan:
+        out["sorgu_notu"] = ("Bedesten yalnız harf ve rakam kabul eder; esas/karar numarasındaki eğik çizgi "
+                             "boşluğa çevrildi: %s" % phrase)
+    oneri = _veya_onerisi(phrase)
+    if oneri:
+        out["onerilen_sorgu"] = oneri
+        out["arama_notu"] = ("Tırnaklı ifadenin yanındaki işaretsiz terimleri Bedesten VEYA ile birleştirir; "
+                             "toplam bu yüzden büyük olabilir. Hepsi geçsin istiyorsanız onerilen_sorgu'yu kullanın.")
     if len(steps) > 1:
         out["uygulanan_sorgu"] = data["phrase"]
         out["arama_modu"] = tried[-1]["mod"]
@@ -260,7 +321,7 @@ def _http_error(exc: HttpError) -> Dict[str, Any]:
 SEARCH_SCHEMA = {
     "type": "object",
     "properties": {
-        "query": {"type": "string", "description": "Arama ifadesi. Tırnaksız çok kelime önce tam ifade olarak aranır (bkz. kelime_modu). \"tam cümle\", +zorunlu, -hariç, AND/OR/NOT olduğu gibi gönderilir. Joker yok."},
+        "query": {"type": "string", "description": "Arama ifadesi. Tırnaksız çok kelime önce tam ifade olarak aranır (bkz. kelime_modu). \"tam cümle\", +zorunlu, -hariç, AND/OR/NOT olduğu gibi gönderilir; tırnaklı ifadenin yanındaki işaretsiz kelime VEYA ile birleşir, hepsi geçsin diye +\"ifade\" +kelime yazın. Joker yok. Esas ya da karar numarası: 2014 27629."},
         "kelime_modu": {"type": "string", "enum": ["ifade", "hepsi", "herhangi"], "default": "ifade",
                         "description": "Tırnaksız çok kelimeli sorgu: ifade = önce tam ifade, sonuç yoksa her kelime, o da yoksa herhangi biri; hepsi = her kelime geçsin; herhangi = Bedesten'in ham davranışı (VEYA, çok geniş)."},
         "courts": {"type": "array", "items": {"type": "string", "enum": list(COURT_TYPES)},
@@ -270,7 +331,10 @@ SEARCH_SCHEMA = {
         "date_to": {"type": "string", "description": "Karar tarihi bitişi, YYYY-MM-DD"},
         "page": {"type": "integer", "minimum": 1, "default": 1},
         "page_size": {"type": "integer", "minimum": 1, "maximum": 10, "default": 10},
-        "sort": {"type": "string", "enum": ["desc", "asc"], "default": "desc"},
+        "sort": {"type": "string", "enum": ["ilgi", "yeni", "eski"], "default": "ilgi",
+                 "description": "ilgi = konuyla en ilgili karar önce (varsayılan); yeni = en yeni karar önce; "
+                                "eski = en eski önce. Yerleşik içtihat çoğu zaman eski tarihlidir: konu aramasında "
+                                "ilgi, güncel uygulamanın teyidinde yeni."},
     },
     "required": ["query"],
 }
@@ -292,6 +356,7 @@ SOURCE = Source(
     notes=(
         "Bedesten (mevzuat.adalet.gov.tr/ictihat) 5 mahkeme türünü tek uçta verir. Karar "
         "listesi METİN içermez; yorum yapmadan önce ictihat_getir ile metni okuyun. "
+        "Sonuçlar ilgiye göre sıralanır (sort='ilgi'); en yeni karar için sort='yeni'. "
         "Hız sınırı: 10 istek/30 sn — art arda 5'ten fazla arama yapmayın. Alıntı: "
         "'Yargıtay 9. HD, E. 2023/1234, K. 2024/567, 12.03.2024' — citation alanı verbatim."
     ),
