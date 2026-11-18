@@ -319,6 +319,17 @@ class Akis(unittest.TestCase):
         self.assertEqual(durumlar[0], "okundu")
         self.assertTrue(all("istek sınırı" in d for d in durumlar[1:]))
 
+    def test_sure_dolarsa_kalan_gunler_uyariya(self):
+        an = [0.0]
+
+        def getir(url, zaman_asimi=10, **kw):
+            an[0] += 100                                   # her istek 100 sn sürüyor (yavaş RG)
+            return (200, RG_GUN) if url.endswith("/20250724.htm") else (404, b"")
+        istemci = ortak.Nazik(getir, aralik=0, sinir=80, uyu=lambda s: None, sayac=lambda: an[0], sure=150)
+        s = mb.calis(GUN, 4, mb.Paketler(self.d.name), istemci, mb.tablo_yukle())
+        self.assertTrue(any("süre sınırı" in h for h in s["hatalar"]))
+        self.assertIn(mb.UYARI_TARAMA, [x["title"] for x in mb.adaylar(s, self.d.name)])
+
     def test_paket_yoksa_uyari(self):
         with tempfile.TemporaryDirectory() as bos:
             s, _ = _calis(SahteGetirici({"/20250724.htm": (200, RG_GUN)}), bos)
@@ -396,6 +407,20 @@ class Ortak(unittest.TestCase):
         for _ in range(3):
             n("https://x")
         self.assertEqual(uyunan, [1.5, 1.5])
+        with self.assertRaises(ortak.ErisimHatasi):
+            n("https://x")
+
+    def test_nazik_sure_siniri(self):
+        an = [100.0]
+        n = ortak.Nazik(lambda u, t, **k: (200, b""), aralik=0, sinir=50, uyu=lambda s: None,
+                        sayac=lambda: an[0], sure=60)
+        n("https://x")
+        an[0] += 59
+        n("https://x")
+        self.assertIsNone(n.neden())
+        an[0] += 2
+        self.assertIn("süre sınırı (60 sn)", n.neden())
+        self.assertEqual(n.kalan, 0)
         with self.assertRaises(ortak.ErisimHatasi):
             n("https://x")
 

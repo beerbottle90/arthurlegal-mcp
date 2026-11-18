@@ -83,22 +83,36 @@ class Nazik:
     """İstekleri seyrekleştirir ve sayar. Testler sahte getirici, uyu ve sayaç verir."""
 
     def __init__(self, getir: Getirici, aralik: float = 1.5, sinir: int = 60,
-                 uyu: Callable[[float], None] = time.sleep, sayac: Callable[[], float] = time.monotonic) -> None:
+                 uyu: Callable[[float], None] = time.sleep, sayac: Callable[[], float] = time.monotonic,
+                 sure: Optional[float] = None) -> None:
         self._getir = getir
         self._aralik = aralik
         self.sinir = sinir
         self._uyu = uyu
         self._sayac = sayac
+        self._sure = sure            # sn; Actions iş sınırından önce bitsin, uyarı issue'su açılabilsin
+        self._ilk: Optional[float] = None
         self._son: Optional[float] = None
         self.sayi = 0
 
+    def neden(self) -> Optional[str]:
+        """İstek yapılamıyorsa nedeni (istek ya da süre sınırı), yoksa None."""
+        if self.sayi >= self.sinir:
+            return "koşu başına istek sınırı (%d) doldu" % self.sinir
+        if self._sure is not None and self._ilk is not None and self._sayac() - self._ilk > self._sure:
+            return "koşu süre sınırı (%d sn) doldu" % self._sure
+        return None
+
     @property
     def kalan(self) -> int:
-        return max(0, self.sinir - self.sayi)
+        return 0 if self.neden() else self.sinir - self.sayi
 
     def __call__(self, url: str, zaman_asimi: float = ZAMAN_ASIMI, **kw: Any) -> Tuple[int, bytes]:
-        if self.sayi >= self.sinir:
-            raise ErisimHatasi("Koşu başına istek sınırı (%d) doldu" % self.sinir)
+        neden = self.neden()
+        if neden:
+            raise ErisimHatasi(neden[0].upper() + neden[1:])
+        if self._ilk is None:
+            self._ilk = self._sayac()
         if self._son is not None:
             bekle = self._aralik - (self._sayac() - self._son)
             if bekle > 0:

@@ -22,7 +22,9 @@ e-postası başlıktan okur). Aynı başlıklı issue (açık ya da kapalı) var
   (aynı başlıklı açık issue yoksa) ve Actions uyarısı.
 
 RG okuma kalıbı hesap-mcp/tazelik.py'dendir (yalnız https://www.resmigazete.gov.tr, kısa tanıtım). İstekler
-nazik: iki istek arasında en az 1,5 sn, koşu başına en çok 80 istek. Commit atmaz; yalnız `gh issue`.
+nazik: iki istek arasında en az 1,5 sn, koşu başına en çok 80 istek ve 9 dakika (iş akışının 15 dakikalık sınırından
+önce biter; süre dolarsa kalan günler uyarı issue'suna, kalan metinler "okunmadı"ya düşer). Commit atmaz; yalnız
+`gh issue`.
 
     python kalite/mevzuat_bekcisi.py --paketler al-paketler [--gun 7] [--cikti sonuc.json] [--kuru]
 
@@ -76,6 +78,8 @@ GUN_VARSAYILAN = 7
 GUN_AZAMI = 14
 ISTEK_ARALIGI = 1.5          # sn
 ISTEK_SINIRI = 80            # koşu başına
+SURE_SINIRI = 540.0          # sn; iş akışının 15 dk sınırından önce biter, uyarı issue'su açılabilir
+FIHRIST_ZAMAN_ASIMI = 15.0   # sn
 METIN_ZAMAN_ASIMI = 30.0     # sn; kararname ve karar PDF'leri
 PDF_SAYFA = 40
 TABLO_SATIRI = 10           # issue'da mevzuat başına rehber satırı
@@ -149,7 +153,7 @@ def tara(gunler: List[date], getir: Callable[..., Tuple[int, bytes]]) -> Dict[st
     for g in gunler:
         url = tz.gun_url(g)
         try:
-            durum, govde = getir(url)
+            durum, govde = getir(url, FIHRIST_ZAMAN_ASIMI)
             if durum == 404:
                 kayit[g.isoformat()] = {"durum": "yok", "url": url}
                 continue
@@ -159,7 +163,7 @@ def tara(gunler: List[date], getir: Callable[..., Tuple[int, bytes]]) -> Dict[st
             hepsi = [dict(k, mukerrer=None) for k in f["kalemler"]]
             for n in f["mukerrerler"]:
                 murl = tz.gun_url(g, n)
-                d2, g2 = getir(murl)
+                d2, g2 = getir(murl, FIHRIST_ZAMAN_ASIMI)
                 if d2 != 200:
                     raise ortak.ErisimHatasi("HTTP %d: %s" % (d2, murl))
                 hepsi += [dict(k, mukerrer=n) for k in fihrist(tz._coz(g2), murl, g)["kalemler"]]
@@ -569,9 +573,9 @@ def calis(bugun: date, gun: int, paketler: Paketler, getir: Callable[..., Tuple[
         (elenen if gurultu_mu(k, tur) else secilen).append(k)
     secilen.sort(key=lambda k: (TURLER[k["tur"]]["sira"], k["tarih"], k["baslik"]))
     for k in secilen:
-        kalan = getattr(getir, "kalan", 1)
-        if kalan <= 0:
-            metin, durum = None, "okunmadı (koşu başına istek sınırı doldu); yalnız başlıkla arandı"
+        neden = getir.neden() if hasattr(getir, "neden") else None
+        if neden:
+            metin, durum = None, "okunmadı (%s); yalnız başlıkla arandı" % neden
         else:
             metin, durum = metin_getir(k.get("url") or "", getir)
         k["metin_durumu"] = durum
@@ -629,7 +633,8 @@ def main(argv: Optional[List[str]] = None, getir: Optional[Callable[..., Tuple[i
     gun = int(a.gun) if str(a.gun).strip().isdigit() else GUN_VARSAYILAN
     gun = max(1, min(gun, GUN_AZAMI))
     bugun = date.fromisoformat(a.bugun) if a.bugun else datetime.now(tz.TR).date()
-    istemci = ortak.Nazik(getir or tz.http_getir, aralik=ISTEK_ARALIGI, sinir=ISTEK_SINIRI, uyu=uyu)
+    istemci = ortak.Nazik(getir or tz.http_getir, aralik=ISTEK_ARALIGI, sinir=ISTEK_SINIRI, uyu=uyu,
+                          sure=SURE_SINIRI)
     paketler = Paketler(a.paketler)
     sonuc = calis(bugun, gun, paketler, istemci, tablo_yukle())
     ac, hata = ortak.issuelari_ac(adaylar(sonuc, a.paketler), ETIKET, RENK, ETIKET_ACIKLAMA, a.kuru)
