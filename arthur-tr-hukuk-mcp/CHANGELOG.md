@@ -10,10 +10,6 @@
 - `duman_nobetci.py`: duman testinin issue adımı, tarife nöbetçisiyle aynı kalıp. ADRES, BOS ya da HATA veren
   kaynak için tek issue; aynı kaynağa üç farklı günde üst üste erişilemezse tek issue; aynı başlıklı açık issue
   varsa yenisi açılmaz. Sayaç Actions önbelleğinde; dallarda kuru koşu (issue açmaz, sayaca yazmaz).
-- **`resmi_gazete_fihrist` ve `resmi_gazete_tara` kanunları da listeler.** Yasama Bölümü'nde kanunlar "––" ile değil
-  kanun numarasıyla başlar ("7554 Bazı Kanunlarda …"); ayrıştırıcı yalnız "––" satırlarını okuduğu için hiçbir kanun
-  fihristte görünmüyordu (ör. RG 12.03.2024, S. 32487'de 7499 sayılı Kanun). KANUN/KANUNLAR başlığı altındaki
-  numaralı satırlar artık kalemdir; başlık sayfadaki gibidir, numara ayrıca `kanun_no` alanında.
 
 ## 0.8.1 — 2026-11-19
 
@@ -31,6 +27,10 @@
   işaretlerde kelimeyi böler: tırnaklı `"01 04 1974"` 193 karar, `+muris +muvazaası +01 +04 +1974` 169 karar bulur
   (19.11.2026). Gönderilen biçim `uygulanan_sorgu`da, çevrilenler `sorgu_notu`nda. 0.8.0'daki esas numarası çevirisi
   (`2014/27629` → `2014 27629`) bu kuralın bir hâli olarak sürer.
+- **`resmi_gazete_fihrist` ve `resmi_gazete_tara` kanunları da listeler.** Yasama Bölümü'nde kanunlar "––" ile değil
+  kanun numarasıyla başlar ("7554 Bazı Kanunlarda …"); ayrıştırıcı yalnız "––" satırlarını okuduğu için hiçbir kanun
+  fihristte görünmüyordu (ör. RG 12.03.2024, S. 32487'de 7499 sayılı Kanun). KANUN/KANUNLAR başlığı altındaki
+  numaralı satırlar artık kalemdir; başlık sayfadaki gibidir, numara ayrıca `kanun_no` alanında.
 
 ## 0.8.0 — 2026-11-18
 
