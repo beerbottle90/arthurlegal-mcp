@@ -111,6 +111,31 @@ class WorkflowGuardsTest(unittest.TestCase):
     def test_only_master_head_is_deployed(self) -> None:
         self.assertIn("git ls-remote origin refs/heads/master", _akis())
 
+    def test_a_hung_step_cannot_cut_the_rollback(self) -> None:
+        # 22.11.2026 (issue #84): makine güncelleme isteği 73 dk yanıtsız kaldı, tek sınır işin 75 dk'sıydı ve
+        # geri dönüşü yarıda kesti. Dağıtımdan sonraki her adımın kendi sınırı olmalı, toplamları işe sığmalı.
+        metin = _akis()
+        is_siniri = int(re.search(r"\n    timeout-minutes: (\d+)\n", metin).group(1))
+        adimlar = {}
+        for adim in _adimlar(metin):
+            ad = re.search(r"name: (.+)", adim)
+            if ad:
+                adimlar[ad.group(1).strip()] = adim
+        sinirlar = {}
+        for ad in ("Dağıt (Dockerfile.code)", "Canlıyı denetle", "Önceki imaja dön",
+                   "Geri dönüşten sonra canlı uç", "Issue"):
+            bulunan = re.search(r"\n        timeout-minutes: (\d+)\n", adimlar[ad])
+            self.assertIsNotNone(bulunan, "süre sınırı yok: " + ad)
+            sinirlar[ad] = int(bulunan.group(1))
+        # Dağıtımdan önceki adımlara (çekme, arama kapısı, ekler) 10 dk pay.
+        self.assertLessEqual(10 + sum(sinirlar.values()), is_siniri, sinirlar)
+
+    def test_rollback_is_retried_when_the_lease_is_still_held(self) -> None:
+        adim = next(a for a in _adimlar(_akis()) if "name: Önceki imaja dön" in a)
+        self.assertIn("for deneme in 1 2 3", adim)
+        self.assertIn('--image "$ONCEKI"', adim)
+        self.assertIn("exit 1", adim)
+
 
 class LiveCheckDecisionsTest(unittest.TestCase):
     def test_fewer_tools_is_an_error_unless_allowed(self) -> None:

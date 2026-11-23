@@ -355,7 +355,12 @@ commit, the calculation cards answer. If a check fails it redeploys the previous
 image and opens an issue. If Fly's builder does not start, the build is tried once
 more and then made on the GitHub machine itself
 ([`.github/dagitim/dagit.sh`](.github/dagitim/dagit.sh)); a failure after the build
-is not retried. It needs the repository secret `FLY_API_TOKEN`, a deploy
+is not retried. Every step after the deploy has its own time limit (deploy 30 min,
+live check 15, rollback 25), and together they fit inside the job's limit, so a
+hung step can never cut the rollback or the issue short: on 22 November 2026 a
+machine update request hung for 73 minutes and the job limit alone stopped the
+rollback halfway (issue #84). The rollback is tried three times, 60 s apart, in
+case the cut deploy's machine lease has not expired yet. It needs the repository secret `FLY_API_TOKEN`, a deploy
 token scoped to this app (`flyctl tokens create deploy -a arthurlegal-mcp`). A
 manual run (Actions, "Fly dağıtımı", Run workflow) redeploys `master`; tick
 "Araç sayısı bilerek azaldı" when a release removes tools on purpose. Full images

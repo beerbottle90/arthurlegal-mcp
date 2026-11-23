@@ -24,6 +24,12 @@
 # geldiğini ölçer. Kaynak cevap verdi ama beklenen kayıt yoksa (KALDI) dağıtım başlamaz, canlı uç değişmez ve issue
 # açılır; kaynak o an cevap vermediyse (ERISIM) uyarı yazılır, dağıtım sürer. Bilerek geçmek için elle koşuda
 # "arama_kabul" alanına gerekçe yazılır. Sır almaz.
+#
+# Süre sınırları: dağıtımdan sonraki her adımın kendi sınırı var ve hepsinin toplamı işin sınırına sığar. Böylece
+# takılan bir adım geri dönüşü ve issue'yu kesemez. 22.11.2026'da makine güncelleme isteği 73 dk yanıtsız kaldı
+# (flyctl'in --wait-timeout'u o isteği sınırlamaz); o zamanki tek sınır işin 75 dk'sıydı ve geri dönüşü yarıda
+# kesti (issue #84). Olağan dağıtım baştan sona ~9 dk. Geri dönüş, kesilen dağıtımın makine kilidi (lease)
+# henüz düşmediği için reddedilirse 60 sn arayla üç kez denenir.
 
 name: Fly dağıtımı
 
@@ -70,7 +76,8 @@ jobs:
        github.event.workflow_run.head_branch == 'master' &&
        github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    # Dağıtımdan önceki adımlara 10 dk pay + aşağıdaki adım sınırlarının toplamı (tests/test_dagitim.py denetler).
+    timeout-minutes: 95
     env:
       UYGULAMA: arthurlegal-mcp
       SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -165,6 +172,8 @@ jobs:
 
       - name: Dağıt (Dockerfile.code)
         if: steps.son.outputs.atla != '1'
+        # Olağanı ~6 dk; derleyici iki kez düşüp imaj burada derlense de ~20 dk. Aşarsa adım düşer, geri dönüş başlar.
+        timeout-minutes: 30
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           DERLEYICI: ${{ inputs.derleyici || 'fly' }}
@@ -172,6 +181,7 @@ jobs:
 
       - name: Canlıyı denetle
         if: steps.son.outputs.atla != '1'
+        timeout-minutes: 15
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           AZALABILIR: ${{ inputs.arac_azalabilir && '--arac-azalabilir' || '' }}
@@ -184,18 +194,28 @@ jobs:
       - name: Önceki imaja dön
         id: geri
         if: (failure() || cancelled()) && steps.once.outcome == 'success'
+        timeout-minutes: 25
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           ONCEKI: ${{ steps.once.outputs.onceki }}
-        run: flyctl deploy -a "$UYGULAMA" --config fly.toml --image "$ONCEKI" --wait-timeout 10m
+        run: |
+          for deneme in 1 2 3; do
+            flyctl deploy -a "$UYGULAMA" --config fly.toml --image "$ONCEKI" --wait-timeout 10m && exit 0
+            [ "$deneme" -eq 3 ] && break
+            echo "::warning::Geri dönüş $deneme. denemede düştü (kesilen dağıtımın makine kilidi henüz düşmemiş olabilir); 60 sn sonra yeniden."
+            sleep 60
+          done
+          exit 1
 
       - name: Geri dönüşten sonra canlı uç
         id: saglik
         if: (failure() || cancelled()) && steps.geri.outcome == 'success'
+        timeout-minutes: 10
         run: python .github/dagitim/canli_denetim.py saglik --once "$RUNNER_TEMP/once.json"
 
       - name: Issue
         if: failure() || cancelled()
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
