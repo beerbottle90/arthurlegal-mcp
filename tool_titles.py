@@ -179,6 +179,7 @@ TITLES: Dict[str, str] = {
     "status": "Status of every jurisdiction",
     "al_masasi": "ArthurLegal desk (interactive view)",
     "al_masaya_yaz": "Show the answer on the ArthurLegal desk",
+    "al_dosya": "Build a delivered file for the ArthurLegal desk",
     "al_masada_basla": "Put the question on the ArthurLegal desk",
     # Fee calculator cards (Türkiye)
     "hesap_kalemleri": "Türkiye: fee calculator menu",
@@ -212,7 +213,7 @@ def title_for(name: str) -> str:
 # only reads ("openWorldHint: true when a tool accesses the public internet ... including
 # through read-only actions"). All three hints are explicit booleans on every tool: the OpenAI
 # directory rejects a listing with a missing one.
-CLOSED_WORLD = {"status", "al_masasi", "al_masaya_yaz", "al_masada_basla"}
+CLOSED_WORLD = {"status", "al_masasi", "al_masaya_yaz", "al_masada_basla", "al_dosya"}
 
 
 def annotations_for(name: str) -> Dict[str, Any]:

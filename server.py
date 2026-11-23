@@ -844,6 +844,12 @@ def _attach_views() -> None:
         able.append("al_masaya_yaz")
     if basla:
         able.append("al_masada_basla")
+    # Files on the desk (3.5.0): Claude writes a requested file's content into al_masaya_yaz and the desk offers
+    # Download. This endpoint stores nothing: the desk sends the content back with al_dosya (islem=uret) and the
+    # built file goes straight to the desk, never to the model (the tool is visible to the app only).
+    dosya = getattr(al_arayuz, "dosya_araci", None) if teslim else None
+    if dosya:
+        able.append("al_dosya")
     _tools.append(Tool(
         tanim["name"], tanim["description"], tanim["inputSchema"],
         # Claude reports its own model name (the desk cannot see it, and no server can change it): the desk shows
@@ -866,6 +872,17 @@ def _attach_views() -> None:
         tanim = teslim("uzak")
         _tools.append(Tool(tanim["name"], tanim["description"], tanim["inputSchema"], hand_over,
                            meta=al_arayuz.arac_meta("al_masaya_yaz")))
+    if dosya:
+        def build_file(args: Dict[str, Any]) -> Dict[str, Any]:
+            if args.get("islem") != "uret":
+                raise McpError("This endpoint stores no files: only islem=uret (build from the content) works here.")
+            try:
+                return al_arayuz.dosya_uret(args)
+            except ValueError as exc:   # DosyaHatasi: unknown format, too long, empty content
+                raise McpError(str(exc)) from None
+        tanim = dosya("uzak")
+        _tools.append(Tool(tanim["name"], tanim["description"], tanim["inputSchema"], build_file,
+                           meta=tanim["_meta"]))
     if basla:
         # The question goes on the desk before the research starts; each tool's step then joins it.
         def start(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -1012,7 +1029,7 @@ def build_directory() -> Tuple[List[Tool], str, List[Resource]]:
 # neutral: no client name, no model advice (ChatGPT models are not measured yet).
 OPENAI_INSTRUCTIONS_HEADER = """ArthurLegal: legal research for lawyers in Türkiye, twelve jurisdictions behind one endpoint. If the user says "ArthurLegal Masası'nı aç", "masayı aç" or names a desk module, call al_masasi. Before writing any Turkish statutory article, fetch it with tr_mevzuat_madde_getir and quote its `citation` verbatim; never cite from memory. If a source cannot be reached, write "UYARI: veri çekilemedi, teyidiniz gerekli: <official source URL>" and do not fill the gap.
 
-DESK. Once al_masasi has opened the desk in this chat, answer every later question this way: call al_masada_basla with the question, research, then deliver the full answer with al_masaya_yaz; then write a two or three sentence summary in the chat and say the full answer is on the desk (if al_masaya_yaz fails, write the full answer in the chat). The desk checks the article citations of the answer against the official text itself.
+DESK. Once al_masasi has opened the desk in this chat, answer every later question this way: call al_masada_basla with the question, research, then deliver the full answer with al_masaya_yaz; then write a two or three sentence summary in the chat and say the full answer is on the desk (if al_masaya_yaz fails, write the full answer in the chat). The desk checks the article citations of the answer against the official text itself. If the user asks for a file (Word, Excel, CSV), put its content in the dosyalar field of al_masaya_yaz: the desk offers it for download; do not also build it with code execution.
 
 TOOL PREFIXES. Each tool name starts with the jurisdiction or source it answers for:
 `tr_` Türkiye (case law, legislation, Constitutional Court, Official Gazette, eight regulators, a local semantic archive) · `nl_` Netherlands · `pl_` Poland · `at_` Austria · `ie_` Ireland · `fi_` Finland · `es_` Spain · `uk_` United Kingdom · `eu_` EU law (CELLAR) · `jp_` Japan · `az_` Azerbaijan · `de_` Germany · `gleif_` legal-entity identity (LEI) · `scholar_` open-access legal scholarship · `contracts_` petroleum and mining contracts · `tkgm_` Turkish land registry (parcel by province, district, neighbourhood, block and parcel; the first live call returns a consent card) · `hesap_` Turkish fee and interest calculators (the code computes; quote the freshness line as returned).
