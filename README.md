@@ -215,8 +215,8 @@ tools below and a one-line step for the rest. `/directory/mcp` keeps the two car
   the desk cannot read it, so Claude hands its answer over with this tool (question, steps, Markdown
   answer, sources). The host reopens the desk with the tool's input and the answer streams in as it is
   written; the desk then checks the answer's statutory citations against the official text. The server
-  stores nothing and echoes nothing back. The order (start, research, hand over; "Cevap masada." in
-  the chat) is part of this endpoint's instructions, near the top. Neither tool is on `/directory/mcp`,
+  stores nothing and echoes nothing back. The order (start, research, hand over; a two or three sentence summary in
+  the chat, since 23.11.2026 so that an answer is never lost when the desk is not in view) is part of this endpoint's instructions, near the top. Neither tool is on `/directory/mcp`,
   whose descriptions give no instructions; there the answer stays in the chat. The MCP screen lists connected servers and their
   status (Claude reports them when it opens the desk), not their tools.
 
