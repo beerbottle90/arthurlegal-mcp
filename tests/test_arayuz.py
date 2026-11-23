@@ -103,8 +103,18 @@ class ServerViewsTest(unittest.TestCase):
         # Memory, masking and UYAP run on the lawyer's computer; this endpoint serves web and phone.
         self.assertEqual(masa["moduller"]["beyin"], {"durum": "masaustu"})
         self.assertEqual(masa["moduller"]["tapu"], {"durum": "claude"})
-        self.assertEqual(masa["yetenekler"], ["al_masada_basla", "al_masaya_yaz", "status", "tr_ictihat_ara",
+        self.assertEqual(masa["yetenekler"], ["al_dosya", "al_masada_basla", "al_masaya_yaz", "status", "tr_ictihat_ara",
                                               "tr_mevzuat_madde_getir"])
+        # Files on the desk (3.5.0): the desk asks this endpoint to build a delivered file; nothing is stored, the
+        # tool is for the app only and cannot open or read files.
+        dosya = tools["al_dosya"]
+        self.assertEqual(dosya.meta, {"ui": {"visibility": ["app"]}})
+        self.assertEqual(dosya.input_schema["properties"]["islem"]["enum"], ["uret"])
+        uret = dosya.handler({"islem": "uret", "ad": "Liste", "bicim": "csv", "icerik": "a;b"})
+        self.assertEqual((uret["ad"], uret["mime"]), ("Liste.csv", "text/csv"))
+        for kotu in ({"islem": "ac", "ad": "x.docx"}, {"islem": "uret", "ad": "x", "bicim": "pdf", "icerik": "x"}):
+            with self.assertRaises(McpError):
+                dosya.handler(kotu)
         # The question goes on the desk first; an empty question is an error, not an empty desk.
         basla = tools["al_masada_basla"].handler({"soru": "Kira artışı nasıl belirlenir?"})
         self.assertEqual((basla["bolum"], basla["basla"]["soru"]), ("sohbet", "Kira artışı nasıl belirlenir?"))
