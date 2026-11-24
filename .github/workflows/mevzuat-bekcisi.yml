@@ -8,8 +8,9 @@
 #
 # Resmî Gazete'ye ulaşılamaz ya da paketler okunamazsa "Mevzuat bekçisi uyarısı: …" issue'su ve Actions uyarısı.
 # İstekler nazik: kısa tanıtım, istek arası en az 1,5 sn, koşu başına en çok 80 istek. Sır kullanmaz; paketler
-# public depodan salt okunur çekilir. Dallarda yalnız dener (issue açmaz). Kaçan haftayı kapatmak için elle
-# çalıştırırken `gun` en çok 14.
+# public depodan salt okunur çekilir. Dallarda yalnız dener (issue açmaz). Taranamayan gün aynı koşuda bir kez
+# daha denenir, yine okunamazsa açık uyarı issue'su onu sonraki koşuya taşır (hepsi taranınca issue kapanır).
+# Beklemeden kapatmak için elle çalıştırırken `gun` en çok 14.
 
 name: Mevzuat bekçisi
 

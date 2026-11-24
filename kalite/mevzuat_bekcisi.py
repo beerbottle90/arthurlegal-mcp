@@ -21,6 +21,11 @@ e-postası başlıktan okur). Aynı başlıklı issue (açık ya da kapalı) var
   ve yalnız koşu özetinde sayılır.
 * Resmî Gazete'ye ulaşılamaz ya da paketler okunamazsa sessiz geçmez: "Mevzuat bekçisi uyarısı: …" issue'su
   (aynı başlıklı açık issue yoksa) ve Actions uyarısı.
+* Taranamayan gün kaybolmaz: zaman aşımına uğrayan gün aynı koşunun sonunda bir kez daha denenir; yine
+  okunamazsa uyarı issue'sunun gövdesindeki `<!-- taranamayan-gunler: … -->` satırına yazılır. Sonraki koşu
+  açık uyarı issue'sundaki günleri kendi aralığına ekler (en çok `TASIMA_AZAMI` gün); hepsi taranınca issue'yu
+  yorumla kapatır, kalan varsa gövdeyi güncel listeyle yeniler. Böylece hafta aralığının dışına düşen gün de
+  taranır (2026-11-22 olayı, issue #89).
 
 RG okuma kalıbı hesap-mcp/tazelik.py'dendir (yalnız https://www.resmigazete.gov.tr, kısa tanıtım). İstekler
 nazik: iki istek arasında en az 1,5 sn, koşu başına en çok 80 istek ve 9 dakika (iş akışının 15 dakikalık sınırından
@@ -42,6 +47,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from datetime import date, datetime, timedelta
@@ -85,6 +91,9 @@ METIN_ZAMAN_ASIMI = 30.0     # sn; kararname ve karar PDF'leri
 PDF_SAYFA = 40
 TABLO_SATIRI = 10           # issue'da mevzuat başına rehber satırı
 GOVDE_AZAMI = 60_000        # GitHub issue gövdesi en çok 65 536 karakter
+TASIMA_AZAMI = 14           # açık uyarı issue'sundan sonraki koşuya taşınan en çok gün (en yeniler)
+_ISARET = re.compile(r"<!--\s*taranamayan-gunler:\s*(.*?)\s*-->")
+_ESKI_SATIR = re.compile(r"^- (\d{2})\.(\d{2})\.(\d{4}):", re.M)   # işaretten önce açılan uyarılar (#89)
 
 TABLO_YOLU = os.path.join(BURADA, "kanunlar.json")
 
@@ -555,14 +564,39 @@ def issue_govdesi(k: Dict[str, Any]) -> str:
     return "\n".join(s + orta + son)[:GOVDE_AZAMI + 1000]
 
 
-def tarama_uyarisi(hatalar: List[str]) -> str:
+def tarama_uyarisi(hatalar: List[str], gunler: List[str] = ()) -> str:
+    """Uyarı gövdesi. ``gunler`` (ISO) gizli işaret satırına yazılır: sonraki koşu bu günleri yeniden tarar."""
     return "\n".join([
         "Haftalık mevzuat bekçisi Resmî Gazete taramasını tamamlayamadı; aşağıdaki günlerdeki yayımlar "
         "denetlenmedi.", ""] + ["- %s" % h for h in hatalar] + [
         "",
-        "Yapılacak: Resmî Gazete'yi bir tarayıcıdan açıp sitenin çalıştığını görün; sonra Actions'tan "
-        "\"Mevzuat bekçisi\" işini `gun` girdisiyle (en çok 14) elle çalıştırın. Sorun sürüyorsa iş akışının "
-        "günlüğüne bakın. Taranamayan haftayı elle kapatınca bu issue'yu kapatın."])
+        "Bu günler kaybolmaz: bekçinin sonraki koşusu onları kendiliğinden yeniden tarar; hepsi taranınca bu "
+        "issue'yu yorumla kapatır, kalan olursa listeyi burada günceller.",
+        "",
+        "Beklemek istemezseniz: Resmî Gazete'yi bir tarayıcıdan açıp sitenin çalıştığını görün; sonra Actions'tan "
+        "\"Mevzuat bekçisi\" işini elle çalıştırın (taşınan günleri o koşu da okur). Sorun sürüyorsa iş akışının "
+        "günlüğüne bakın.",
+        "",
+        "<!-- taranamayan-gunler: %s -->" % ",".join(sorted(set(gunler)))])
+
+
+def tasinan_gunler(govde: str) -> List[date]:
+    """Açık uyarı issue'sundaki taranamamış günler: işaret satırı; yoksa eski biçimdeki '- GG.AA.YYYY:' satırları."""
+    gunler = set()
+    m = _ISARET.search(govde or "")
+    if m:
+        for parca in m.group(1).split(","):
+            try:
+                gunler.add(date.fromisoformat(parca.strip()))
+            except ValueError:
+                continue
+    else:
+        for g, a, y in _ESKI_SATIR.findall(govde or ""):
+            try:
+                gunler.add(date(int(y), int(a), int(g)))
+            except ValueError:
+                continue
+    return sorted(gunler)[-TASIMA_AZAMI:]
 
 
 def paket_uyarisi(kok: str) -> str:
@@ -576,8 +610,11 @@ def paket_uyarisi(kok: str) -> str:
 
 # --------------------------------------------------------------------------- akış
 def calis(bugun: date, gun: int, paketler: Paketler, getir: Callable[..., Tuple[int, bytes]],
-          tablo: Dict[str, Any]) -> Dict[str, Any]:
-    gunler = [bugun - timedelta(days=i) for i in range(gun - 1, -1, -1)]
+          tablo: Dict[str, Any], tasinan: List[date] = ()) -> Dict[str, Any]:
+    aralik = [bugun - timedelta(days=i) for i in range(gun - 1, -1, -1)]
+    # Önceki koşudan taşınan günler aralığın önüne eklenir (gelecek gün alınmaz).
+    ek = sorted({g for g in tasinan if g < aralik[0]})
+    gunler = ek + aralik
     tarama = tara(gunler, getir)
     secilen: List[Dict[str, Any]] = []
     elenen: List[Dict[str, Any]] = []
@@ -598,25 +635,60 @@ def calis(bugun: date, gun: int, paketler: Paketler, getir: Callable[..., Tuple[
         k.update(degerlendir(k, metin, paketler, tablo))
         her_zaman = TURLER[k["tur"]]["her_zaman"] and not UYGUN_BULMA.search(katla(k["baslik"]))
         k["issue"] = her_zaman or bool(k["rehberler"])
-    return {"aralik": [gunler[0].isoformat(), gunler[-1].isoformat()], "gunler": tarama["gunler"],
-            "hatalar": tarama["hatalar"], "secilen": secilen, "elenen": elenen,
-            "paket_dosyasi": len(paketler.dosyalar), "istek": getattr(getir, "sayi", None)}
+    return {"aralik": [aralik[0].isoformat(), aralik[-1].isoformat()], "gunler": tarama["gunler"],
+            "tasinan": [g.isoformat() for g in ek], "hatalar": tarama["hatalar"], "secilen": secilen,
+            "elenen": elenen, "paket_dosyasi": len(paketler.dosyalar), "istek": getattr(getir, "sayi", None)}
+
+
+def taranamayan(sonuc: Dict[str, Any]) -> List[str]:
+    """Bu koşuda da okunamayan günler (ISO); uyarı issue'su bunları sonraki koşuya taşır."""
+    return sorted(g for g, k in sonuc["gunler"].items() if k["durum"] == "hata")
 
 
 def adaylar(sonuc: Dict[str, Any], paket_kok: str) -> List[Dict[str, str]]:
     out = [{"title": issue_basligi(k), "body": issue_govdesi(k), "tur": "degisiklik"}
            for k in sonuc["secilen"] if k["issue"]]
     if sonuc["hatalar"]:
-        out.append({"title": UYARI_TARAMA, "body": tarama_uyarisi(sonuc["hatalar"]), "tur": "uyari"})
+        out.append({"title": UYARI_TARAMA, "body": tarama_uyarisi(sonuc["hatalar"], taranamayan(sonuc)),
+                    "tur": "uyari"})
     if not sonuc["paket_dosyasi"]:
         out.append({"title": UYARI_PAKET, "body": paket_uyarisi(paket_kok), "tur": "uyari"})
     return out
+
+
+def uyari_issuesunu_yurut(acik: Dict[str, Any], sonuc: Dict[str, Any], kuru: bool) -> str:
+    """Açık tarama uyarısını bu koşunun sonucuna göre kapatır ya da günceller; ne yapıldığını döndürür.
+
+    Kuru koşuda (dallar, PR) yalnız ne yapılacağını söyler. gh hatası koşuyu düşürmez, özete yazılır.
+    """
+    no = acik.get("number")
+    kalan = taranamayan(sonuc)
+    try:
+        if kalan:
+            govde = tarama_uyarisi(sonuc["hatalar"], kalan)
+            if (acik.get("body") or "").strip() == govde.strip():
+                return "#%s açık kalır (aynı günler)" % no
+            if not kuru:
+                ortak.issue_guncelle(no, govde)
+            return "#%s %s: taranamayan %s" % (no, "güncellenirdi (kuru)" if kuru else "güncellendi",
+                                               ", ".join(ortak.tr_tarih(g) for g in kalan))
+        tarandi = ", ".join(ortak.tr_tarih(g) for g in sonuc.get("tasinan") or []) or "aralıktaki günler"
+        yorum = "Taşınan günler bu koşuda tarandı: %s. Değişiklik varsa ayrı \"Mevzuat değişikliği\" issue'su açıldı." % tarandi
+        if not kuru:
+            ortak.issue_kapat(no, yorum)
+        return "#%s %s (%s)" % (no, "kapanırdı (kuru)" if kuru else "kapatıldı", tarandi)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return "#%s işlenemedi: %s" % (no, exc)
 
 
 def ozet(sonuc: Dict[str, Any], ac: List[Dict[str, str]], kuru: bool, hata: Optional[str]) -> str:
     s = ["## Mevzuat bekçisi (kalite süreci 7)", "",
          "- Aralık: %s – %s" % tuple(ortak.tr_tarih(x) for x in sonuc["aralik"]),
          "- İstek: %s · paket rehberi: %d" % (sonuc["istek"], sonuc["paket_dosyasi"])]
+    if sonuc.get("tasinan"):
+        s.append("- Önceki koşudan taşınan: %s" % ", ".join(ortak.tr_tarih(g) for g in sonuc["tasinan"]))
+    if sonuc.get("uyari_issue"):
+        s.append("- Tarama uyarısı: %s" % sonuc["uyari_issue"])
     for g, k in sorted(sonuc["gunler"].items()):
         s.append("- %s: %s%s" % (ortak.tr_tarih(g), k["durum"], ", sayı %s, mükerrer %s, %s kalem" % (
             k.get("sayi"), k.get("mukerrerler") or "-", k.get("kalem")) if k["durum"] == "tamam"
@@ -653,8 +725,15 @@ def main(argv: Optional[List[str]] = None, getir: Optional[Callable[..., Tuple[i
     istemci = ortak.Nazik(getir or tz.http_getir, aralik=ISTEK_ARALIGI, sinir=ISTEK_SINIRI, uyu=uyu,
                           sure=SURE_SINIRI)
     paketler = Paketler(a.paketler)
-    sonuc = calis(bugun, gun, paketler, istemci, tablo_yukle())
+    try:
+        acik = ortak.acik_issue(ETIKET, UYARI_TARAMA)
+    except (OSError, subprocess.CalledProcessError, ValueError) as exc:
+        acik = None
+        ortak.uyari("Mevzuat bekçisi: açık uyarı issue'su okunamadı, taşınan gün yok sayıldı (%s)" % exc)
+    tasinan = tasinan_gunler(acik.get("body", "")) if acik else []
+    sonuc = calis(bugun, gun, paketler, istemci, tablo_yukle(), tasinan)
     ac, hata = ortak.issuelari_ac(adaylar(sonuc, a.paketler), ETIKET, RENK, ETIKET_ACIKLAMA, a.kuru)
+    sonuc["uyari_issue"] = uyari_issuesunu_yurut(acik, sonuc, a.kuru) if acik and not hata else None
     for h in sonuc["hatalar"]:
         ortak.uyari("Mevzuat bekçisi: %s" % h)
     if not sonuc["paket_dosyasi"]:
