@@ -167,6 +167,23 @@ def mevcut_issuelar(etiket: str) -> List[Dict[str, str]]:
                          "--json", "title,state") or "[]")
 
 
+def acik_issue(etiket: str, baslik: str) -> Optional[Dict[str, Any]]:
+    """Bu başlıklı açık issue ({number, title, body}) ya da None. Bekçinin koşudan koşuya taşıdığı durum."""
+    for i in json.loads(gh("issue", "list", "--state", "open", "--label", etiket, "--limit", "100",
+                           "--json", "number,title,body") or "[]"):
+        if i.get("title") == baslik:
+            return i
+    return None
+
+
+def issue_guncelle(no: int, govde: str) -> None:
+    gh("issue", "edit", str(no), "--body", govde)
+
+
+def issue_kapat(no: int, yorum: str) -> None:
+    gh("issue", "close", str(no), "--comment", yorum)
+
+
 def etiket_kur(etiket: str, renk: str, aciklama: str) -> None:
     gh("label", "create", etiket, "--color", renk, "--force", "--description", aciklama)
 

@@ -33,7 +33,7 @@ import urllib.request
 import zlib
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
-__all__ = ["Http", "HttpError", "TokenBucket", "UA", "decode", "qs"]
+__all__ = ["Http", "HttpError", "TokenBucket", "UA", "chain_context", "decode", "qs"]
 
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
@@ -142,18 +142,39 @@ def qs(params: Union[Dict[str, Any], Sequence[Tuple[str, Any]]]) -> str:
                                   doseq=True)
 
 
+def chain_context(intermediates: str) -> ssl.SSLContext:
+    """A verifying context whose store also holds ``intermediates`` (PEM) for chain building.
+
+    Python 3.13 turns on VERIFY_X509_PARTIAL_CHAIN by default, which would let a stored intermediate end the
+    chain on its own; it is turned off here so the chain must reach a root of the system store, as without it.
+    """
+    ctx = ssl.create_default_context()
+    ctx.load_verify_locations(cadata=intermediates)
+    if hasattr(ssl, "VERIFY_X509_PARTIAL_CHAIN"):
+        ctx.verify_flags &= ~ssl.VERIFY_X509_PARTIAL_CHAIN
+    return ctx
+
+
 class Http:
     """A small cookie-aware HTTP client bound to one upstream.
 
     ``headers`` are sent on every request; ``bucket`` throttles; ``verify=False``
     disables TLS verification. No source uses it today: the upstreams that once
     needed it (KİK, Uyuşmazlık) are removed or verify with a stock store.
+
+    ``intermediates`` (PEM text) is for an upstream that sends its leaf certificate
+    without the issuing CA. The PEM is added to this client's own store only, as a
+    chain building aid: verification stays on, the hostname is still checked and the
+    chain must still end at a root of the system store (partial chains are refused,
+    so the intermediate is never a trust anchor by itself). Other clients never see it.
     """
 
     def __init__(self, base_url: str = "", headers: Optional[Dict[str, str]] = None,
                  bucket: Optional[TokenBucket] = None, verify: bool = True,
                  timeout: float = DEFAULT_TIMEOUT, follow_redirects: bool = True,
-                 ciphers: str = "", allowed_domains: Iterable[str] = ()):
+                 ciphers: str = "", allowed_domains: Iterable[str] = (), intermediates: str = ""):
+        if intermediates and not verify:
+            raise ValueError("intermediates only make sense with verification on")
         self.base_url = base_url.rstrip("/")
         # Tool arguments reach request paths (a decision URL, a document id), so every request, and every
         # redirect, must stay on the upstream's own domain: without this the server fetches any URL a caller
@@ -171,8 +192,11 @@ class Http:
         self.timeout = timeout
         self.jar = http.cookiejar.CookieJar()
         handlers: List[Any] = [urllib.request.HTTPCookieProcessor(self.jar)]
+        # Kept for inspection (tests read it); None means urllib's own default context.
+        self.ssl_context: Optional[ssl.SSLContext] = chain_context(intermediates) if intermediates else None
         if not verify or ciphers:
-            ctx = ssl.create_default_context()
+            ctx = self.ssl_context or ssl.create_default_context()
+            self.ssl_context = ctx
             if not verify:
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
@@ -183,6 +207,8 @@ class Http:
                 # default security level refuses its handshake outright.
                 ctx.set_ciphers(ciphers)
             handlers.append(urllib.request.HTTPSHandler(context=ctx))
+        elif self.ssl_context is not None:
+            handlers.append(urllib.request.HTTPSHandler(context=self.ssl_context))
         handlers.append(self._redirect_handler(follow_redirects))
         self.opener = urllib.request.build_opener(*handlers)
         self.verify = verify

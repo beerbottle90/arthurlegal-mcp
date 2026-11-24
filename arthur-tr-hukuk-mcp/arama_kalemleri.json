@@ -78,6 +78,16 @@
       "beklenen": [{"madde_no": "389"}],
       "kaynak": "Başlık eşleşmesi: HMK m.389 ihtiyati tedbirin şartları.",
       "olcum": "2026-11-18: sıra 1, başlık 'İhtiyati tedbirin şartları'."
+    },
+    {
+      "id": "kurum-kvkk-acik-riza",
+      "arac": "kurum_karari_ara",
+      "argumanlar": {"kurum": "kvkk", "query": "açık rıza", "scan_pages": 10, "limit": 20},
+      "ilk_n": 20,
+      "en_az": 1,
+      "beklenen": [{"decision_no": "2024/1393"}],
+      "kaynak": "issue #78: kvkk.gov.tr 17.11.2026'daki sertifika yenilemesinden beri ara sertifikayı göndermiyor, KVKK araçları 18.11'den beri TLS hatası veriyordu; KVKK istemcisine yalnız kendi alan adı için GlobalSign ara sertifikası eklendi. Beklenen kararın başlığı 'AÇIK RIZA ŞARTINA BAĞLANMASINA İLİŞKİN ŞİKÂYET' (kurum_karari_getir ile metinden okundu).",
+      "olcum": "2026-11-24: sıra 1 (10 liste sayfası, 14 sonuç). Düzeltme öncesi: KVKK araması 18.11.2026'dan beri TLS hatası veriyordu (issue #78), kalem ERISIM olurdu."
     }
   ]
 }

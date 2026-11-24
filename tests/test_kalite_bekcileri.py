@@ -390,9 +390,9 @@ class Komut(unittest.TestCase):
     def test_kuru_kosu_issue_acmaz(self):
         with tempfile.TemporaryDirectory() as d:
             paket_klasoru(d, REHBERLER)
-            eski = (ortak.mevcut_issuelar, ortak.issue_ac, ortak.etiket_kur)
+            eski = (ortak.mevcut_issuelar, ortak.issue_ac, ortak.etiket_kur, ortak.acik_issue)
             acilan = []
-            ortak.mevcut_issuelar, ortak.etiket_kur = _gh_yok, _gh_yok
+            ortak.mevcut_issuelar, ortak.etiket_kur, ortak.acik_issue = _gh_yok, _gh_yok, _gh_yok
             ortak.issue_ac = lambda *a: acilan.append(a)
             ozet = os.environ.pop("GITHUB_STEP_SUMMARY", None)
             try:
@@ -402,7 +402,7 @@ class Komut(unittest.TestCase):
                                    "--cikti", os.path.join(d, "o", "s.json")],
                                   getir=SahteGetirici({"/20250724.htm": (200, RG_GUN)}), uyu=lambda s: None)
             finally:
-                ortak.mevcut_issuelar, ortak.issue_ac, ortak.etiket_kur = eski
+                ortak.mevcut_issuelar, ortak.issue_ac, ortak.etiket_kur, ortak.acik_issue = eski
                 if ozet is not None:
                     os.environ["GITHUB_STEP_SUMMARY"] = ozet
             self.assertEqual(kod, 0)
@@ -414,8 +414,8 @@ class Komut(unittest.TestCase):
     def test_gun_girdisi_sinirlanir(self):
         g = SahteGetirici()
         with tempfile.TemporaryDirectory() as d, redirect_stdout(io.StringIO()):
-            eski = ortak.mevcut_issuelar
-            ortak.mevcut_issuelar = _gh_yok
+            eski = ortak.mevcut_issuelar, ortak.acik_issue
+            ortak.mevcut_issuelar = ortak.acik_issue = _gh_yok
             try:
                 mb.main(["--paketler", d, "--bugun", "2025-07-24", "--gun", "99; rm -rf /", "--kuru"], getir=g,
                         uyu=lambda s: None)
@@ -423,9 +423,107 @@ class Komut(unittest.TestCase):
                 g.istenen.clear()
                 mb.main(["--paketler", d, "--bugun", "2025-07-24", "--gun", "30", "--kuru"], getir=g, uyu=lambda s: None)
             finally:
-                ortak.mevcut_issuelar = eski
+                ortak.mevcut_issuelar, ortak.acik_issue = eski
         self.assertEqual(n_kotu, mb.GUN_VARSAYILAN)
         self.assertEqual(len(g.istenen), mb.GUN_AZAMI)
+
+
+class Tasima(unittest.TestCase):
+    """Issue #89: hafta aralığı dışına düşen taranamamış gün sonraki koşuda kendiliğinden taranır."""
+
+    # issue #89'un gövdesi (işaret satırı yokken açılmış eski biçim)
+    ESKI_GOVDE = ("Haftalık mevzuat bekçisi Resmî Gazete taramasını tamamlayamadı; aşağıdaki günlerdeki yayımlar "
+                  "denetlenmedi.\n\n- 22.11.2026: URLError: timed out\n\nYapılacak: …")
+
+    def setUp(self):
+        self.d = tempfile.TemporaryDirectory()
+        paket_klasoru(self.d.name, REHBERLER)
+        self.eski = (ortak.mevcut_issuelar, ortak.etiket_kur, ortak.issue_ac, ortak.acik_issue,
+                     ortak.issue_guncelle, ortak.issue_kapat)
+        self.olay = []
+        ortak.mevcut_issuelar = lambda e: [{"title": mb.UYARI_TARAMA, "state": "OPEN"}]
+        ortak.etiket_kur = lambda *a: None
+        ortak.issue_ac = lambda *a: self.olay.append(("ac",) + a)
+        ortak.issue_guncelle = lambda no, govde: self.olay.append(("guncelle", no, govde))
+        ortak.issue_kapat = lambda no, yorum: self.olay.append(("kapat", no, yorum))
+        self.ozet = os.environ.pop("GITHUB_STEP_SUMMARY", None)
+
+    def tearDown(self):
+        (ortak.mevcut_issuelar, ortak.etiket_kur, ortak.issue_ac, ortak.acik_issue,
+         ortak.issue_guncelle, ortak.issue_kapat) = self.eski
+        if self.ozet is not None:
+            os.environ["GITHUB_STEP_SUMMARY"] = self.ozet
+        self.d.cleanup()
+
+    def _main(self, getir, bugun, govde, kuru=False):
+        ortak.acik_issue = lambda etiket, baslik: {"number": 89, "title": baslik, "body": govde}
+        arg = ["--paketler", self.d.name, "--bugun", bugun, "--gun", "7"] + (["--kuru"] if kuru else [])
+        cikti = io.StringIO()
+        with redirect_stdout(cikti):
+            kod = mb.main(arg, getir=getir, uyu=lambda s: None)
+        return kod, cikti.getvalue()
+
+    def test_isaret_ve_eski_bicim_okunur(self):
+        govde = mb.tarama_uyarisi(["24.07.2025: URLError: timed out"], ["2025-07-24"])
+        self.assertIn("<!-- taranamayan-gunler: 2025-07-24 -->", govde)
+        self.assertEqual(mb.tasinan_gunler(govde), [date(2025, 7, 24)])
+        self.assertEqual(mb.tasinan_gunler(self.ESKI_GOVDE), [date(2026, 11, 22)])
+        self.assertEqual(mb.tasinan_gunler("işaretsiz ve satırsız"), [])
+        self.assertEqual(mb.tasinan_gunler("<!-- taranamayan-gunler: 2025-07-24,bozuk,2025-13-40 -->"),
+                         [date(2025, 7, 24)])
+
+    def test_iki_denemede_de_zaman_asimi_isarete_yazilir(self):
+        g = SahteGetirici({"/20250724.htm": ortak.ErisimHatasi("URLError: timed out")})
+        s, _ = _calis(g, self.d.name, gun=2)
+        self.assertEqual(sum(u.endswith("/20250724.htm") for u in g.istenen), 2)   # aynı koşuda yeniden denendi
+        uyari = [x for x in mb.adaylar(s, self.d.name) if x["tur"] == "uyari"][0]
+        self.assertEqual(mb.tasinan_gunler(uyari["body"]), [date(2025, 7, 24)])
+
+    def test_tasinan_gun_sonraki_kosuda_taranir_ve_issue_kapanir(self):
+        # Koşu 1 (24.07): gün iki kez zaman aşımı → uyarı gövdesi günü taşır.
+        g1 = SahteGetirici({"/20250724.htm": ortak.ErisimHatasi("URLError: timed out")})
+        s1, _ = _calis(g1, self.d.name, gun=1)
+        govde = [x for x in mb.adaylar(s1, self.d.name) if x["tur"] == "uyari"][0]["body"]
+        # Koşu 2 (bir hafta sonra, 31.07, aralık 25.07 ile 31.07): 24.07 aralık dışında ama yine okunur.
+        g2 = SahteGetirici({"/20250724.htm": (200, RG_GUN)})
+        kod, cikti = self._main(g2, "2025-07-31", govde)
+        self.assertEqual(kod, 0)
+        self.assertTrue(any(u.endswith("/20250724.htm") for u in g2.istenen))
+        kapat = [o for o in self.olay if o[0] == "kapat"]
+        self.assertEqual(len(kapat), 1)
+        self.assertEqual(kapat[0][1], 89)
+        self.assertIn("24.07.2025", kapat[0][2])
+        self.assertIn("Önceki koşudan taşınan: 24.07.2025", cikti)
+        # taşınan gündeki kanun değişikliği de normal yoldan issue olur
+        self.assertTrue(any(o[0] == "ac" and "RG 24.07.2025: 7554" in o[1] for o in self.olay))
+
+    def test_eski_bicimdeki_issue_89_de_tasinir(self):
+        g = SahteGetirici({"/20261122.htm": (200, RG_GUN)})
+        kod, cikti = self._main(g, "2026-11-30", self.ESKI_GOVDE)
+        self.assertTrue(any(u.endswith("/20261122.htm") for u in g.istenen))
+        self.assertEqual([o[1] for o in self.olay if o[0] == "kapat"], [89])
+
+    def test_hala_okunamazsa_issue_guncellenir_kapanmaz(self):
+        govde = mb.tarama_uyarisi(["24.07.2025: URLError: timed out"], ["2025-07-24"])
+        g = SahteGetirici({"/20250724.htm": ortak.ErisimHatasi("URLError: timed out"),
+                           "/20250731.htm": ortak.ErisimHatasi("URLError: timed out")})
+        self._main(g, "2025-07-31", govde)
+        self.assertEqual([o for o in self.olay if o[0] == "kapat"], [])
+        guncel = [o for o in self.olay if o[0] == "guncelle"]
+        self.assertEqual(len(guncel), 1)
+        self.assertEqual(mb.tasinan_gunler(guncel[0][2]), [date(2025, 7, 24), date(2025, 7, 31)])
+
+    def test_kuru_kosu_issue_ya_dokunmaz(self):
+        govde = mb.tarama_uyarisi(["24.07.2025: URLError: timed out"], ["2025-07-24"])
+        kod, cikti = self._main(SahteGetirici({"/20250724.htm": (200, RG_GUN)}), "2025-07-31", govde, kuru=True)
+        self.assertEqual([o for o in self.olay if o[0] in ("kapat", "guncelle", "ac")], [])
+        self.assertIn("#89 kapanırdı (kuru)", cikti)
+
+    def test_tasima_siniri(self):
+        govde = "<!-- taranamayan-gunler: %s -->" % ",".join(
+            "2025-06-%02d" % g for g in range(1, 31))
+        self.assertEqual(len(mb.tasinan_gunler(govde)), mb.TASIMA_AZAMI)
+        self.assertEqual(mb.tasinan_gunler(govde)[-1], date(2025, 6, 30))
 
 
 # =========================================================================== ortak

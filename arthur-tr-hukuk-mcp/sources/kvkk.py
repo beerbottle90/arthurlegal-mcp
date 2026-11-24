@@ -30,8 +30,61 @@ from sources import Source
 
 BASE = "https://www.kvkk.gov.tr"
 LIST = "/Icerik/5406/kurul-karar-ozetleri"
+# www.kvkk.gov.tr sends only its leaf certificate since its renewal on 17.11.2026 (*.kvkk.gov.tr, valid until
+# 04.06.2027): the issuing CA is missing from the handshake, so a client without AIA fetching (Python, curl)
+# fails with "unable to get local issuer certificate" while browsers fetch the CA themselves. This is that
+# CA, added to the KVKK client's store only (net.chain_context): verification stays on, the chain must still
+# end at GlobalSign Root R46 from the system store, and no other upstream uses it.
+# Source: the leaf's own AIA "CA Issuers" address http://secure.globalsign.com/cacert/gsgccr46ovtlsca2025.crt,
+# fetched 24.11.2026. Subject: GlobalSign GCC R46 OV TLS CA 2025; issuer: GlobalSign Root R46; valid until
+# 23.06.2029; SHA-256 D1:60:E2:DE:4E:56:CB:10:B6:6C:1C:B0:AD:CB:79:CF:93:C7:8D:CD:9D:B3:0C:20:18:22:02:62:C0:40:63:F9
+# (tests/test_kvkk_kaynak.py checks it). Harmless once the site sends its full chain again; if KVKK moves to
+# another CA the tools answer "kaynak erişilemez" and the daily smoke test opens an issue.
+_GLOBALSIGN_GCC_R46_OV_2025 = """-----BEGIN CERTIFICATE-----
+MIIFfDCCA2SgAwIBAgIRAIRDWJCDb2c5QYLLnJpdyZ8wDQYJKoZIhvcNAQELBQAw
+RjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExHDAaBgNV
+BAMTE0dsb2JhbFNpZ24gUm9vdCBSNDYwHhcNMjUwOTE3MDI1NTU2WhcNMjkwNjIz
+MDAwMDAwWjBUMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xvYmFsU2lnbiBudi1z
+YTEqMCgGA1UEAxMhR2xvYmFsU2lnbiBHQ0MgUjQ2IE9WIFRMUyBDQSAyMDI1MIIB
+IjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1JyrGiv+210Lw4LTp9qxx9WC
+o6w8HnxcTKr5XwR6WwtKidGXriLqGXtBINGTi4HUZ1Vl3FUIvscLwNcq2DRLwjWs
+cYFNClVnuSw4CtwAcfa7Iltz+0FmFeh/KOWv5BfgCxAo9FaeXRG725b2eedo/7fb
+0zBc6M/XcfQREVteZ6GovnLE96+T8RzRImvX38Y8vZoulp/XWv3p09C1pgp/53+1
+itDl7xbrM4sglGNkeJ5LBN2dOR1sqWCMZ/V4a4cPQwopBtZis1vVh7/k4S6Ysgk0
+CTi5vei0RSEIhxoFk48BHSXzTA4FJxqjfauYCZ4M5tmZ/R5VgXOZ4Ck/PifnXQID
+AQABo4IBVTCCAVEwDgYDVR0PAQH/BAQDAgGGMBMGA1UdJQQMMAoGCCsGAQUFBwMB
+MBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFGl0Pq/DWwGVSe4UQVqT+rEw
+mNqiMB8GA1UdIwQYMBaAFANcq3OBh6jMsKbVlOI2lkn/BZksMHsGCCsGAQUFBwEB
+BG8wbTAuBggrBgEFBQcwAYYiaHR0cDovL29jc3AuZ2xvYmFsc2lnbi5jb20vcm9v
+dHI0NjA7BggrBgEFBQcwAoYvaHR0cDovL3NlY3VyZS5nbG9iYWxzaWduLmNvbS9j
+YWNlcnQvcm9vdHI0Ni5jcnQwNgYDVR0fBC8wLTAroCmgJ4YlaHR0cDovL2NybC5n
+bG9iYWxzaWduLmNvbS9yb290cjQ2LmNybDAhBgNVHSAEGjAYMAgGBmeBDAECAjAM
+BgorBgEEAaAyCgECMA0GCSqGSIb3DQEBCwUAA4ICAQBEUTiKxe5jEintARUvLBm9
+qWZtGiOSV9E+3bntbFFBDBAroqwB6Cj53Zp/W08HwgxaPXdkVaRNYHB/eAatEtSm
+1ldtoorfPc+mVlzbwCwfbpIs2uqW5rF78ne37qy2o+iVnJptq9AzPnlC03+zhhB9
+JwmjUXVtPuqQZ96tFl0fAT77xGSLzCO8yfEDrxCqdWz2wneShSbCCsC15JB07OgO
+StE+MsVBkwe5+PNzAlAr8NZ6f8mzeY/FzaBzlhYw5+c1yyzXJqp+gjRXWrLpD3Ho
+hGOvIXIvCBnyVrYI/HPe6DR5w7oteui9Rt0xfUUudaTkt0iz7fc23eGboZ+bpvgT
+gbd/kYK6JOrxawMyfBYxrR5zDHIJX0Mws99DNgACKBUfFadKAfwFw0+0airY5WAI
+Xs8yhCb5XGwyzVpcB30BrQbWtqdI0PoE9usNvNbH3YFGfuS8oRmAJEgUUQnwOoGK
+jMWtHacw0n8QESdRM274LJvLd9nwawYU4svJpf06FtKPqGH3nXefL741NO9KzDAG
+PM11YScyJVfYdBDXFM86HU1fBGTKlkLcG/qMJxOqppY4wydRI3koSH6A78nO2QaJ
+yqjTOQyCNHaSlmGjdiOvhJ8y1PiazHnuvWBx6z+7JJF2ukqqfjlSARwyfkfnRUIY
+la7ZYEqcc56eoPAiElhvrg==
+-----END CERTIFICATE-----
+"""
 # At most one request a second: a full crawl reads ~36 listing pages and ~360 decisions.
-_http = Http(BASE, {"Accept": "text/html,*/*"}, bucket=TokenBucket(capacity=1, refill_s=1.0))
+_http = Http(BASE, {"Accept": "text/html,*/*"}, bucket=TokenBucket(capacity=1, refill_s=1.0),
+             intermediates=_GLOBALSIGN_GCC_R46_OV_2025)
+# The UYARI line of AL's rule: a source that cannot be read is said so, with the address to check by hand.
+UYARI = "UYARI: veri çekilemedi, teyidiniz gerekli: %s"
+
+
+def _erisilemez(exc: Exception, url: str) -> Dict[str, Any]:
+    """KVKK could not be read: never an empty result list, always the UYARI line and the address."""
+    return {"error": "KVKK kaynağına erişilemedi: %s" % exc, "error_code": "UPSTREAM_UNAVAILABLE",
+            "unavailable": True, "retry": True, "retry_after_s": 60, "source_url": url,
+            "uyari": UYARI % url}
 _LINK = re.compile(r'<a[^>]*href="(?:https://www\.kvkk\.gov\.tr)?(/Icerik/(\d+)/(\d{4}-\d+))"', re.I)
 # The decision itself; what follows it is the sidebar and the footer.
 _ARTICLE = re.compile(r'<div[^>]*class="news__detail-article(?:\s[^"]*)?"[^>]*>', re.I)
@@ -89,7 +142,7 @@ def search(args: Dict[str, Any]) -> Dict[str, Any]:
                     hits.append({**it, "id": "%s/%s" % (it["id"], it["slug"]),
                                  "excerpt": excerpt(it["summary"], q.split()[0] if q else "", 200)})
     except HttpError as exc:
-        return {"error": str(exc)}
+        return _erisilemez(exc, BASE + LIST)
     return {"query": q, "scanned": scanned, "total": len(hits), "results": hits[: int(args.get("limit") or 20)],
             "note": "Canlı tarama son %d liste sayfası (≈%d özet) ile sınırlıdır; tüm arşiv için yerel "
                     "indeks (semantik_ara, kurum='kvkk'). Tam metin: kurum_karari_getir(kurum='kvkk', id=id)." % (max_pages, max_pages * 10)}
@@ -136,15 +189,18 @@ def get(args: Dict[str, Any]) -> Dict[str, Any]:
     try:
         url = _url(ident)
     except HttpError as exc:
-        return {"error": str(exc)}
+        return _erisilemez(exc, BASE + LIST)
     if not url:
         return {"error": "KVKK kararının sayfası bulunamadı (%s). Sayfa adresi karar numarasını da taşır "
                          "(/Icerik/8887/2026-1183): kurum_karari_ara ya da semantik_ara sonucundaki id'yi "
                          "veya adresi verin." % ident}
+    if not _http.allowed(url):
+        # A caller's address outside kvkk.gov.tr is refused, and never echoed as the UYARI link.
+        return {"error": "Yalnız kvkk.gov.tr adresleri açılır.", "error_code": "INVALID_ARGUMENT", "retry": False}
     try:
         html = _http.get_text(url)
     except HttpError as exc:
-        return {"error": str(exc), "source_url": url}
+        return _erisilemez(exc, url)
     doc = _parse(html)
     if doc is None:
         return {"error": "KVKK sayfası karar metni döndürmedi (yanlış adres ya da sayfa yapısı değişti).",
