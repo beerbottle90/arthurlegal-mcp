@@ -992,12 +992,13 @@ def build_directory() -> Tuple[List[Tool], str, List[Resource]]:
     """Tools, instructions and views for DIRECTORY_PATH. Call after build()."""
     # al_masaya_yaz and al_masada_basla stay off the directory: they tell Claude where to write, and
     # the directory takes no instructions. There the desk keeps the answer in the chat and the tools
-    # keep their own cards (article, decision list); copies, because Tool has __slots__.
+    # keep their own cards (article, decision list); copies, because Tool has __slots__. al_dosya builds
+    # a file handed over with al_masaya_yaz, so it has nothing to do here either.
     kart = getattr(al_arayuz, "kart_meta", None) if al_arayuz is not None else None
     tools = [Tool(t.name, t.description, t.input_schema, _directory_handler(t.name, t.handler),
                   meta=kart(t.name) if kart else t.meta, title=t.title, annotations=t.annotations)
              for t in _tools
-             if t.name not in ("status", "al_masasi", "al_masaya_yaz", "al_masada_basla")
+             if t.name not in ("status", "al_masasi", "al_masaya_yaz", "al_masada_basla", "al_dosya")
              and not _directory_excluded(t.name)]
     main_status = next(t for t in _tools if t.name == "status")
     status = Tool(
@@ -1069,8 +1070,10 @@ def _openai_handler(name: str, handler: Callable[[Dict[str, Any]], Any]) -> Call
 
 def build_openai() -> Tuple[List[Tool], str, List[Resource]]:
     """Tools, instructions and views for OPENAI_PATH. Call after build()."""
+    # The copies carry no view: in ChatGPT only the desk and the hand-over open it. al_dosya keeps its own meta,
+    # which hides it from the model and leaves it to the desk (ChatGPT reads _meta.ui.visibility).
     tools = [Tool(t.name, t.description, _openai_schema(t.name, t.input_schema), _openai_handler(t.name, t.handler),
-                  title=t.title, annotations=t.annotations)
+                  meta=t.meta if t.name == "al_dosya" else None, title=t.title, annotations=t.annotations)
              for t in _tools
              if t.name not in ("status", "al_masasi", "al_masaya_yaz", "al_masada_basla")
              and t.name not in OPENAI_EXCLUDED_TOOLS]
@@ -1082,7 +1085,8 @@ def build_openai() -> Tuple[List[Tool], str, List[Resource]]:
     views: List[Resource] = []
     web = getattr(al_arayuz, "CHATGPT_WEB", None) if al_arayuz is not None else None
     if web is not None and any(t.name == "al_masasi" for t in _tools):
-        able = [t.name for t in tools if t.name in MASA_TOOLS] + ["al_masaya_yaz", "al_masada_basla"]
+        able = ([t.name for t in tools if t.name in MASA_TOOLS] + ["al_masaya_yaz", "al_masada_basla"]
+                + [t.name for t in tools if t.name == "al_dosya"])
 
         def desk_state(args: Dict[str, Any]) -> Dict[str, Any]:
             return al_arayuz.masa_cevabi("uzak", able, OPENAI_MODULES, args.get("bolum"), args.get("baglayicilar"),

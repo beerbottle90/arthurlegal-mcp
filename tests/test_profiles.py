@@ -61,10 +61,12 @@ class DirectoryProfile(unittest.TestCase):
         self.assertIn("tr_mevzuat_madde_getir", names)
         main = {t.name for t in server._tools}
         # al_masaya_yaz and al_masada_basla tell Claude where to write; the directory takes no instructions.
+        # al_dosya builds a file handed over with al_masaya_yaz: nothing to build here (3.5.0).
         # tr_resmi_gazete_ek_sayfa answers with a page image and stays on /mcp.
         self.assertIn("tr_resmi_gazete_ek_sayfa", main)
         self.assertEqual(names, {n for n in main if not n.startswith(("tkgm_", "hesap_"))
-                                 and n not in ("al_masaya_yaz", "al_masada_basla", "tr_resmi_gazete_ek_sayfa")})
+                                 and n not in ("al_masaya_yaz", "al_masada_basla", "al_dosya",
+                                               "tr_resmi_gazete_ek_sayfa")})
 
     def test_fee_cards_on_main_and_on_its_desk(self):
         main = {t.name: t for t in server._tools}
@@ -325,6 +327,12 @@ class OpenAIProfile(unittest.TestCase):
         self.assertNotIn("uzakta_kal", desk.input_schema["properties"])
         state = desk.handler({})
         self.assertEqual(state["ev"], "chatgpt")
+        # Files on the desk (3.5.0): the helper is for the desk only, as on /mcp, and builds without storing.
+        if "al_dosya" in {t.name for t in server._tools}:
+            dosya = next(t for t in OPENAI_TOOLS if t.name == "al_dosya")
+            self.assertEqual(dosya.meta, {"ui": {"visibility": ["app"]}})
+            self.assertEqual(dosya.input_schema["properties"]["islem"]["enum"], ["uret"])
+            self.assertIn("al_dosya", state["yetenekler"])
         self.assertNotIn("yonlendir", state)
         for view in OPENAI_VIEWS:
             self.assertEqual(view.meta["ui"]["domain"], server.OPENAI_DOMAIN)
