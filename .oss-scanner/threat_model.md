@@ -65,7 +65,6 @@ locations, `EMBEDDINGS_API_KEY` (Voyage), and the Fly organisation's private net
 - `eu_sparql` is a deliberate passthrough to the EU Publications Office endpoint; report only escapes from it.
 - TLS is verified for every upstream. `HTTP_TLS_FALLBACK=1` (unset in deployment) lets an operator fall back to
   unverified TLS for a source's own domain while its certificate is broken; report only paths that disable it
-  without that setting. A client given its own intermediates (`Http(intermediates=…)`, today only KVKK) never
-  takes that fallback: report any path where it does.
+  without that setting.
 - SQL in `retrieval.py` and `_where` inserts fixed column names, not input; XML from government sites parsed with
   ElementTree is expected.
