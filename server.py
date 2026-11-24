@@ -1100,7 +1100,9 @@ def build_openai() -> Tuple[List[Tool], str, List[Resource]]:
                 return al_arayuz.teslim_cevabi(args, desk_state({}))
             except al_arayuz.TeslimHatasi as exc:
                 raise McpError(str(exc)) from None
-        tanim = al_arayuz.teslim_araci()
+        # 24.11.2026 kullanıcı kararı ("Şimdi ChatGPT'ye de ekle"): Claude'daki uzak uç gibi ChatGPT'de de bu iki araç
+        # bilgisayardaki ArthurLegal'in (arthurlegal-yerel) aynı adlı aracını önce kullandırır.
+        tanim = al_arayuz.teslim_araci("uzak")
         tools.append(Tool(tanim["name"], tanim["description"], tanim["inputSchema"], hand_over,
                           meta=al_arayuz.arac_meta("al_masaya_yaz", web)))
 
@@ -1109,7 +1111,7 @@ def build_openai() -> Tuple[List[Tool], str, List[Resource]]:
                 return al_arayuz.baslangic_cevabi(args, desk_state({}))
             except al_arayuz.TeslimHatasi as exc:
                 raise McpError(str(exc)) from None
-        tanim = al_arayuz.baslangic_araci()
+        tanim = al_arayuz.baslangic_araci("uzak")
         tanim["inputSchema"]["properties"].pop("model", None)   # ChatGPT models are not measured (K7)
         tools.append(Tool(tanim["name"], tanim["description"], tanim["inputSchema"], start,
                           meta=al_arayuz.arac_meta("al_masada_basla", web)))
