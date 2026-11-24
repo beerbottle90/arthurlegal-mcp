@@ -788,6 +788,10 @@ def _akis(ad):
         return fh.read()
 
 
+# OSS Scanner imajında .github yoktur (.dockerignore): iş akışı dosyaları orada okunamaz, testler.yml'de depoda denetlenir.
+# 18.11'den beri bu sınıf imajda düşüyordu; imaj iş akışı ana dalda o günden beri hiç koşmamıştı (24.11.2026).
+@unittest.skipUnless(os.path.isdir(os.path.join(KOK, ".github", "workflows")),
+                     "imajda .github yok (.dockerignore); iş akışları depoda denetlenir")
 class IsAkislari(unittest.TestCase):
     ADLAR = ("mevzuat-bekcisi.yml", "model-bekcisi.yml")
 
