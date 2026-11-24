@@ -315,6 +315,14 @@ class OpenAIProfile(unittest.TestCase):
         for tool in OPENAI_TOOLS:
             self.assertNotIn("Claude", json.dumps(tool.public(), ensure_ascii=False), tool.name)
 
+    def test_desk_tools_prefer_the_local_install(self):
+        # 24.11.2026 (kullanıcı: "Şimdi ChatGPT'ye de ekle"): Claude'daki uzak uç gibi ChatGPT'de de.
+        if server.al_arayuz is None:
+            self.skipTest("arayuz/ missing")
+        for name in ("al_masada_basla", "al_masaya_yaz"):
+            tool = next(t for t in OPENAI_TOOLS if t.name == name)
+            self.assertIn("arthurlegal-yerel", tool.description, name)
+
     def test_only_the_desk_and_the_hand_over_carry_the_view(self):
         if server.al_arayuz is None:
             self.skipTest("arayuz/ missing")
