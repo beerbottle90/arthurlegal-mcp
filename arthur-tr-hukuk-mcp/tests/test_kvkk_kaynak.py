@@ -14,10 +14,13 @@ sertifikayı yalnız kendi deposuna ekler (net.chain_context). Bu testler şunla
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import ssl
+import subprocess
 import sys
 import unittest
+import urllib.error
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -70,6 +73,100 @@ class AraSertifika(unittest.TestCase):
         if hasattr(ssl, "VERIFY_X509_PARTIAL_CHAIN"):
             self.assertFalse(ctx.verify_flags & ssl.VERIFY_X509_PARTIAL_CHAIN)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+
+def _dogrulanamadi(*_a, **_k):
+    raise urllib.error.URLError(ssl.SSLCertVerificationError(
+        1, "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate"))
+
+
+class TlsYedegi(unittest.TestCase):
+    """HTTP_TLS_FALLBACK=1 açık olsa da ara sertifikalı KVKK istemcisi doğrulamasız bağlantıya düşmez (QA G1)."""
+
+    def setUp(self):
+        self._eski = net.TLS_FALLBACK
+        net.TLS_FALLBACK = True
+
+    def tearDown(self):
+        net.TLS_FALLBACK = self._eski
+
+    def test_kvkk_istemcisi_dogrulamali_kalir_ve_uyari_doner(self):
+        ctx = kvkk._http.ssl_context
+        with mock.patch.object(kvkk._http.opener, "open", _dogrulanamadi):
+            with mock.patch.object(Http, "_degrade_tls", side_effect=AssertionError("yedek yola girildi")):
+                out = kvkk.search({"query": "veri"})
+        self.assertTrue(kvkk._http.verify)
+        self.assertIs(kvkk._http.ssl_context, ctx)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(ctx.check_hostname)
+        self.assertTrue(out["unavailable"])
+        self.assertIn("TLS certificate", out["error"])
+        self.assertTrue(out["uyari"].startswith("UYARI: veri çekilemedi, teyidiniz gerekli: https://www.kvkk.gov.tr/"))
+
+    def test_dogrudan_cagrilsa_da_dusurmez(self):
+        h = Http("https://www.kvkk.gov.tr", intermediates=kvkk._GLOBALSIGN_GCC_R46_OV_2025)
+        with self.assertRaises(HttpError):
+            h._degrade_tls("https://www.kvkk.gov.tr/")
+        self.assertTrue(h.verify)
+        self.assertEqual(h.ssl_context.verify_mode, ssl.CERT_REQUIRED)
+
+    def test_ara_sertifikasiz_istemcide_kacis_kapisi_aynen_durur(self):
+        # Karşı deneme: operatörün kaçış kapısı öteki kaynaklarda değişmedi.
+        h = Http("https://www.bddk.org.tr")
+        cagri = []
+        with mock.patch.object(h.opener, "open", _dogrulanamadi), \
+                mock.patch.object(Http, "_degrade_tls", lambda self, url: (cagri.append(url),
+                                                                           setattr(self, "opener", _Bos()))):
+            h.get("/x")
+        self.assertEqual(len(cagri), 1)
+
+    def test_ortam_degiskeniyle_ayri_surecte(self):
+        # Ortam değişkeni net.py yüklenirken okunur; gerçek ayarı görmek için temiz bir süreç.
+        betik = (
+            "import json, ssl, sys, urllib.error\n"
+            "sys.path.insert(0, %r)\n"
+            "import net\n"
+            "from sources import kvkk\n"
+            "def hata(*a, **k):\n"
+            "    raise urllib.error.URLError(ssl.SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] x'))\n"
+            "kvkk._http.opener.open = hata\n"
+            "out = kvkk.search({'query': 'veri'})\n"
+            "print(json.dumps({'yedek': net.TLS_FALLBACK, 'verify': kvkk._http.verify,\n"
+            "                  'mod': int(kvkk._http.ssl_context.verify_mode), 'ad': kvkk._http.ssl_context.check_hostname,\n"
+            "                  'unavailable': out.get('unavailable'), 'uyari': out.get('uyari', '')}))\n"
+        ) % os.path.dirname(HERE)
+        ortam = dict(os.environ, HTTP_TLS_FALLBACK="1", PYTHONIOENCODING="utf-8")
+        cikti = subprocess.run([sys.executable, "-c", betik], capture_output=True, text=True, encoding="utf-8",
+                               env=ortam, timeout=120, check=True).stdout
+        sonuc = json.loads(cikti.strip().splitlines()[-1])
+        self.assertTrue(sonuc["yedek"])
+        self.assertTrue(sonuc["verify"])
+        self.assertEqual(sonuc["mod"], int(ssl.CERT_REQUIRED))
+        self.assertTrue(sonuc["ad"])
+        self.assertTrue(sonuc["unavailable"])
+        self.assertTrue(sonuc["uyari"].startswith("UYARI: veri çekilemedi, teyidiniz gerekli: "))
+
+
+class _Bos:
+    def open(self, req, timeout=None):
+        return _Yanit()
+
+
+class _Yanit:
+    status = 200
+    headers = {}
+
+    def read(self, n=-1):
+        return b""
+
+    def geturl(self):
+        return "https://www.bddk.org.tr/x"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
 
 
 class Erisilemez(unittest.TestCase):

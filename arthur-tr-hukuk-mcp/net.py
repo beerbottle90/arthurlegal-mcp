@@ -167,6 +167,7 @@ class Http:
     chain building aid: verification stays on, the hostname is still checked and the
     chain must still end at a root of the system store (partial chains are refused,
     so the intermediate is never a trust anchor by itself). Other clients never see it.
+    Such a client is excluded from HTTP_TLS_FALLBACK: a failed chain stays an error.
     """
 
     def __init__(self, base_url: str = "", headers: Optional[Dict[str, str]] = None,
@@ -212,6 +213,8 @@ class Http:
         handlers.append(self._redirect_handler(follow_redirects))
         self.opener = urllib.request.build_opener(*handlers)
         self.verify = verify
+        # A client given its own intermediates never takes the HTTP_TLS_FALLBACK path (see request()).
+        self.pinned_chain = bool(intermediates)
         self._ciphers = ciphers
         self._follow = follow_redirects
 
@@ -236,6 +239,9 @@ class Http:
         return _Redirect()
 
     def _degrade_tls(self, url: str) -> None:
+        if self.pinned_chain:
+            # Defence in depth: request() never comes here for such a client.
+            raise HttpError(0, url, b"TLS certificate of this upstream could not be verified")
         import sys
         sys.stderr.write("net: TLS chain for %s not verifiable with the local CA store; "
                          "continuing unverified for this upstream\n" % urllib.parse.urlsplit(url).netloc)
@@ -306,9 +312,11 @@ class Http:
                 raise HttpError(exc.code, url, body, rh) from None
             except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
                 # A verification failure is reported, not retried unverified: the caller sees an upstream
-                # error (unavailable, never "no results"). TLS_FALLBACK is the operator's escape hatch.
+                # error (unavailable, never "no results"). TLS_FALLBACK is the operator's escape hatch; it never
+                # applies to a client with its own intermediates: that client fails verified (the caller writes
+                # the UYARI line) instead of dropping to an unverified connection.
                 if "CERTIFICATE_VERIFY_FAILED" in str(exc):
-                    if TLS_FALLBACK and self.verify:
+                    if TLS_FALLBACK and self.verify and not self.pinned_chain:
                         self._degrade_tls(url)
                         continue
                     raise HttpError(0, url, b"TLS certificate of this upstream could not be verified") from None
