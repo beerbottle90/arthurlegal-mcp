@@ -309,6 +309,19 @@ class OpenAIProfile(unittest.TestCase):
         self.assertIn("tr_mevzuat_madde_getir", head)
         self.assertIn("UYARI: veri çekilemedi", head)
 
+    def test_desk_first_call_rule_on_every_profile_with_the_desk(self):
+        # T007: the first call rule is one sentence; English on the OpenAI header, Turkish everywhere else.
+        if server.al_arayuz is None or not hasattr(server.al_arayuz, "ILK_ARAC_KURALI"):
+            self.skipTest("arayuz/ missing or older")
+        a = server.al_arayuz
+        self.assertIn(a.ILK_ARAC_KURALI_EN, OPENAI_TEXT)
+        self.assertNotIn("<ILK_ARAC>", OPENAI_TEXT)
+        self.assertNotIn("answer every later question this way", OPENAI_TEXT)
+        self.assertIn(a.ILK_ARAC_KURALI, MAIN_TEXT)
+        start = {t.name: t for t in OPENAI_TOOLS}["al_masada_basla"]
+        self.assertIn(a.ILK_ARAC_KURALI, start.public()["description"])
+        self.assertNotIn(a.ILK_ARAC_KURALI, DIRECTORY_TEXT)
+
     def test_host_neutral_text(self):
         self.assertNotIn("Claude", OPENAI_TEXT)
         self.assertNotIn("MODEL.", OPENAI_TEXT)
