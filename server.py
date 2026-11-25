@@ -939,7 +939,9 @@ if al_arayuz is not None and getattr(al_arayuz, "TESLIM_KURALI", None):
     # The model rule follows it, still inside the part every host shows: the server cannot switch the model or
     # the effort, so a chat running on a model that fell short in the measurements says so once.
     _model = ("\n\n" + al_arayuz.model_kurali()) if hasattr(al_arayuz, "model_kurali") else ""
-    INSTRUCTIONS_HEADER = _head + "\n\n" + al_arayuz.TESLIM_KURALI + _model + _sep + _rest
+    # T007 r3: the remote wording names only tools this endpoint has (no arthurlegal_talimat, no memory tools).
+    _kural = getattr(al_arayuz, "TESLIM_KURALI_UZAK", None) or al_arayuz.TESLIM_KURALI
+    INSTRUCTIONS_HEADER = _head + "\n\n" + _kural + _model + _sep + _rest
 
 
 # Directory profile header: describes what the tools return, in English, without the
