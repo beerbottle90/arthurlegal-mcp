@@ -939,7 +939,9 @@ if al_arayuz is not None and getattr(al_arayuz, "TESLIM_KURALI", None):
     # The model rule follows it, still inside the part every host shows: the server cannot switch the model or
     # the effort, so a chat running on a model that fell short in the measurements says so once.
     _model = ("\n\n" + al_arayuz.model_kurali()) if hasattr(al_arayuz, "model_kurali") else ""
-    INSTRUCTIONS_HEADER = _head + "\n\n" + al_arayuz.TESLIM_KURALI + _model + _sep + _rest
+    # T007 r3: the remote wording names only tools this endpoint has (no arthurlegal_talimat, no memory tools).
+    _kural = getattr(al_arayuz, "TESLIM_KURALI_UZAK", None) or al_arayuz.TESLIM_KURALI
+    INSTRUCTIONS_HEADER = _head + "\n\n" + _kural + _model + _sep + _rest
 
 
 # Directory profile header: describes what the tools return, in English, without the
@@ -1030,7 +1032,7 @@ def build_directory() -> Tuple[List[Tool], str, List[Resource]]:
 # neutral: no client name, no model advice (ChatGPT models are not measured yet).
 OPENAI_INSTRUCTIONS_HEADER = """ArthurLegal: legal research for lawyers in Türkiye, twelve jurisdictions behind one endpoint. If the user says "ArthurLegal Masası'nı aç", "masayı aç" or names a desk module, call al_masasi. Before writing any Turkish statutory article, fetch it with tr_mevzuat_madde_getir and quote its `citation` verbatim; never cite from memory. If a source cannot be reached, write "UYARI: veri çekilemedi, teyidiniz gerekli: <official source URL>" and do not fill the gap.
 
-DESK. Once al_masasi has opened the desk in this chat, answer every later question this way: call al_masada_basla with the question, research, then deliver the full answer with al_masaya_yaz; then write a two or three sentence summary in the chat and say the full answer is on the desk (if al_masaya_yaz fails, write the full answer in the chat). The desk checks the article citations of the answer against the official text itself. If the user asks for a file (Word, Excel, CSV), put its content in the dosyalar field of al_masaya_yaz: the desk offers it for download; do not also build it with code execution.
+DESK. <ILK_ARAC> Then research and deliver the full answer with al_masaya_yaz; then write a two or three sentence summary in the chat and say the full answer is on the desk (if al_masaya_yaz fails, write the full answer in the chat). The desk checks the article citations of the answer against the official text itself. If the user asks for a file (Word, Excel, CSV), put its content in the dosyalar field of al_masaya_yaz: the desk offers it for download; do not also build it with code execution.
 
 TOOL PREFIXES. Each tool name starts with the jurisdiction or source it answers for:
 `tr_` Türkiye (case law, legislation, Constitutional Court, Official Gazette, eight regulators, a local semantic archive) · `nl_` Netherlands · `pl_` Poland · `at_` Austria · `ie_` Ireland · `fi_` Finland · `es_` Spain · `uk_` United Kingdom · `eu_` EU law (CELLAR) · `jp_` Japan · `az_` Azerbaijan · `de_` Germany · `gleif_` legal-entity identity (LEI) · `scholar_` open-access legal scholarship · `contracts_` petroleum and mining contracts · `tkgm_` Turkish land registry (parcel by province, district, neighbourhood, block and parcel; the first live call returns a consent card) · `hesap_` Turkish fee and interest calculators (the code computes; quote the freshness line as returned).
@@ -1041,6 +1043,11 @@ UNAVAILABLE SOURCES. An error (`error`, `error_code`) or a result marked `unavai
 ENTRY POINTS. `tr_hukuk_arastirma_rehberi` maps Turkish research questions to the right tools; `tr_kurum_listesi` lists the regulators and their filters.
 
 Each section below describes one jurisdiction's sources and citation conventions."""
+# T007 (25.11.2026): the first call rule is one sentence everywhere; its English form lives in arayuz/al_arayuz.py
+# (copied from arthurlegal-app4all, tested there). Without arayuz/ the profile keeps a plain fallback.
+OPENAI_INSTRUCTIONS_HEADER = OPENAI_INSTRUCTIONS_HEADER.replace("<ILK_ARAC>", getattr(
+    al_arayuz, "ILK_ARAC_KURALI_EN", None) or ("Once al_masasi has opened the desk in this chat, al_masada_basla is "
+                                               "your first tool call on every user message."))
 
 OPENAI_MODULES = dict(REMOTE_MODULES)
 

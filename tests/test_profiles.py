@@ -98,7 +98,7 @@ class DirectoryProfile(unittest.TestCase):
     def test_hand_over_rule_near_the_top_of_main_only(self):
         if server.al_arayuz is None:
             self.skipTest("arayuz/ missing")
-        kural = server.al_arayuz.TESLIM_KURALI
+        kural = getattr(server.al_arayuz, "TESLIM_KURALI_UZAK", None) or server.al_arayuz.TESLIM_KURALI
         # A host may show only the beginning of long instructions.
         self.assertLess(MAIN_TEXT.index(kural) + len(kural), 2048)
         self.assertNotIn("al_masada_basla", DIRECTORY_TEXT)
@@ -308,6 +308,45 @@ class OpenAIProfile(unittest.TestCase):
         self.assertIn("ArthurLegal Masası'nı aç", head)
         self.assertIn("tr_mevzuat_madde_getir", head)
         self.assertIn("UYARI: veri çekilemedi", head)
+
+    def test_desk_first_call_rule_on_every_profile_with_the_desk(self):
+        # T007: the first call rule is one sentence; English on the OpenAI header, Turkish everywhere else.
+        if server.al_arayuz is None or not hasattr(server.al_arayuz, "ILK_ARAC_KURALI"):
+            self.skipTest("arayuz/ missing or older")
+        a = server.al_arayuz
+        self.assertIn(a.ILK_ARAC_KURALI_EN, OPENAI_TEXT)
+        self.assertNotIn("<ILK_ARAC>", OPENAI_TEXT)
+        self.assertNotIn("answer every later question this way", OPENAI_TEXT)
+        # T007 r3: the remote end carries the remote wording (no local only tool names), not the local one.
+        self.assertIn(a.ILK_ARAC_KURALI_UZAK, MAIN_TEXT)
+        self.assertNotIn(a.ILK_ARAC_KURALI, MAIN_TEXT)
+        start = {t.name: t for t in OPENAI_TOOLS}["al_masada_basla"]
+        self.assertIn(a.ILK_ARAC_KURALI_UZAK, start.public()["description"])
+        self.assertNotIn(a.ILK_ARAC_KURALI_UZAK, DIRECTORY_TEXT)
+
+    def test_remote_texts_name_only_remote_tools(self):
+        # T007 r3 (code QA r1): every al_, hafiza_ or arthurlegal_ name in what a model reads on /mcp and /openai/mcp
+        # (instructions, tool descriptions and schemas, desk result notes) is a tool of that endpoint.
+        if server.al_arayuz is None or not hasattr(server.al_arayuz, "ILK_ARAC_KURALI_UZAK"):
+            self.skipTest("arayuz/ missing or older")
+        import re
+        pattern = re.compile(r"\b(?:al|hafiza|arthurlegal)_[a-z_]+")
+        for profile, tools, text in (("/mcp", server._tools, MAIN_TEXT), ("/openai/mcp", OPENAI_TOOLS, OPENAI_TEXT)):
+            names = {t.name for t in tools}
+            by_name = {t.name: t for t in tools}
+            texts = {"instructions": text}
+            texts.update({t.name: json.dumps(t.public(), ensure_ascii=False) for t in tools if t.name.startswith("al_")})
+            if "al_masada_basla" in by_name:
+                question = {"soru": "s", "sorular": [{"soru": "Hangi proje?", "secenekler": ["A", "B"]}]}
+                texts["start note"] = json.dumps(by_name["al_masada_basla"].handler({"soru": "s"}), ensure_ascii=False)
+                texts["start note with questions"] = json.dumps(by_name["al_masada_basla"].handler(question),
+                                                                ensure_ascii=False)
+            if "al_masasi" in by_name:
+                texts["desk note"] = json.dumps(by_name["al_masasi"].handler({"uzakta_kal": True, "baglayicilar": []}),
+                                                ensure_ascii=False)
+            for where, body in texts.items():
+                for name in set(pattern.findall(body)):
+                    self.assertIn(name, names, f"{profile} {where}: {name}")
 
     def test_host_neutral_text(self):
         self.assertNotIn("Claude", OPENAI_TEXT)
